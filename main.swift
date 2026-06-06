@@ -81,7 +81,7 @@ struct ProviderStatus {
 
 // MARK: - Helpers
 
-let HOME = FileManager.default.homeDirectoryForCurrentUser.path
+let HOME = ProcessInfo.processInfo.environment["HOME"] ?? FileManager.default.homeDirectoryForCurrentUser.path
 func nowEpoch() -> Double { Date().timeIntervalSince1970 }
 func floorToHour(_ ep: Double) -> Double { ep - ep.truncatingRemainder(dividingBy: 3600) }
 

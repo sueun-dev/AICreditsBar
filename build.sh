@@ -5,6 +5,12 @@ HERE="$(cd "$(dirname "$0")" && pwd)"
 APP="$HERE/AICreditsBar.app"
 CONTENTS="$APP/Contents"
 
+if ! command -v swiftc >/dev/null 2>&1; then
+  echo "error: 'swiftc' not found — install Xcode Command Line Tools first:" >&2
+  echo "       xcode-select --install" >&2
+  exit 1
+fi
+
 rm -rf "$APP"
 mkdir -p "$CONTENTS/MacOS" "$CONTENTS/Resources"
 
