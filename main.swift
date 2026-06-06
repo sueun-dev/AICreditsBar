@@ -180,7 +180,7 @@ func readCodex() -> ProviderStatus {
     let base = (HOME as NSString).appendingPathComponent(".codex/sessions")
     guard FileManager.default.fileExists(atPath: base) else { st.problem = "not installed (~/.codex/sessions absent)"; return st }
     let files = Array(filesByMtime(under: base, suffix: ".jsonl").prefix(20))
-    var bestEpoch = -1.0
+    var bestEpoch = -Double.infinity   // so a record even without a parseable timestamp is still usable
     var best: [String: Any]? = nil
     for f in files {
         for line in tailLines(f.path, must: "\"rate_limits\"") {     // tail-read so huge append-only files aren't skipped
@@ -229,7 +229,9 @@ let claudeCache = EventCache()
 
 func parseClaudeFile(_ path: String) -> [(Double, Double, String)] {   // (epoch, totalTokens, dedupKey)
     var out: [(Double, Double, String)] = []
-    for line in grepLines(path, must: "\"usage\"") {
+    // tailLines (not grepLines) so an enormous single session file isn't dropped whole —
+    // that would wrongly show "100% / idle". Claude jsonl is append-only; freshest events at EOF.
+    for line in tailLines(path, must: "\"usage\"", maxBytes: 256_000_000) {
         guard line.contains("\"assistant\"") else { continue }      // cheap reject before JSON parse
         guard let data = line.data(using: .utf8),
               let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any],

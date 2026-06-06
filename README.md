@@ -23,14 +23,19 @@ left for **Codex**, **Claude**, and **Gemini** — and flags when a window has r
 > Numbers update only when that CLI actually makes a request, so a snapshot can be a few
 > minutes old (shown as "snapshot Nm ago"). Stale Codex windows are greyed instead of shown as confident green.
 
+## Requirements
+
+- **macOS 11+** (Intel or Apple Silicon — you build a native binary on your own Mac).
+- **Xcode Command Line Tools** (provides `swiftc`). If missing: `xcode-select --install`.
+
 ## Build & run
 
 ```bash
-bash build.sh          # compiles main.swift → AICreditsBar.app (needs Xcode CLT: swiftc)
+bash build.sh          # compiles main.swift → AICreditsBar.app
 open AICreditsBar.app  # launches the menu-bar agent (no Dock icon)
 ```
 
-Quit from the menu (**Quit AICreditsBar**) or `pkill -f aicreditsbar`. Print values as text without the GUI:
+Quit from the menu (**Quit AICreditsBar**) or `pkill -x aicreditsbar`. Print values as text without the GUI:
 
 ```bash
 ./AICreditsBar.app/Contents/MacOS/aicreditsbar --once
@@ -56,13 +61,15 @@ Because Claude has no official % on disk, the cleanest accurate fix is a one-tim
 The app back-computes your token budgets from the current usage so the displayed % matches
 reality, then tracks proportionally as you spend tokens. Re-calibrate occasionally if it drifts.
 
-You can also calibrate from the command line (then it restarts cleanly on next launch):
+The in-app **Settings → Calibrate** updates the running app live. You can also calibrate from
+the command line, but then you must restart the app for it to take effect:
 
 ```bash
 BIN=./AICreditsBar.app/Contents/MacOS/aicreditsbar
 $BIN --set-week-used 52   # /usage says 52% of the weekly limit used → weekly shows 48% left
 $BIN --set-5h-used 80     # /usage says 80% of the 5-hour limit used → 5h shows 20% left
-# if it's already running: launchctl kickstart -k "gui/$(id -u)/com.sueun.aicreditsbar"
+# then restart so it reloads: quit from the menu (or `pkill -x aicreditsbar`) and `open AICreditsBar.app`
+# (or, if you installed the login item: launchctl kickstart -k "gui/$(id -u)/com.sueun.aicreditsbar")
 ```
 
 ## Start at login (optional)
