@@ -599,6 +599,27 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
 // MARK: - Entry
 
+// CLI calibration: `--set-week-used 52` / `--set-5h-used 80` — derive the Claude budget
+// from the app's own token sums so the window shows (100 - used)% to match `/usage`.
+func argValue(_ flag: String) -> Double? {
+    guard let i = CommandLine.arguments.firstIndex(of: flag), i + 1 < CommandLine.arguments.count else { return nil }
+    return Double(CommandLine.arguments[i + 1])
+}
+if let pct = argValue("--set-week-used") {
+    let sums = claudeCalibrationSums()
+    guard pct > 0, pct <= 100, sums.week > 0 else { print("need 0<pct<=100 and some Claude usage (7d tokens=\(tokLabel(sums.week)))"); exit(1) }
+    Cfg.claudeWeekBudget = sums.week / (pct / 100); Cfg.d.synchronize()
+    print("Claude weekly calibrated: 7d=\(tokLabel(sums.week)) tok @ \(Int(pct))% used → budget \(tokLabel(Cfg.claudeWeekBudget)), shows \(100 - Int(pct))% left")
+    exit(0)
+}
+if let pct = argValue("--set-5h-used") {
+    let sums = claudeCalibrationSums()
+    guard pct > 0, pct <= 100, sums.five > 0 else { print("need 0<pct<=100 and an active Claude 5h block (5h tokens=\(tokLabel(sums.five)))"); exit(1) }
+    Cfg.claudePlan = "Custom"; Cfg.claude5hBudget = sums.five / (pct / 100); Cfg.d.synchronize()
+    print("Claude 5h calibrated: 5h=\(tokLabel(sums.five)) tok @ \(Int(pct))% used → budget \(tokLabel(Cfg.claude5hBudget)), shows \(100 - Int(pct))% left")
+    exit(0)
+}
+
 if CommandLine.arguments.contains("--once") || CommandLine.arguments.contains("--dump-config") {
     if CommandLine.arguments.contains("--dump-config") {
         print("displayMode=\(Cfg.displayMode) labels=\(Cfg.showLabels) refresh=\(Int(Cfg.refreshInterval))s")
