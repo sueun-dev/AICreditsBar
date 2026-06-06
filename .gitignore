@@ -1,0 +1,11 @@
+# Build output (rebuild with `bash build.sh`)
+AICreditsBar.app/
+aicb_test
+*.dSYM/
+
+# macOS
+.DS_Store
+
+# Python
+__pycache__/
+*.pyc
