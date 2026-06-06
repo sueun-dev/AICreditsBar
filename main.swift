@@ -643,6 +643,12 @@ if CommandLine.arguments.contains("--once") || CommandLine.arguments.contains("-
     exit(0)
 }
 
+// Single-instance: if another copy is already in the menu bar, bow out quietly
+// (prevents duplicate icons when launched via both `open` and the login item).
+let myPid = ProcessInfo.processInfo.processIdentifier
+if NSRunningApplication.runningApplications(withBundleIdentifier: Bundle.main.bundleIdentifier ?? "com.sueun.aicreditsbar")
+    .contains(where: { $0.processIdentifier != myPid }) { exit(0) }
+
 let app = NSApplication.shared
 app.setActivationPolicy(.accessory)
 let delegate = AppDelegate()
