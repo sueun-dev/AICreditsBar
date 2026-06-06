@@ -15,7 +15,10 @@ rm -rf "$APP"
 mkdir -p "$CONTENTS/MacOS" "$CONTENTS/Resources"
 
 echo "compiling…"
-/usr/bin/swiftc -swift-version 5 -O \
+# Build native arch for this machine, but pin a low min-OS floor (macOS 11, 2020)
+# so the binary is portable and the compiler flags any too-new API at build time.
+ARCH="$(uname -m)"
+/usr/bin/swiftc -swift-version 5 -O -target "${ARCH}-apple-macos11" \
   -o "$CONTENTS/MacOS/aicreditsbar" "$HERE/main.swift"
 
 cat > "$CONTENTS/Info.plist" <<'PLIST'
@@ -30,13 +33,14 @@ cat > "$CONTENTS/Info.plist" <<'PLIST'
     <key>CFBundleVersion</key>            <string>1</string>
     <key>CFBundleShortVersionString</key> <string>1.0</string>
     <key>CFBundlePackageType</key>        <string>APPL</string>
+    <key>LSMinimumSystemVersion</key>     <string>11.0</string>
     <key>LSUIElement</key>                <true/>
     <key>NSHighResolutionCapable</key>    <true/>
 </dict>
 </plist>
 PLIST
 
-# Ad-hoc sign so it launches cleanly when moved/quarantined.
-codesign --force --sign - "$APP" 2>/dev/null || true
+# Ad-hoc sign so it launches cleanly. Surface real failures instead of hiding them.
+codesign --force --sign - "$APP" || echo "warning: ad-hoc codesign failed (app still runs locally)" >&2
 
 echo "Built $APP"
