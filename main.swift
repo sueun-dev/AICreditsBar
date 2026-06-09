@@ -618,12 +618,12 @@ final class SettingsWindow: NSObject, NSWindowDelegate, NSTextFieldDelegate {
         return h
     }
     private func num(_ f: NSTextField, _ w: CGFloat = 90) { f.delegate = self; f.target = self; f.action = #selector(changed(_:)); f.widthAnchor.constraint(equalToConstant: w).isActive = true }
-    private func well(_ w: NSColorWell) { w.target = self; w.action = #selector(colorChanged(_:)); w.widthAnchor.constraint(equalToConstant: 44).isActive = true; w.heightAnchor.constraint(equalToConstant: 24).isActive = true }
+    private func well(_ w: NSColorWell) { w.target = self; w.action = #selector(colorChanged(_:)); w.widthAnchor.constraint(equalToConstant: 30).isActive = true; w.heightAnchor.constraint(equalToConstant: 20).isActive = true }
 
     private let cardW: CGFloat = 432
 
     func build() {
-        let win = NSWindow(contentRect: NSRect(x: 0, y: 0, width: cardW + 40, height: 812),
+        let win = NSWindow(contentRect: NSRect(x: 0, y: 0, width: cardW + 40, height: 624),
                            styleMask: [.titled, .closable, .fullSizeContentView], backing: .buffered, defer: false)
         win.title = "AICreditsBar"; win.titlebarAppearsTransparent = true; win.isMovableByWindowBackground = true
         win.delegate = self; win.isReleasedWhenClosed = false
@@ -632,26 +632,34 @@ final class SettingsWindow: NSObject, NSWindowDelegate, NSTextFieldDelegate {
         modePopup.addItems(withTitles: ["5-hour window", "Weekly window", "Both (5h/week)", "Lowest"]); modePopup.target = self; modePopup.action = #selector(changed(_:))
         planPopup.addItems(withTitles: ["Pro", "Max 5x", "Max 20x", "Custom"]); planPopup.target = self; planPopup.action = #selector(changed(_:))
         for b in [cCodex, cClaude, cGemini, cLabels] { b.target = self; b.action = #selector(changed(_:)) }
-        for f in [fRefresh, fGreen, fYellow, f5hBudget, fWkBudget] { num(f) }
-        for f in [fReal5h, fRealWk] { f.target = self; f.action = #selector(calibrate); f.widthAnchor.constraint(equalToConstant: 56).isActive = true }
-        calStatus.font = .systemFont(ofSize: 11); calStatus.textColor = .secondaryLabelColor
+        num(fRefresh, 56); num(fGreen, 46); num(fYellow, 46)
         for w in [wHigh, wMid, wLow, wUnknown] { well(w) }
-        func sub(_ s: String) -> NSTextField { let l = NSTextField(labelWithString: s); l.font = .systemFont(ofSize: 11); l.textColor = .secondaryLabelColor; l.lineBreakMode = .byWordWrapping; l.maximumNumberOfLines = 2; l.preferredMaxLayoutWidth = cardW - 32; return l }
+        func sub(_ s: String) -> NSTextField { let l = NSTextField(labelWithString: s); l.font = .systemFont(ofSize: 11); l.textColor = .secondaryLabelColor; l.lineBreakMode = .byWordWrapping; l.maximumNumberOfLines = 3; l.preferredMaxLayoutWidth = cardW - 40; return l }
         func lbtn(_ t: String, _ sel: Selector) -> NSButton { let b = NSButton(title: t, target: self, action: sel); b.controlSize = .small; b.bezelStyle = .rounded; return b }
+        func formGrid(_ pairs: [(String, NSView)]) -> NSGridView {
+            let g = NSGridView(views: pairs.map { p -> [NSView] in
+                let l = NSTextField(labelWithString: p.0); l.font = .systemFont(ofSize: 12); return [l, p.1]
+            })
+            g.rowSpacing = 11; g.columnSpacing = 10
+            g.column(at: 0).xPlacement = .trailing; g.column(at: 1).xPlacement = .leading
+            g.translatesAutoresizingMaskIntoConstraints = false
+            return g
+        }
+        func swatch(_ name: String, _ cw: NSColorWell) -> NSStackView {
+            let l = NSTextField(labelWithString: name); l.font = .systemFont(ofSize: 11); l.setContentCompressionResistancePriority(.required, for: .horizontal)
+            let s = NSStackView(views: [l, cw]); s.orientation = .horizontal; s.spacing = 4; s.alignment = .centerY; return s
+        }
 
-        let providers = NSStackView(views: [cCodex, cClaude, cGemini]); providers.orientation = .horizontal; providers.spacing = 14
-        let thresholds = NSStackView(views: [NSTextField(labelWithString: "green >"), fGreen, NSTextField(labelWithString: "  yellow ≥"), fYellow, NSTextField(labelWithString: "%")])
+        let providers = NSStackView(views: [cCodex, cClaude, cGemini]); providers.orientation = .horizontal; providers.spacing = 16
+        let thresholds = NSStackView(views: [NSTextField(labelWithString: "green >"), fGreen, NSTextField(labelWithString: "yellow ≥"), fYellow, NSTextField(labelWithString: "%")])
         thresholds.orientation = .horizontal; thresholds.spacing = 6; thresholds.alignment = .centerY
-        let colors = NSStackView(views: [NSTextField(labelWithString: "High"), wHigh, NSTextField(labelWithString: "Mid"), wMid, NSTextField(labelWithString: "Low"), wLow, NSTextField(labelWithString: "Unk"), wUnknown])
-        colors.orientation = .horizontal; colors.spacing = 6; colors.alignment = .centerY
-        let calBtn = lbtn("Calibrate", #selector(calibrate))
-        let calRow = NSStackView(views: [NSTextField(labelWithString: "5h used"), fReal5h, NSTextField(labelWithString: "%  weekly"), fRealWk, NSTextField(labelWithString: "%"), calBtn])
-        calRow.orientation = .horizontal; calRow.spacing = 6; calRow.alignment = .centerY
-        let claudeRow = NSStackView(views: [{ let l = NSTextField(labelWithString: "Claude"); l.font = .systemFont(ofSize: 12, weight: .medium); l.widthAnchor.constraint(equalToConstant: 52).isActive = true; return l }(), claudeStatus, NSView(), lbtn("Log in", #selector(loginClaude)), lbtn("Log out", #selector(logoutClaude))])
-        claudeRow.orientation = .horizontal; claudeRow.spacing = 8; claudeRow.alignment = .centerY; claudeRow.distribution = .fill
+        let colors = NSStackView(views: [swatch("High", wHigh), swatch("Mid", wMid), swatch("Low", wLow), swatch("Unk", wUnknown)])
+        colors.orientation = .horizontal; colors.spacing = 12; colors.alignment = .centerY
+        let claudeCtl = NSStackView(views: [claudeStatus, lbtn("Log in", #selector(loginClaude)), lbtn("Log out", #selector(logoutClaude))])
+        claudeCtl.orientation = .horizontal; claudeCtl.spacing = 8; claudeCtl.alignment = .centerY
         codexLoginBtn = lbtn("Log in", #selector(loginCodex)); codexLogoutBtn = lbtn("Log out", #selector(logoutCodex))
-        let codexRow = NSStackView(views: [{ let l = NSTextField(labelWithString: "Codex"); l.font = .systemFont(ofSize: 12, weight: .medium); l.widthAnchor.constraint(equalToConstant: 52).isActive = true; return l }(), codexStatus, NSView(), codexLoginBtn, codexLogoutBtn])
-        codexRow.orientation = .horizontal; codexRow.spacing = 8; codexRow.alignment = .centerY; codexRow.distribution = .fill
+        let codexCtl = NSStackView(views: [codexStatus, codexLoginBtn, codexLogoutBtn])
+        codexCtl.orientation = .horizontal; codexCtl.spacing = 8; codexCtl.alignment = .centerY
 
         // --- glass card builder ---
         func icon(_ name: String) -> NSImageView {
@@ -684,19 +692,17 @@ final class SettingsWindow: NSObject, NSWindowDelegate, NSTextFieldDelegate {
             return container
         }
 
-        let loginCard = card("key.fill", "Accurate login — exact official %", [claudeRow, codexRow,
-            sub("Log in once, in-app, for the EXACT official % — no DevTools. Tokens expire occasionally → just log in again.")])
-        let displayCard = card("slider.horizontal.3", "Menu bar", [row("Show:", modePopup), row("Providers:", providers), cLabels, row("Refresh (s):", fRefresh)])
-        let colorsCard = card("paintpalette.fill", "Appearance", [row("Thresholds:", thresholds), row("Colors:", colors)])
-        let claudeCard = card("chart.bar.fill", "Claude estimate", [row("Plan:", planPopup), row("5h budget (M):", f5hBudget), row("Weekly (M):", fWkBudget), row("Calibrate:", calRow),
-            sub("Used only when you're not logged in above. Calibrate from /usage so the estimate matches reality."), calStatus])
+        let loginCard = card("key.fill", "Accurate login", [formGrid([("Claude", claudeCtl), ("Codex", codexCtl)]),
+            sub("Log in once, in-app, for the exact official % — no DevTools. Tokens expire occasionally → just log in again.")])
+        let displayCard = card("slider.horizontal.3", "Menu bar", [formGrid([("Show", modePopup), ("Providers", providers), ("", cLabels), ("Refresh (s)", fRefresh)])])
+        let colorsCard = card("paintpalette.fill", "Appearance", [formGrid([("Thresholds", thresholds), ("Colors", colors)])])
 
         let resetBtn = NSButton(title: "Reset to defaults", target: self, action: #selector(resetDefaults)); resetBtn.bezelStyle = .rounded
         let doneBtn = NSButton(title: "Done", target: self, action: #selector(closeWindow)); doneBtn.keyEquivalent = "\r"; doneBtn.bezelStyle = .rounded
         let footer = NSStackView(views: [resetBtn, NSView(), doneBtn]); footer.orientation = .horizontal; footer.distribution = .fill
         footer.widthAnchor.constraint(equalToConstant: cardW).isActive = true
 
-        let column = NSStackView(views: [loginCard, displayCard, colorsCard, claudeCard, footer])
+        let column = NSStackView(views: [loginCard, displayCard, colorsCard, footer])
         column.orientation = .vertical; column.alignment = .centerX; column.spacing = 14
         column.edgeInsets = NSEdgeInsets(top: 40, left: 18, bottom: 18, right: 18); column.translatesAutoresizingMaskIntoConstraints = false
 
@@ -704,8 +710,10 @@ final class SettingsWindow: NSObject, NSWindowDelegate, NSTextFieldDelegate {
         bg.addSubview(column)
         NSLayoutConstraint.activate([
             column.leadingAnchor.constraint(equalTo: bg.leadingAnchor), column.trailingAnchor.constraint(equalTo: bg.trailingAnchor),
-            column.topAnchor.constraint(equalTo: bg.topAnchor), column.bottomAnchor.constraint(equalTo: bg.bottomAnchor)])
+            column.topAnchor.constraint(equalTo: bg.topAnchor)])
         win.contentView = bg
+        bg.layoutSubtreeIfNeeded()
+        win.setContentSize(NSSize(width: cardW + 40, height: column.fittingSize.height))   // fit window to content (no stretched cards)
         window = win
     }
     func load() {
