@@ -7,6 +7,30 @@
 import AppKit
 import Foundation
 import WebKit
+import Security
+
+// MARK: - Keychain (session tokens stored encrypted, never in the plist)
+enum Keychain {
+    static let service = "com.sueun.aicreditsbar"
+    static func get(_ account: String) -> String? {
+        let q: [String: Any] = [kSecClass as String: kSecClassGenericPassword,
+                                 kSecAttrService as String: service, kSecAttrAccount as String: account,
+                                 kSecReturnData as String: true, kSecMatchLimit as String: kSecMatchLimitOne]
+        var item: CFTypeRef?
+        guard SecItemCopyMatching(q as CFDictionary, &item) == errSecSuccess,
+              let d = item as? Data, let s = String(data: d, encoding: .utf8) else { return nil }
+        return s
+    }
+    static func set(_ account: String, _ value: String) {
+        let base: [String: Any] = [kSecClass as String: kSecClassGenericPassword,
+                                    kSecAttrService as String: service, kSecAttrAccount as String: account]
+        SecItemDelete(base as CFDictionary)
+        guard !value.isEmpty, let data = value.data(using: .utf8) else { return }
+        var add = base; add[kSecValueData as String] = data
+        add[kSecAttrAccessible as String] = kSecAttrAccessibleAfterFirstUnlock
+        SecItemAdd(add as CFDictionary, nil)
+    }
+}
 
 // MARK: - Config (UserDefaults-backed, with defaults)
 
@@ -36,9 +60,21 @@ enum Cfg {
     static var claudeWeekBudget: Double { get { validBudget(dbl("claudeWeekBudget", 1_500_000_000), 1_500_000_000) } set { d.set(newValue, forKey: "claudeWeekBudget") } }
     static var claudePlan: String { get { d.string(forKey: "claudePlan") ?? "Max 20x" } set { d.set(newValue, forKey: "claudePlan") } }
     // Official web-session tokens (exact %, like usage4claude). Empty = use local estimate/disk.
-    static var claudeSessionKey: String { get { d.string(forKey: "claudeSessionKey") ?? "" } set { d.set(newValue, forKey: "claudeSessionKey") } }
+    // Stored in Keychain; legacy plist values are read as a fallback and migrated on write.
+    static var claudeSessionKey: String {
+        get { Keychain.get("claudeSessionKey") ?? (d.string(forKey: "claudeSessionKey") ?? "") }
+        set { Keychain.set("claudeSessionKey", newValue); d.removeObject(forKey: "claudeSessionKey") }
+    }
+    static var codexSessionToken: String {
+        get { Keychain.get("codexSessionToken") ?? (d.string(forKey: "codexSessionToken") ?? "") }
+        set { Keychain.set("codexSessionToken", newValue); d.removeObject(forKey: "codexSessionToken") }
+    }
     static var claudeOrgUuid: String { get { d.string(forKey: "claudeOrgUuid") ?? "" } set { d.set(newValue, forKey: "claudeOrgUuid") } }
-    static var codexSessionToken: String { get { d.string(forKey: "codexSessionToken") ?? "" } set { d.set(newValue, forKey: "codexSessionToken") } }
+    static func migrateSecretsToKeychain() {
+        for k in ["claudeSessionKey", "codexSessionToken"] {
+            if Keychain.get(k) == nil, let v = d.string(forKey: k), !v.isEmpty { Keychain.set(k, v); d.removeObject(forKey: k) }
+        }
+    }
 
     static let planBudgets: [String: Double] = ["Pro": 19_000_000, "Max 5x": 88_000_000, "Max 20x": 220_000_000]
 
@@ -833,6 +869,7 @@ func argString(_ flag: String) -> String? {
     guard let i = CommandLine.arguments.firstIndex(of: flag), i + 1 < CommandLine.arguments.count else { return nil }
     return CommandLine.arguments[i + 1]
 }
+Cfg.migrateSecretsToKeychain()   // move any legacy plist tokens into the Keychain
 if let k = argString("--set-claude-key") {
     Cfg.claudeSessionKey = k; Cfg.claudeOrgUuid = ""; Cfg.d.synchronize()
     print("Claude sessionKey saved (\(k.count) chars). Restart the app to use official data."); exit(0)

@@ -103,7 +103,7 @@ def render_dropdown():
 # ---------------------------------------------------------------- settings
 def render_settings():
     fT=ui(13,bold=True); fL=ui(12); fH=ui(12,bold=True); fS=ui(11)
-    W,H=470,500
+    W,H=470,600
     img=Image.new("RGB",(W*S,H*S),WIN_BG); d=ImageDraw.Draw(img)
     # title bar
     d.rectangle([0,0,W*S,28*S],fill=TITLE_BG)
@@ -126,6 +126,12 @@ def render_settings():
         text(d,(x+22,y+1),t,fL,WHITE)
         return x+22+tw(d,t,fL)+18
 
+    def btn2(x,w,t):
+        rrect(d,(x,y-3,x+w,y+16),5,(92,92,98)); text(d,(x+w/2,y+1),t,fS,WHITE,anchor="ma")
+    head("Accurate login — exact official %")
+    label("Claude:"); text(d,(160,y+1),"✓ logged in — exact official %",fS,GREEN); btn2(356,48,"Log in"); btn2(410,54,"Log out"); y+=24
+    label("Codex:"); text(d,(160,y+1),"✓ logged in (codex CLI) — official",fS,GREEN); btn2(356,48,"Log in"); btn2(410,54,"Log out"); y+=24
+    text(d,(20,y+1),"Log in once in-app for the exact official % — no DevTools. Codex reuses your codex CLI login.",fS,SUB); y+=28
     head("Display")
     label("Show in menu bar:"); popup(160,170,"5-hour window"); y+=28
     label("Providers:");
