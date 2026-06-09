@@ -20,7 +20,7 @@ echo "compiling…"
 ARCH="$(uname -m)"
 /usr/bin/swiftc -swift-version 5 -O -target "${ARCH}-apple-macos11" \
   -framework AppKit -framework WebKit \
-  -o "$CONTENTS/MacOS/aicreditsbar" "$HERE/main.swift"
+  -o "$CONTENTS/MacOS/aicreditsbar" "$HERE"/Sources/*.swift
 
 cat > "$CONTENTS/Info.plist" <<'PLIST'
 <?xml version="1.0" encoding="UTF-8"?>

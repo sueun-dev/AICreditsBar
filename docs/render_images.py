@@ -49,17 +49,33 @@ def save(img, name):
     print("wrote", p, img.size[0]//S, "x", img.size[1]//S)
 
 # ---------------------------------------------------------------- menu bar
+import math
+def _sunburst(d, cx, cy, r, col):  # Claude mark
+    for i in range(11):
+        a = i/11*2*math.pi
+        d.line([(cx, cy), (cx+math.cos(a)*r, cy+math.sin(a)*r)], fill=col, width=int(2.2*S))
+    d.ellipse([cx-r*0.22, cy-r*0.22, cx+r*0.22, cy+r*0.22], fill=col)
+def _blossom(d, cx, cy, r, col):   # Codex mark
+    pr = r*0.5
+    for i in range(6):
+        a = (i*60-90)*math.pi/180
+        px, py = cx+math.cos(a)*r*0.55, cy+math.sin(a)*r*0.55
+        d.ellipse([px-pr, py-pr, px+pr, py+pr], fill=col)
+    d.ellipse([cx-r*0.25, cy-r*0.25, cx+r*0.25, cy+r*0.25], fill=BAR_BG)  # center hole
+def _sparkle(d, cx, cy, r, col):   # Gemini mark
+    k = r*0.18
+    d.polygon([(cx,cy-r),(cx+k,cy-k),(cx+r,cy),(cx+k,cy+k),(cx,cy+r),(cx-k,cy+k),(cx-r,cy),(cx-k,cy-k)], fill=col)
+
 def render_menubar():
-    W,H = 360, 26
+    W,H = 250, 26
     img = Image.new("RGB", (W*S, H*S), BAR_BG); d = ImageDraw.Draw(img)
-    fl = ui(13); fm = mono(13)
-    x = 14; y = 5
-    segs = [("Cx ", WHITE, "54%", GREEN), (" · ", SEP, "", None),
-            ("Cl ", WHITE, "31%", YELLOW), (" · ", SEP, "", None),
-            ("Gm ", WHITE, "—", GRAY)]
-    for lab, lc, val, vc in segs:
-        text(d,(x,y),lab,fm,lc); x += tw(d,lab,fm)
-        if val: text(d,(x,y),val,fm,vc); x += tw(d,val,fm)
+    fm = mono(13)
+    x = 14*S; y = 5*S; r = 7*S
+    def seg(mark, val, vc):
+        nonlocal x
+        mark(d, x+r, (H*S)//2, r, WHITE); x += r*2 + 4*S
+        text(d, (x/S, y/S), val, fm, vc); x += tw(d, val, fm)*S + 14*S
+    seg(_blossom, "9%", RED); seg(_sunburst, "73%", GREEN); seg(_sparkle, "—", GRAY)
     save(img, "menubar.png")
 
 # ---------------------------------------------------------------- dropdown
