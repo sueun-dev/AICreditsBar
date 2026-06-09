@@ -528,15 +528,9 @@ func barInfo(_ p: ProviderStatus) -> (String, NSColor) {
 }
 // Monochrome menu-bar glyphs per provider (template images → tint to the bar appearance).
 var glyphCache: [String: NSImage] = [:]
-func providerGlyph(_ key: String, _ pt: CGFloat = 15) -> NSImage {
+func providerGlyph(_ key: String, _ pt: CGFloat = 16) -> NSImage {
     if let g = glyphCache[key] { return g }
-    // Real brand logo from the installed desktop app (no redistribution), keep full color.
-    let appPaths: [String: String] = ["Cx": "/Applications/Codex.app", "Cl": "/Applications/Claude.app"]
-    if let path = appPaths[key], FileManager.default.fileExists(atPath: path) {
-        let icon = NSWorkspace.shared.icon(forFile: path)
-        icon.size = NSSize(width: pt, height: pt); icon.isTemplate = false
-        glyphCache[key] = icon; return icon
-    }
+    // Bold monochrome marks → tint white like native menu-bar icons.
     let img = NSImage(size: NSSize(width: pt, height: pt)); img.lockFocus()
     NSColor.black.setFill(); NSColor.black.setStroke()
     let c = NSPoint(x: pt/2, y: pt/2)
