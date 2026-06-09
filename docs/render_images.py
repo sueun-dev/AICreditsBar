@@ -130,8 +130,8 @@ def render_settings():
         rrect(d,(x,y-3,x+w,y+16),5,(92,92,98)); text(d,(x+w/2,y+1),t,fS,WHITE,anchor="ma")
     head("Accurate login — exact official %")
     label("Claude:"); text(d,(160,y+1),"✓ logged in — exact official %",fS,GREEN); btn2(356,48,"Log in"); btn2(410,54,"Log out"); y+=24
-    label("Codex:"); text(d,(160,y+1),"✓ logged in (codex CLI) — official",fS,GREEN); btn2(356,48,"Log in"); btn2(410,54,"Log out"); y+=24
-    text(d,(20,y+1),"Log in once in-app for the exact official % — no DevTools. Codex reuses your codex CLI login.",fS,SUB); y+=28
+    label("Codex:"); text(d,(160,y+1),"✓ official — via your codex CLI (no login needed)",fS,GREEN); y+=24
+    text(d,(20,y+1),"Claude: log in once in-app for the exact official % (no DevTools). Codex is automatic via your codex CLI.",fS,SUB); y+=28
     head("Display")
     label("Show in menu bar:"); popup(160,170,"5-hour window"); y+=28
     label("Providers:");

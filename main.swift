@@ -634,6 +634,7 @@ final class SettingsWindow: NSObject, NSWindowDelegate, NSTextFieldDelegate {
     let wHigh = NSColorWell(); let wMid = NSColorWell(); let wLow = NSColorWell(); let wUnknown = NSColorWell()
     let claudeLogin = WebLoginWindow(); let codexLogin = WebLoginWindow()
     let claudeStatus = NSTextField(labelWithString: ""); let codexStatus = NSTextField(labelWithString: "")
+    var codexLoginBtn: NSButton!; var codexLogoutBtn: NSButton!
 
     func show() {
         if window == nil { build() }
@@ -677,7 +678,8 @@ final class SettingsWindow: NSObject, NSWindowDelegate, NSTextFieldDelegate {
         func lbtn(_ t: String, _ sel: Selector) -> NSButton { NSButton(title: t, target: self, action: sel) }
         let claudeRow = NSStackView(views: [{ let l = NSTextField(labelWithString: "Claude:"); l.widthAnchor.constraint(equalToConstant: 56).isActive = true; return l }(), claudeStatus, lbtn("Log in", #selector(loginClaude)), lbtn("Log out", #selector(logoutClaude))])
         claudeRow.orientation = .horizontal; claudeRow.spacing = 8; claudeRow.alignment = .centerY
-        let codexRow = NSStackView(views: [{ let l = NSTextField(labelWithString: "Codex:"); l.widthAnchor.constraint(equalToConstant: 56).isActive = true; return l }(), codexStatus, lbtn("Log in", #selector(loginCodex)), lbtn("Log out", #selector(logoutCodex))])
+        codexLoginBtn = lbtn("Log in", #selector(loginCodex)); codexLogoutBtn = lbtn("Log out", #selector(logoutCodex))
+        let codexRow = NSStackView(views: [{ let l = NSTextField(labelWithString: "Codex:"); l.widthAnchor.constraint(equalToConstant: 56).isActive = true; return l }(), codexStatus, codexLoginBtn, codexLogoutBtn])
         codexRow.orientation = .horizontal; codexRow.spacing = 8; codexRow.alignment = .centerY
         let loginNote = NSTextField(labelWithString: "Log in once, in-app, to show the EXACT official % (no DevTools). Tokens expire occasionally → just log in again."); loginNote.textColor = .secondaryLabelColor; loginNote.font = .systemFont(ofSize: 11)
         let rows: [NSView] = [head("Accurate login — exact official %"), claudeRow, codexRow, loginNote,
@@ -706,8 +708,18 @@ final class SettingsWindow: NSObject, NSWindowDelegate, NSTextFieldDelegate {
         f5hBudget.isEnabled = (planPopup.titleOfSelectedItem == "Custom")
         claudeStatus.stringValue = Cfg.claudeSessionKey.isEmpty ? "not logged in — using estimate" : "✓ logged in — exact official %"
         claudeStatus.textColor = Cfg.claudeSessionKey.isEmpty ? .secondaryLabelColor : .systemGreen
-        codexStatus.stringValue = Cfg.codexSessionToken.isEmpty ? "not logged in — using local disk" : "✓ logged in — exact official %"
-        codexStatus.textColor = Cfg.codexSessionToken.isEmpty ? .secondaryLabelColor : .systemGreen
+        // Codex needs no browser login when the codex CLI is already authed — hide the button then.
+        let codexCLI = codexCLIAccessToken() != nil
+        if codexCLI {
+            codexStatus.stringValue = "✓ official — via your codex CLI (no login needed)"; codexStatus.textColor = .systemGreen
+            codexLoginBtn?.isHidden = true; codexLogoutBtn?.isHidden = true
+        } else if !Cfg.codexSessionToken.isEmpty {
+            codexStatus.stringValue = "✓ logged in (ChatGPT) — exact official %"; codexStatus.textColor = .systemGreen
+            codexLoginBtn?.isHidden = false; codexLogoutBtn?.isHidden = false
+        } else {
+            codexStatus.stringValue = "not logged in — log in to your codex CLI, or ChatGPT here"; codexStatus.textColor = .secondaryLabelColor
+            codexLoginBtn?.isHidden = false; codexLogoutBtn?.isHidden = true
+        }
     }
     @objc func changed(_ sender: Any?) {
         let modes = ["5h", "week", "both", "min"]
@@ -755,7 +767,7 @@ final class SettingsWindow: NSObject, NSWindowDelegate, NSTextFieldDelegate {
         }
     }
     @objc func loginCodex() {
-        codexLogin.start(title: "Log in to ChatGPT (Codex)", url: "https://chatgpt.com/", domain: "chatgpt.com", cookieName: "__Secure-next-auth.session-token") { [weak self] val in
+        codexLogin.start(title: "Log in to ChatGPT (Codex)", url: "https://chatgpt.com/auth/login", domain: "chatgpt.com", cookieName: "__Secure-next-auth.session-token") { [weak self] val in
             Cfg.codexSessionToken = val; self?.load(); self?.onChange()
         }
     }
