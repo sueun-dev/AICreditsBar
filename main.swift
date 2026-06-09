@@ -6,6 +6,7 @@
 // Auto-detects which CLIs you use by reading their local data dirs. No network calls.
 import AppKit
 import Foundation
+import WebKit
 
 // MARK: - Config (UserDefaults-backed, with defaults)
 
@@ -34,6 +35,10 @@ enum Cfg {
     static var claude5hBudget: Double { get { validBudget(dbl("claude5hBudget", 220_000_000), 220_000_000) } set { d.set(newValue, forKey: "claude5hBudget") } }
     static var claudeWeekBudget: Double { get { validBudget(dbl("claudeWeekBudget", 1_500_000_000), 1_500_000_000) } set { d.set(newValue, forKey: "claudeWeekBudget") } }
     static var claudePlan: String { get { d.string(forKey: "claudePlan") ?? "Max 20x" } set { d.set(newValue, forKey: "claudePlan") } }
+    // Official web-session tokens (exact %, like usage4claude). Empty = use local estimate/disk.
+    static var claudeSessionKey: String { get { d.string(forKey: "claudeSessionKey") ?? "" } set { d.set(newValue, forKey: "claudeSessionKey") } }
+    static var claudeOrgUuid: String { get { d.string(forKey: "claudeOrgUuid") ?? "" } set { d.set(newValue, forKey: "claudeOrgUuid") } }
+    static var codexSessionToken: String { get { d.string(forKey: "codexSessionToken") ?? "" } set { d.set(newValue, forKey: "codexSessionToken") } }
 
     static let planBudgets: [String: Double] = ["Pro": 19_000_000, "Max 5x": 88_000_000, "Max 20x": 220_000_000]
 
@@ -175,7 +180,7 @@ func digRateLimits(_ obj: Any) -> [String: Any]? {
 
 let CODEX_STALE: Double = 90 * 60   // snapshot older than this (window not yet reset) -> show as stale
 
-func readCodex() -> ProviderStatus {
+func readCodexLocal() -> ProviderStatus {
     var st = ProviderStatus(key: "Cx", name: "Codex", available: false)
     let base = (HOME as NSString).appendingPathComponent(".codex/sessions")
     guard FileManager.default.fileExists(atPath: base) else { st.problem = "not installed (~/.codex/sessions absent)"; return st }
@@ -290,7 +295,7 @@ func claudeCalibrationSums() -> (five: Double, week: Double) {
     return ((cb?.active == true) ? cb!.tokens : 0, claudeWeekTokens(ev))
 }
 
-func readClaude() -> ProviderStatus {
+func readClaudeLocal() -> ProviderStatus {
     var st = ProviderStatus(key: "Cl", name: "Claude", available: false)
     let base = (HOME as NSString).appendingPathComponent(".claude/projects")
     guard FileManager.default.fileExists(atPath: base) else { st.problem = "not installed (~/.claude/projects absent)"; return st }
@@ -316,6 +321,146 @@ func readClaude() -> ProviderStatus {
     st.weekly = WindowStat(remaining: max(0, min(100, Int((100 * (1 - weekTokens / wb)).rounded()))), note: "\(tokLabel(weekTokens))/7d")
     st.details.append("7d used \(tokLabel(weekTokens)) / \(tokLabel(wb)) est. · calibrate in Settings")
     return st
+}
+
+// MARK: - Official web-API usage (exact %, method from github.com/f-is-h/usage4claude)
+// Claude → claude.ai web session (sessionKey cookie). Codex → chatgpt.com session-token.
+
+let WEB_UA = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
+
+// Synchronous GET (runs on the background refresh queue, never main).
+func httpGet(_ urlStr: String, headers: [String: String], timeout: TimeInterval = 12) -> (status: Int, body: Data)? {
+    guard let url = URL(string: urlStr) else { return nil }
+    var req = URLRequest(url: url, timeoutInterval: timeout)
+    req.httpMethod = "GET"
+    for (k, v) in headers { req.setValue(v, forHTTPHeaderField: k) }
+    let cfg = URLSessionConfiguration.ephemeral
+    cfg.httpShouldSetCookies = false            // send our explicit Cookie header verbatim
+    cfg.requestCachePolicy = .reloadIgnoringLocalCacheData
+    let session = URLSession(configuration: cfg)
+    defer { session.finishTasksAndInvalidate() }
+    let sem = DispatchSemaphore(value: 0)
+    var out: (Int, Data)? = nil
+    let task = session.dataTask(with: req) { data, resp, _ in
+        if let http = resp as? HTTPURLResponse { out = (http.statusCode, data ?? Data()) }
+        sem.signal()
+    }
+    task.resume()
+    if sem.wait(timeout: .now() + timeout + 2) == .timedOut { task.cancel() }
+    return out
+}
+
+// ---- Claude (claude.ai) ----
+struct ClaudeLimitWire: Codable { let utilization: Double; let resets_at: String? }
+struct ClaudeUsageWire: Codable { let five_hour: ClaudeLimitWire?; let seven_day: ClaudeLimitWire?; let seven_day_opus: ClaudeLimitWire?; let seven_day_sonnet: ClaudeLimitWire? }
+struct ClaudeOrgWire: Codable { let uuid: String; let name: String?; let capabilities: [String]? }
+
+func claudeHeaders(_ key: String) -> [String: String] {
+    ["accept": "*/*", "content-type": "application/json",
+     "anthropic-client-platform": "web_claude_ai", "anthropic-client-version": "1.0.0",
+     "user-agent": WEB_UA, "origin": "https://claude.ai", "referer": "https://claude.ai/settings/usage",
+     "sec-fetch-dest": "empty", "sec-fetch-mode": "cors", "sec-fetch-site": "same-origin",
+     "Cookie": "sessionKey=\(key)"]
+}
+
+func readClaudeOfficial() -> ProviderStatus {
+    var st = ProviderStatus(key: "Cl", name: "Claude", available: false)
+    let key = Cfg.claudeSessionKey
+    let h = claudeHeaders(key)
+    var org = Cfg.claudeOrgUuid
+    if org.isEmpty {
+        guard let r = httpGet("https://claude.ai/api/organizations", headers: h) else { st.problem = "network error"; return st }
+        if r.status == 401 || r.status == 403 { st.problem = "login expired — update sessionKey"; return st }
+        guard r.status == 200, let orgs = try? JSONDecoder().decode([ClaudeOrgWire].self, from: r.body), !orgs.isEmpty else {
+            st.problem = "org lookup failed (HTTP \(r.status))"; return st
+        }
+        org = (orgs.first { ($0.capabilities ?? []).contains { $0.contains("claude") } } ?? orgs[0]).uuid
+        Cfg.claudeOrgUuid = org
+    }
+    guard let r = httpGet("https://claude.ai/api/organizations/\(org)/usage", headers: h) else { st.problem = "network error"; return st }
+    if r.status == 401 || r.status == 403 { Cfg.claudeOrgUuid = ""; st.problem = "login expired — update sessionKey"; return st }
+    guard r.status == 200, let u = try? JSONDecoder().decode(ClaudeUsageWire.self, from: r.body) else {
+        st.problem = "usage unavailable (HTTP \(r.status))"; return st
+    }
+    func win(_ w: ClaudeLimitWire?) -> WindowStat? {
+        guard let w = w else { return nil }
+        return WindowStat(remaining: max(0, min(100, Int((100 - w.utilization).rounded()))), resetEpoch: parseISO(w.resets_at ?? ""), refilled: false)
+    }
+    st.available = true; st.plan = "official"
+    st.fiveHour = win(u.five_hour)
+    st.weekly = win(u.seven_day)
+    if let o = u.seven_day_opus, !(o.utilization == 0 && o.resets_at == nil) { st.details.append("Opus 7d: \(Int((100 - o.utilization).rounded()))% left") }
+    if let s = u.seven_day_sonnet, !(s.utilization == 0 && s.resets_at == nil) { st.details.append("Sonnet 7d: \(Int((100 - s.utilization).rounded()))% left") }
+    return st
+}
+
+// ---- Codex (chatgpt.com) ----
+struct CodexWindowWire: Codable { let used_percent: Double; let limit_window_seconds: Int?; let reset_after_seconds: Int?; let reset_at: Int? }
+struct CodexRateLimitWire: Codable { let primary_window: CodexWindowWire?; let secondary_window: CodexWindowWire?; let limit_reached: Bool? }
+struct CodexUsageWire: Codable { let plan_type: String?; let rate_limit: CodexRateLimitWire? }
+struct CodexSessionWire: Codable { let accessToken: String? }
+
+// Codex CLI's own OAuth access token (~/.codex/auth.json) — lets official Codex work
+// WITHOUT a separate ChatGPT browser login, since the user already authed the codex CLI.
+func codexCLIAccessToken() -> String? {
+    let p = (HOME as NSString).appendingPathComponent(".codex/auth.json")
+    guard let data = FileManager.default.contents(atPath: p),
+          let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+          let tokens = obj["tokens"] as? [String: Any],
+          let at = tokens["access_token"] as? String, !at.isEmpty else { return nil }
+    return at
+}
+
+func readCodexOfficial() -> ProviderStatus {
+    var st = ProviderStatus(key: "Cx", name: "Codex", available: false)
+    // accessToken: prefer ChatGPT web session-token exchange; else reuse the codex CLI token.
+    var access: String? = nil
+    let tok = Cfg.codexSessionToken
+    if !tok.isEmpty {
+        let sh = ["accept": "*/*", "user-agent": WEB_UA, "origin": "https://chatgpt.com", "referer": "https://chatgpt.com/",
+                  "sec-fetch-dest": "empty", "sec-fetch-mode": "cors", "sec-fetch-site": "same-origin",
+                  "Cookie": "__Secure-next-auth.session-token=\(tok)"]
+        if let sr = httpGet("https://chatgpt.com/api/auth/session", headers: sh), sr.status == 200,
+           let sess = try? JSONDecoder().decode(CodexSessionWire.self, from: sr.body), let a = sess.accessToken, !a.isEmpty {
+            access = a
+        }
+    }
+    if access == nil { access = codexCLIAccessToken() }
+    guard let accessToken = access, !accessToken.isEmpty else { st.problem = "no codex login"; return st }
+    let uh = ["accept": "*/*", "content-type": "application/json", "user-agent": WEB_UA, "authorization": "Bearer \(accessToken)",
+              "origin": "https://chatgpt.com", "referer": "https://chatgpt.com/",
+              "sec-fetch-dest": "empty", "sec-fetch-mode": "cors", "sec-fetch-site": "same-origin"]
+    guard let ur = httpGet("https://chatgpt.com/backend-api/wham/usage", headers: uh), ur.status == 200,
+          let u = try? JSONDecoder().decode(CodexUsageWire.self, from: ur.body) else { st.problem = "usage unavailable"; return st }
+    func win(_ w: CodexWindowWire?) -> WindowStat? {
+        guard let w = w else { return nil }
+        let reset = w.reset_at.map { Double($0) }
+        let refilled = (reset ?? .greatestFiniteMagnitude) <= nowEpoch()
+        return WindowStat(remaining: refilled ? 100 : max(0, min(100, Int((100 - w.used_percent).rounded()))), resetEpoch: reset, refilled: refilled)
+    }
+    st.available = true; st.plan = u.plan_type ?? "official"
+    st.fiveHour = win(u.rate_limit?.primary_window)
+    st.weekly = win(u.rate_limit?.secondary_window)
+    st.throttled = (u.rate_limit?.limit_reached == true) && !(st.fiveHour?.refilled ?? false)
+    return st
+}
+
+// ---- dispatchers: official (if a token is set) first, else local ----
+func readClaude() -> ProviderStatus {
+    guard !Cfg.claudeSessionKey.isEmpty else { return readClaudeLocal() }
+    let off = readClaudeOfficial()
+    if off.available { return off }
+    var local = readClaudeLocal()
+    local.details.insert("⚠︎ official login: \(off.problem ?? "failed") — showing estimate", at: 0)
+    return local
+}
+func readCodex() -> ProviderStatus {
+    guard !Cfg.codexSessionToken.isEmpty || codexCLIAccessToken() != nil else { return readCodexLocal() }
+    let off = readCodexOfficial()
+    if off.available { return off }
+    var local = readCodexLocal()   // disk rate_limits are also official, just updated only when codex runs
+    local.details.insert("⚠︎ live: \(off.problem ?? "failed") — showing last disk snapshot", at: 0)
+    return local
 }
 
 // MARK: - Gemini (best-effort status)
@@ -389,6 +534,52 @@ func barSegment(_ p: ProviderStatus) -> NSAttributedString {
     return s
 }
 
+// MARK: - In-app browser login (captures the web session cookie, no DevTools needed)
+
+final class WebLoginWindow: NSObject, NSWindowDelegate {
+    private var window: NSWindow?
+    private var webView: WKWebView?
+    private var cookieName = ""
+    private var domain = ""
+    private var onCapture: ((String) -> Void)?
+    private var polling = false
+
+    func start(title: String, url: String, domain: String, cookieName: String, onCapture: @escaping (String) -> Void) {
+        close()
+        self.domain = domain; self.cookieName = cookieName; self.onCapture = onCapture
+        let cfg = WKWebViewConfiguration()
+        cfg.websiteDataStore = WKWebsiteDataStore.default()   // persistent so the login sticks
+        let wv = WKWebView(frame: NSRect(x: 0, y: 0, width: 540, height: 720), configuration: cfg)
+        let win = NSWindow(contentRect: wv.frame, styleMask: [.titled, .closable, .resizable], backing: .buffered, defer: false)
+        win.title = title; win.contentView = wv; win.delegate = self; win.isReleasedWhenClosed = false; win.center()
+        self.window = win; self.webView = wv
+        NSApp.activate(ignoringOtherApps: true); win.makeKeyAndOrderFront(nil)
+        if let u = URL(string: url) { wv.load(URLRequest(url: u)) }
+        polling = true
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2) { [weak self] in self?.poll() }
+    }
+    private func poll() {
+        guard polling, let wv = webView else { return }
+        wv.configuration.websiteDataStore.httpCookieStore.getAllCookies { [weak self] cookies in
+            guard let self = self, self.polling else { return }
+            if let c = cookies.first(where: { $0.name == self.cookieName && $0.domain.contains(self.domain) && !$0.value.isEmpty }) {
+                self.polling = false
+                let cb = self.onCapture
+                self.close()
+                cb?(c.value)
+                return
+            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { self.poll() }
+        }
+    }
+    func close() {
+        polling = false
+        if let w = window { w.delegate = nil; w.close() }
+        window = nil; webView = nil
+    }
+    func windowWillClose(_ notification: Notification) { polling = false; window = nil; webView = nil }
+}
+
 // MARK: - Settings window
 
 final class SettingsWindow: NSObject, NSWindowDelegate, NSTextFieldDelegate {
@@ -405,6 +596,8 @@ final class SettingsWindow: NSObject, NSWindowDelegate, NSTextFieldDelegate {
     let fReal5h = NSTextField(); let fRealWk = NSTextField()
     let calStatus = NSTextField(labelWithString: "")
     let wHigh = NSColorWell(); let wMid = NSColorWell(); let wLow = NSColorWell(); let wUnknown = NSColorWell()
+    let claudeLogin = WebLoginWindow(); let codexLogin = WebLoginWindow()
+    let claudeStatus = NSTextField(labelWithString: ""); let codexStatus = NSTextField(labelWithString: "")
 
     func show() {
         if window == nil { build() }
@@ -422,7 +615,7 @@ final class SettingsWindow: NSObject, NSWindowDelegate, NSTextFieldDelegate {
     private func well(_ w: NSColorWell) { w.target = self; w.action = #selector(colorChanged(_:)); w.widthAnchor.constraint(equalToConstant: 44).isActive = true; w.heightAnchor.constraint(equalToConstant: 24).isActive = true }
 
     func build() {
-        let win = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 480, height: 660), styleMask: [.titled, .closable], backing: .buffered, defer: false)
+        let win = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 490, height: 760), styleMask: [.titled, .closable], backing: .buffered, defer: false)
         win.title = "AICreditsBar — Settings"; win.delegate = self; win.isReleasedWhenClosed = false
         modePopup.addItems(withTitles: ["5-hour window", "Weekly window", "Both (5h/week)", "Lowest"]); modePopup.target = self; modePopup.action = #selector(changed(_:))
         planPopup.addItems(withTitles: ["Pro", "Max 5x", "Max 20x", "Custom"]); planPopup.target = self; planPopup.action = #selector(changed(_:))
@@ -445,7 +638,14 @@ final class SettingsWindow: NSObject, NSWindowDelegate, NSTextFieldDelegate {
         let calRow = NSStackView(views: [NSTextField(labelWithString: "real 5h used"), fReal5h, NSTextField(labelWithString: "%  weekly"), fRealWk, NSTextField(labelWithString: "%"), calBtn])
         calRow.orientation = .horizontal; calRow.spacing = 6; calRow.alignment = .centerY
         let calHelp = NSTextField(labelWithString: "Run /usage in Claude Code, type the two numbers here, click Calibrate."); calHelp.textColor = .secondaryLabelColor; calHelp.font = .systemFont(ofSize: 11)
-        let rows: [NSView] = [head("Display"), row("Show in menu bar:", modePopup), row("Providers:", providers), row("", cLabels), row("Refresh every (s):", fRefresh),
+        func lbtn(_ t: String, _ sel: Selector) -> NSButton { NSButton(title: t, target: self, action: sel) }
+        let claudeRow = NSStackView(views: [{ let l = NSTextField(labelWithString: "Claude:"); l.widthAnchor.constraint(equalToConstant: 56).isActive = true; return l }(), claudeStatus, lbtn("Log in", #selector(loginClaude)), lbtn("Log out", #selector(logoutClaude))])
+        claudeRow.orientation = .horizontal; claudeRow.spacing = 8; claudeRow.alignment = .centerY
+        let codexRow = NSStackView(views: [{ let l = NSTextField(labelWithString: "Codex:"); l.widthAnchor.constraint(equalToConstant: 56).isActive = true; return l }(), codexStatus, lbtn("Log in", #selector(loginCodex)), lbtn("Log out", #selector(logoutCodex))])
+        codexRow.orientation = .horizontal; codexRow.spacing = 8; codexRow.alignment = .centerY
+        let loginNote = NSTextField(labelWithString: "Log in once, in-app, to show the EXACT official % (no DevTools). Tokens expire occasionally → just log in again."); loginNote.textColor = .secondaryLabelColor; loginNote.font = .systemFont(ofSize: 11)
+        let rows: [NSView] = [head("Accurate login — exact official %"), claudeRow, codexRow, loginNote,
+                              head("Display"), row("Show in menu bar:", modePopup), row("Providers:", providers), row("", cLabels), row("Refresh every (s):", fRefresh),
                               head("Colors & thresholds"), row("Thresholds:", thresholds), row("Colors:", colors),
                               head("Claude budget (estimate)"), row("Plan:", planPopup), row("5h budget (M tok):", f5hBudget), row("Weekly budget (M tok):", fWkBudget),
                               row("Calibrate:", calRow), calHelp, row("", calStatus), note, footer]
@@ -468,6 +668,10 @@ final class SettingsWindow: NSObject, NSWindowDelegate, NSTextFieldDelegate {
         planPopup.selectItem(withTitle: Cfg.planBudgets[Cfg.claudePlan] != nil ? Cfg.claudePlan : "Custom")
         wHigh.color = Cfg.colorHigh; wMid.color = Cfg.colorMid; wLow.color = Cfg.colorLow; wUnknown.color = Cfg.colorUnknown
         f5hBudget.isEnabled = (planPopup.titleOfSelectedItem == "Custom")
+        claudeStatus.stringValue = Cfg.claudeSessionKey.isEmpty ? "not logged in — using estimate" : "✓ logged in — exact official %"
+        claudeStatus.textColor = Cfg.claudeSessionKey.isEmpty ? .secondaryLabelColor : .systemGreen
+        codexStatus.stringValue = Cfg.codexSessionToken.isEmpty ? "not logged in — using local disk" : "✓ logged in — exact official %"
+        codexStatus.textColor = Cfg.codexSessionToken.isEmpty ? .secondaryLabelColor : .systemGreen
     }
     @objc func changed(_ sender: Any?) {
         let modes = ["5h", "week", "both", "min"]
@@ -509,6 +713,18 @@ final class SettingsWindow: NSObject, NSWindowDelegate, NSTextFieldDelegate {
                                              : "✓ Calibrated: \(done.joined(separator: " · ")) tokens/window"
         load(); onChange()
     }
+    @objc func loginClaude() {
+        claudeLogin.start(title: "Log in to Claude (claude.ai)", url: "https://claude.ai/login", domain: "claude.ai", cookieName: "sessionKey") { [weak self] val in
+            Cfg.claudeSessionKey = val; Cfg.claudeOrgUuid = ""; self?.load(); self?.onChange()
+        }
+    }
+    @objc func loginCodex() {
+        codexLogin.start(title: "Log in to ChatGPT (Codex)", url: "https://chatgpt.com/", domain: "chatgpt.com", cookieName: "__Secure-next-auth.session-token") { [weak self] val in
+            Cfg.codexSessionToken = val; self?.load(); self?.onChange()
+        }
+    }
+    @objc func logoutClaude() { Cfg.claudeSessionKey = ""; Cfg.claudeOrgUuid = ""; load(); onChange() }
+    @objc func logoutCodex() { Cfg.codexSessionToken = ""; load(); onChange() }
     @objc func resetDefaults() { Cfg.resetAll(); load(); onChange() }
     @objc func closeWindow() { window?.orderOut(nil) }
 }
@@ -533,6 +749,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         refresh(); rescheduleTimer()
         if CommandLine.arguments.contains("--settings") {
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in self?.openSettings() }
+        }
+        if CommandLine.arguments.contains("--login-claude") {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in self?.settings.loginClaude() }
+        }
+        if CommandLine.arguments.contains("--login-codex") {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in self?.settings.loginCodex() }
         }
     }
     func rescheduleTimer() {
@@ -606,6 +828,22 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 func argValue(_ flag: String) -> Double? {
     guard let i = CommandLine.arguments.firstIndex(of: flag), i + 1 < CommandLine.arguments.count else { return nil }
     return Double(CommandLine.arguments[i + 1])
+}
+func argString(_ flag: String) -> String? {
+    guard let i = CommandLine.arguments.firstIndex(of: flag), i + 1 < CommandLine.arguments.count else { return nil }
+    return CommandLine.arguments[i + 1]
+}
+if let k = argString("--set-claude-key") {
+    Cfg.claudeSessionKey = k; Cfg.claudeOrgUuid = ""; Cfg.d.synchronize()
+    print("Claude sessionKey saved (\(k.count) chars). Restart the app to use official data."); exit(0)
+}
+if let t = argString("--set-codex-token") {
+    Cfg.codexSessionToken = t; Cfg.d.synchronize()
+    print("Codex session-token saved (\(t.count) chars). Restart the app to use official data."); exit(0)
+}
+if CommandLine.arguments.contains("--clear-logins") {
+    Cfg.claudeSessionKey = ""; Cfg.claudeOrgUuid = ""; Cfg.codexSessionToken = ""; Cfg.d.synchronize()
+    print("cleared official logins; back to local estimate/disk."); exit(0)
 }
 if let pct = argValue("--set-week-used") {
     let sums = claudeCalibrationSums()

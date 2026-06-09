@@ -19,6 +19,7 @@ echo "compiling…"
 # so the binary is portable and the compiler flags any too-new API at build time.
 ARCH="$(uname -m)"
 /usr/bin/swiftc -swift-version 5 -O -target "${ARCH}-apple-macos11" \
+  -framework AppKit -framework WebKit \
   -o "$CONTENTS/MacOS/aicreditsbar" "$HERE/main.swift"
 
 cat > "$CONTENTS/Info.plist" <<'PLIST'
