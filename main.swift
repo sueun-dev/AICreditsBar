@@ -7,30 +7,6 @@
 import AppKit
 import Foundation
 import WebKit
-import Security
-
-// MARK: - Keychain (session tokens stored encrypted, never in the plist)
-enum Keychain {
-    static let service = "com.sueun.aicreditsbar"
-    static func get(_ account: String) -> String? {
-        let q: [String: Any] = [kSecClass as String: kSecClassGenericPassword,
-                                 kSecAttrService as String: service, kSecAttrAccount as String: account,
-                                 kSecReturnData as String: true, kSecMatchLimit as String: kSecMatchLimitOne]
-        var item: CFTypeRef?
-        guard SecItemCopyMatching(q as CFDictionary, &item) == errSecSuccess,
-              let d = item as? Data, let s = String(data: d, encoding: .utf8) else { return nil }
-        return s
-    }
-    static func set(_ account: String, _ value: String) {
-        let base: [String: Any] = [kSecClass as String: kSecClassGenericPassword,
-                                    kSecAttrService as String: service, kSecAttrAccount as String: account]
-        SecItemDelete(base as CFDictionary)
-        guard !value.isEmpty, let data = value.data(using: .utf8) else { return }
-        var add = base; add[kSecValueData as String] = data
-        add[kSecAttrAccessible as String] = kSecAttrAccessibleAfterFirstUnlock
-        SecItemAdd(add as CFDictionary, nil)
-    }
-}
 
 // MARK: - Config (UserDefaults-backed, with defaults)
 
@@ -60,21 +36,10 @@ enum Cfg {
     static var claudeWeekBudget: Double { get { validBudget(dbl("claudeWeekBudget", 1_500_000_000), 1_500_000_000) } set { d.set(newValue, forKey: "claudeWeekBudget") } }
     static var claudePlan: String { get { d.string(forKey: "claudePlan") ?? "Max 20x" } set { d.set(newValue, forKey: "claudePlan") } }
     // Official web-session tokens (exact %, like usage4claude). Empty = use local estimate/disk.
-    // Stored in Keychain; legacy plist values are read as a fallback and migrated on write.
-    static var claudeSessionKey: String {
-        get { Keychain.get("claudeSessionKey") ?? (d.string(forKey: "claudeSessionKey") ?? "") }
-        set { Keychain.set("claudeSessionKey", newValue); d.removeObject(forKey: "claudeSessionKey") }
-    }
-    static var codexSessionToken: String {
-        get { Keychain.get("codexSessionToken") ?? (d.string(forKey: "codexSessionToken") ?? "") }
-        set { Keychain.set("codexSessionToken", newValue); d.removeObject(forKey: "codexSessionToken") }
-    }
+    // Stored in UserDefaults (no keychain prompt for an ad-hoc-built app). Local, revocable session cookies.
+    static var claudeSessionKey: String { get { d.string(forKey: "claudeSessionKey") ?? "" } set { d.set(newValue, forKey: "claudeSessionKey") } }
+    static var codexSessionToken: String { get { d.string(forKey: "codexSessionToken") ?? "" } set { d.set(newValue, forKey: "codexSessionToken") } }
     static var claudeOrgUuid: String { get { d.string(forKey: "claudeOrgUuid") ?? "" } set { d.set(newValue, forKey: "claudeOrgUuid") } }
-    static func migrateSecretsToKeychain() {
-        for k in ["claudeSessionKey", "codexSessionToken"] {
-            if Keychain.get(k) == nil, let v = d.string(forKey: k), !v.isEmpty { Keychain.set(k, v); d.removeObject(forKey: k) }
-        }
-    }
 
     static let planBudgets: [String: Double] = ["Pro": 19_000_000, "Max 5x": 88_000_000, "Max 20x": 220_000_000]
 
@@ -640,7 +605,11 @@ final class SettingsWindow: NSObject, NSWindowDelegate, NSTextFieldDelegate {
         if window == nil { build() }
         load()
         NSApp.activate(ignoringOtherApps: true)
-        window?.center(); window?.makeKeyAndOrderFront(nil)
+        window?.center(); window?.makeKeyAndOrderFront(nil); window?.orderFrontRegardless()
+        if ProcessInfo.processInfo.environment["AICB_FLOAT"] != nil {
+            NSApp.setActivationPolicy(.regular); NSApp.activate(ignoringOtherApps: true)
+            window?.level = .floating; window?.makeKeyAndOrderFront(nil)
+        }
     }
     private func row(_ label: String, _ control: NSView) -> NSStackView {
         let l = NSTextField(labelWithString: label); l.alignment = .right
@@ -651,49 +620,92 @@ final class SettingsWindow: NSObject, NSWindowDelegate, NSTextFieldDelegate {
     private func num(_ f: NSTextField, _ w: CGFloat = 90) { f.delegate = self; f.target = self; f.action = #selector(changed(_:)); f.widthAnchor.constraint(equalToConstant: w).isActive = true }
     private func well(_ w: NSColorWell) { w.target = self; w.action = #selector(colorChanged(_:)); w.widthAnchor.constraint(equalToConstant: 44).isActive = true; w.heightAnchor.constraint(equalToConstant: 24).isActive = true }
 
+    private let cardW: CGFloat = 432
+
     func build() {
-        let win = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 490, height: 760), styleMask: [.titled, .closable], backing: .buffered, defer: false)
-        win.title = "AICreditsBar — Settings"; win.delegate = self; win.isReleasedWhenClosed = false
+        let win = NSWindow(contentRect: NSRect(x: 0, y: 0, width: cardW + 40, height: 812),
+                           styleMask: [.titled, .closable, .fullSizeContentView], backing: .buffered, defer: false)
+        win.title = "AICreditsBar"; win.titlebarAppearsTransparent = true; win.isMovableByWindowBackground = true
+        win.delegate = self; win.isReleasedWhenClosed = false
+
+        // --- controls ---
         modePopup.addItems(withTitles: ["5-hour window", "Weekly window", "Both (5h/week)", "Lowest"]); modePopup.target = self; modePopup.action = #selector(changed(_:))
         planPopup.addItems(withTitles: ["Pro", "Max 5x", "Max 20x", "Custom"]); planPopup.target = self; planPopup.action = #selector(changed(_:))
         for b in [cCodex, cClaude, cGemini, cLabels] { b.target = self; b.action = #selector(changed(_:)) }
         for f in [fRefresh, fGreen, fYellow, f5hBudget, fWkBudget] { num(f) }
-        for f in [fReal5h, fRealWk] { f.target = self; f.action = #selector(calibrate); f.widthAnchor.constraint(equalToConstant: 60).isActive = true }
+        for f in [fReal5h, fRealWk] { f.target = self; f.action = #selector(calibrate); f.widthAnchor.constraint(equalToConstant: 56).isActive = true }
         calStatus.font = .systemFont(ofSize: 11); calStatus.textColor = .secondaryLabelColor
         for w in [wHigh, wMid, wLow, wUnknown] { well(w) }
-        func head(_ t: String) -> NSTextField { let l = NSTextField(labelWithString: t); l.font = .boldSystemFont(ofSize: 13); return l }
+        func sub(_ s: String) -> NSTextField { let l = NSTextField(labelWithString: s); l.font = .systemFont(ofSize: 11); l.textColor = .secondaryLabelColor; l.lineBreakMode = .byWordWrapping; l.maximumNumberOfLines = 2; l.preferredMaxLayoutWidth = cardW - 32; return l }
+        func lbtn(_ t: String, _ sel: Selector) -> NSButton { let b = NSButton(title: t, target: self, action: sel); b.controlSize = .small; b.bezelStyle = .rounded; return b }
+
         let providers = NSStackView(views: [cCodex, cClaude, cGemini]); providers.orientation = .horizontal; providers.spacing = 14
-        let thresholds = NSStackView(views: [NSTextField(labelWithString: "green >"), fGreen, NSTextField(labelWithString: "  yellow ≥"), fYellow, NSTextField(labelWithString: "% (else red)")])
+        let thresholds = NSStackView(views: [NSTextField(labelWithString: "green >"), fGreen, NSTextField(labelWithString: "  yellow ≥"), fYellow, NSTextField(labelWithString: "%")])
         thresholds.orientation = .horizontal; thresholds.spacing = 6; thresholds.alignment = .centerY
         let colors = NSStackView(views: [NSTextField(labelWithString: "High"), wHigh, NSTextField(labelWithString: "Mid"), wMid, NSTextField(labelWithString: "Low"), wLow, NSTextField(labelWithString: "Unk"), wUnknown])
         colors.orientation = .horizontal; colors.spacing = 6; colors.alignment = .centerY
-        let resetBtn = NSButton(title: "Reset to defaults", target: self, action: #selector(resetDefaults))
-        let doneBtn = NSButton(title: "Done", target: self, action: #selector(closeWindow)); doneBtn.keyEquivalent = "\r"
-        let footer = NSStackView(views: [resetBtn, NSView(), doneBtn]); footer.orientation = .horizontal; footer.distribution = .fill
-        let note = NSTextField(labelWithString: "Claude has no official % on disk; calibrate it from /usage for accuracy."); note.textColor = .secondaryLabelColor; note.font = .systemFont(ofSize: 11)
-        let calBtn = NSButton(title: "Calibrate", target: self, action: #selector(calibrate))
-        let calRow = NSStackView(views: [NSTextField(labelWithString: "real 5h used"), fReal5h, NSTextField(labelWithString: "%  weekly"), fRealWk, NSTextField(labelWithString: "%"), calBtn])
+        let calBtn = lbtn("Calibrate", #selector(calibrate))
+        let calRow = NSStackView(views: [NSTextField(labelWithString: "5h used"), fReal5h, NSTextField(labelWithString: "%  weekly"), fRealWk, NSTextField(labelWithString: "%"), calBtn])
         calRow.orientation = .horizontal; calRow.spacing = 6; calRow.alignment = .centerY
-        let calHelp = NSTextField(labelWithString: "Run /usage in Claude Code, type the two numbers here, click Calibrate."); calHelp.textColor = .secondaryLabelColor; calHelp.font = .systemFont(ofSize: 11)
-        func lbtn(_ t: String, _ sel: Selector) -> NSButton { NSButton(title: t, target: self, action: sel) }
-        let claudeRow = NSStackView(views: [{ let l = NSTextField(labelWithString: "Claude:"); l.widthAnchor.constraint(equalToConstant: 56).isActive = true; return l }(), claudeStatus, lbtn("Log in", #selector(loginClaude)), lbtn("Log out", #selector(logoutClaude))])
-        claudeRow.orientation = .horizontal; claudeRow.spacing = 8; claudeRow.alignment = .centerY
+        let claudeRow = NSStackView(views: [{ let l = NSTextField(labelWithString: "Claude"); l.font = .systemFont(ofSize: 12, weight: .medium); l.widthAnchor.constraint(equalToConstant: 52).isActive = true; return l }(), claudeStatus, NSView(), lbtn("Log in", #selector(loginClaude)), lbtn("Log out", #selector(logoutClaude))])
+        claudeRow.orientation = .horizontal; claudeRow.spacing = 8; claudeRow.alignment = .centerY; claudeRow.distribution = .fill
         codexLoginBtn = lbtn("Log in", #selector(loginCodex)); codexLogoutBtn = lbtn("Log out", #selector(logoutCodex))
-        let codexRow = NSStackView(views: [{ let l = NSTextField(labelWithString: "Codex:"); l.widthAnchor.constraint(equalToConstant: 56).isActive = true; return l }(), codexStatus, codexLoginBtn, codexLogoutBtn])
-        codexRow.orientation = .horizontal; codexRow.spacing = 8; codexRow.alignment = .centerY
-        let loginNote = NSTextField(labelWithString: "Log in once, in-app, to show the EXACT official % (no DevTools). Tokens expire occasionally → just log in again."); loginNote.textColor = .secondaryLabelColor; loginNote.font = .systemFont(ofSize: 11)
-        let rows: [NSView] = [head("Accurate login — exact official %"), claudeRow, codexRow, loginNote,
-                              head("Display"), row("Show in menu bar:", modePopup), row("Providers:", providers), row("", cLabels), row("Refresh every (s):", fRefresh),
-                              head("Colors & thresholds"), row("Thresholds:", thresholds), row("Colors:", colors),
-                              head("Claude budget (estimate)"), row("Plan:", planPopup), row("5h budget (M tok):", f5hBudget), row("Weekly budget (M tok):", fWkBudget),
-                              row("Calibrate:", calRow), calHelp, row("", calStatus), note, footer]
-        let v = NSStackView(views: rows); v.orientation = .vertical; v.alignment = .leading; v.spacing = 10
-        v.edgeInsets = NSEdgeInsets(top: 16, left: 18, bottom: 16, right: 18); v.translatesAutoresizingMaskIntoConstraints = false
-        let content = NSView(); content.addSubview(v); win.contentView = content
+        let codexRow = NSStackView(views: [{ let l = NSTextField(labelWithString: "Codex"); l.font = .systemFont(ofSize: 12, weight: .medium); l.widthAnchor.constraint(equalToConstant: 52).isActive = true; return l }(), codexStatus, NSView(), codexLoginBtn, codexLogoutBtn])
+        codexRow.orientation = .horizontal; codexRow.spacing = 8; codexRow.alignment = .centerY; codexRow.distribution = .fill
+
+        // --- glass card builder ---
+        func icon(_ name: String) -> NSImageView {
+            let iv = NSImageView()
+            iv.image = NSImage(systemSymbolName: name, accessibilityDescription: nil)?
+                .withSymbolConfiguration(NSImage.SymbolConfiguration(pointSize: 13, weight: .semibold))
+            iv.contentTintColor = .controlAccentColor
+            iv.setContentHuggingPriority(.required, for: .horizontal)
+            return iv
+        }
+        func card(_ symbol: String, _ title: String, _ items: [NSView]) -> NSView {
+            let t = NSTextField(labelWithString: title); t.font = .systemFont(ofSize: 13, weight: .semibold)
+            let header = NSStackView(views: [icon(symbol), t]); header.orientation = .horizontal; header.spacing = 7; header.alignment = .centerY
+            let inner = NSStackView(views: [header] + items); inner.orientation = .vertical; inner.alignment = .leading; inner.spacing = 9
+            inner.edgeInsets = NSEdgeInsets(top: 14, left: 16, bottom: 14, right: 16)
+            inner.translatesAutoresizingMaskIntoConstraints = false
+            inner.widthAnchor.constraint(equalToConstant: cardW).isActive = true
+            let container: NSView
+            if #available(macOS 26.0, *), ProcessInfo.processInfo.environment["AICB_NOGLASS"] == nil {
+                let g = NSGlassEffectView(); g.cornerRadius = 18; g.contentView = inner; container = g
+            } else {
+                let ve = NSVisualEffectView(); ve.material = .contentBackground; ve.blendingMode = .withinWindow; ve.state = .active
+                ve.wantsLayer = true; ve.layer?.cornerRadius = 18; ve.layer?.masksToBounds = true
+                inner.translatesAutoresizingMaskIntoConstraints = false; ve.addSubview(inner)
+                NSLayoutConstraint.activate([inner.leadingAnchor.constraint(equalTo: ve.leadingAnchor), inner.trailingAnchor.constraint(equalTo: ve.trailingAnchor), inner.topAnchor.constraint(equalTo: ve.topAnchor), inner.bottomAnchor.constraint(equalTo: ve.bottomAnchor)])
+                container = ve
+            }
+            container.translatesAutoresizingMaskIntoConstraints = false
+            container.widthAnchor.constraint(equalToConstant: cardW).isActive = true
+            return container
+        }
+
+        let loginCard = card("key.fill", "Accurate login — exact official %", [claudeRow, codexRow,
+            sub("Log in once, in-app, for the EXACT official % — no DevTools. Tokens expire occasionally → just log in again.")])
+        let displayCard = card("slider.horizontal.3", "Menu bar", [row("Show:", modePopup), row("Providers:", providers), cLabels, row("Refresh (s):", fRefresh)])
+        let colorsCard = card("paintpalette.fill", "Appearance", [row("Thresholds:", thresholds), row("Colors:", colors)])
+        let claudeCard = card("chart.bar.fill", "Claude estimate", [row("Plan:", planPopup), row("5h budget (M):", f5hBudget), row("Weekly (M):", fWkBudget), row("Calibrate:", calRow),
+            sub("Used only when you're not logged in above. Calibrate from /usage so the estimate matches reality."), calStatus])
+
+        let resetBtn = NSButton(title: "Reset to defaults", target: self, action: #selector(resetDefaults)); resetBtn.bezelStyle = .rounded
+        let doneBtn = NSButton(title: "Done", target: self, action: #selector(closeWindow)); doneBtn.keyEquivalent = "\r"; doneBtn.bezelStyle = .rounded
+        let footer = NSStackView(views: [resetBtn, NSView(), doneBtn]); footer.orientation = .horizontal; footer.distribution = .fill
+        footer.widthAnchor.constraint(equalToConstant: cardW).isActive = true
+
+        let column = NSStackView(views: [loginCard, displayCard, colorsCard, claudeCard, footer])
+        column.orientation = .vertical; column.alignment = .centerX; column.spacing = 14
+        column.edgeInsets = NSEdgeInsets(top: 40, left: 18, bottom: 18, right: 18); column.translatesAutoresizingMaskIntoConstraints = false
+
+        let bg = NSVisualEffectView(); bg.material = .underWindowBackground; bg.blendingMode = .behindWindow; bg.state = .active
+        bg.addSubview(column)
         NSLayoutConstraint.activate([
-            v.leadingAnchor.constraint(equalTo: content.leadingAnchor), v.trailingAnchor.constraint(equalTo: content.trailingAnchor),
-            v.topAnchor.constraint(equalTo: content.topAnchor), v.bottomAnchor.constraint(equalTo: content.bottomAnchor),
-            footer.widthAnchor.constraint(equalTo: v.widthAnchor, constant: -36)])
+            column.leadingAnchor.constraint(equalTo: bg.leadingAnchor), column.trailingAnchor.constraint(equalTo: bg.trailingAnchor),
+            column.topAnchor.constraint(equalTo: bg.topAnchor), column.bottomAnchor.constraint(equalTo: bg.bottomAnchor)])
+        win.contentView = bg
         window = win
     }
     func load() {
@@ -775,6 +787,18 @@ final class SettingsWindow: NSObject, NSWindowDelegate, NSTextFieldDelegate {
     @objc func logoutCodex() { Cfg.codexSessionToken = ""; load(); onChange() }
     @objc func resetDefaults() { Cfg.resetAll(); load(); onChange() }
     @objc func closeWindow() { window?.orderOut(nil) }
+
+    // Offscreen render of the settings layout to a PNG (for design verification).
+    func renderToPNG(_ path: String) {
+        if window == nil { build() }
+        load()
+        guard let content = window?.contentView else { return }
+        content.layoutSubtreeIfNeeded()
+        let r = content.bounds
+        guard let rep = content.bitmapImageRepForCachingDisplay(in: r) else { return }
+        content.cacheDisplay(in: r, to: rep)
+        if let data = rep.representation(using: .png, properties: [:]) { try? data.write(to: URL(fileURLWithPath: path)) }
+    }
 }
 
 // MARK: - App
@@ -881,7 +905,12 @@ func argString(_ flag: String) -> String? {
     guard let i = CommandLine.arguments.firstIndex(of: flag), i + 1 < CommandLine.arguments.count else { return nil }
     return CommandLine.arguments[i + 1]
 }
-Cfg.migrateSecretsToKeychain()   // move any legacy plist tokens into the Keychain
+if let path = argString("--render-settings") {
+    _ = NSApplication.shared
+    NSApplication.shared.setActivationPolicy(.accessory)
+    SettingsWindow().renderToPNG(path)
+    print("rendered settings → \(path)"); exit(0)
+}
 if let k = argString("--set-claude-key") {
     Cfg.claudeSessionKey = k; Cfg.claudeOrgUuid = ""; Cfg.d.synchronize()
     print("Claude sessionKey saved (\(k.count) chars). Restart the app to use official data."); exit(0)
