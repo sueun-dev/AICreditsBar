@@ -554,13 +554,17 @@ func providerGlyph(_ key: String, _ pt: CGFloat = 16) -> NSImage {
             let q = NSPoint(x: c.x+CGFloat(x), y: c.y+CGFloat(y)); i==0 ? p.move(to:q) : p.line(to:q)
         }
         p.close(); p.fill()
-    default: // "Cx" Codex — OpenAI hexagon (bold ring)
-        let R = pt*0.46, hex = NSBezierPath()
+    default: // "Cx" Codex — OpenAI blossom (6 rounded petals)
+        let petalR = pt*0.235, ring = pt*0.255
         for i in 0..<6 {
             let a = (CGFloat(i)*60 - 90) * .pi/180
-            let q = NSPoint(x: c.x+cos(a)*R, y: c.y+sin(a)*R); i==0 ? hex.move(to:q) : hex.line(to:q)
+            let pxc = c.x + cos(a)*ring, pyc = c.y + sin(a)*ring
+            NSBezierPath(ovalIn: NSRect(x: pxc-petalR, y: pyc-petalR, width: petalR*2, height: petalR*2)).fill()
         }
-        hex.close(); hex.lineWidth = pt*0.2; hex.lineJoinStyle = .round; hex.stroke()
+        // knot center punched out for the flower look
+        NSGraphicsContext.current?.compositingOperation = .clear
+        NSBezierPath(ovalIn: NSRect(x: c.x-pt*0.115, y: c.y-pt*0.115, width: pt*0.23, height: pt*0.23)).fill()
+        NSGraphicsContext.current?.compositingOperation = .sourceOver
     }
     img.unlockFocus(); img.isTemplate = true; glyphCache[key] = img; return img
 }
