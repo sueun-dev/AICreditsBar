@@ -27,17 +27,19 @@ func tokLabel(_ t: Double) -> String {
     return String(format: "%.0f", t)
 }
 
+// Split text into lines, keeping only those containing `must` (or all lines if `must` is empty).
+private func matchingLines(_ text: String, must: String) -> [String] {
+    text.split(separator: "\n", omittingEmptySubsequences: true)
+        .filter { must.isEmpty || $0.contains(must) }
+        .map(String.init)
+}
 // Whole-file matching lines.
 func grepLines(_ path: String, must: String, sizeCap: Int = 400_000_000) -> [String] {
     let fm = FileManager.default
     if let attrs = try? fm.attributesOfItem(atPath: path),
        let size = (attrs[.size] as? NSNumber)?.intValue, size > sizeCap { return [] }
     guard let data = fm.contents(atPath: path), let text = String(data: data, encoding: .utf8) else { return [] }
-    var out: [String] = []
-    for line in text.split(separator: "\n", omittingEmptySubsequences: true) where must.isEmpty || line.contains(must) {
-        out.append(String(line))
-    }
-    return out
+    return matchingLines(text, must: must)
 }
 // Like grepLines but, for files bigger than maxBytes, reads only the LAST maxBytes.
 // Append-only logs (Codex rollouts) keep the freshest record at EOF, so the tail suffices.
@@ -53,11 +55,7 @@ func tailLines(_ path: String, must: String, maxBytes: Int = 2_000_000) -> [Stri
         let data = fh.readDataToEndOfFile()
         var text = String(data: data, encoding: .utf8) ?? String(decoding: data, as: UTF8.self)
         if let nl = text.firstIndex(of: "\n") { text = String(text[text.index(after: nl)...]) } // drop partial first line
-        var out: [String] = []
-        for line in text.split(separator: "\n", omittingEmptySubsequences: true) where must.isEmpty || line.contains(must) {
-            out.append(String(line))
-        }
-        return out
+        return matchingLines(text, must: must)
     } catch { return [] }
 }
 func parseISO(_ s: String) -> Double? {

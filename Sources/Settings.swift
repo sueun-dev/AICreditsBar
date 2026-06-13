@@ -13,8 +13,6 @@ final class SettingsWindow: NSObject, NSWindowDelegate, NSTextFieldDelegate {
     let cLabels = NSButton(checkboxWithTitle: "Show provider labels (Cx/Cl/Gm)", target: nil, action: nil)
     let fRefresh = NSTextField(); let fGreen = NSTextField(); let fYellow = NSTextField()
     let f5hBudget = NSTextField(); let fWkBudget = NSTextField()
-    let fReal5h = NSTextField(); let fRealWk = NSTextField()
-    let calStatus = NSTextField(labelWithString: "")
     let wHigh = NSColorWell(); let wMid = NSColorWell(); let wLow = NSColorWell(); let wUnknown = NSColorWell()
     let claudeLogin = WebLoginWindow(); let codexLogin = WebLoginWindow()
     let claudeStatus = NSTextField(labelWithString: ""); let codexStatus = NSTextField(labelWithString: "")
@@ -29,12 +27,6 @@ final class SettingsWindow: NSObject, NSWindowDelegate, NSTextFieldDelegate {
             NSApp.setActivationPolicy(.regular); NSApp.activate(ignoringOtherApps: true)
             window?.level = .floating; window?.makeKeyAndOrderFront(nil)
         }
-    }
-    private func row(_ label: String, _ control: NSView) -> NSStackView {
-        let l = NSTextField(labelWithString: label); l.alignment = .right
-        l.widthAnchor.constraint(equalToConstant: 150).isActive = true
-        let h = NSStackView(views: [l, control]); h.orientation = .horizontal; h.spacing = 10; h.alignment = .centerY
-        return h
     }
     private func num(_ f: NSTextField, _ w: CGFloat = 90) { f.delegate = self; f.target = self; f.action = #selector(changed(_:)); f.widthAnchor.constraint(equalToConstant: w).isActive = true }
     private func well(_ w: NSColorWell) { w.target = self; w.action = #selector(colorChanged(_:)); w.widthAnchor.constraint(equalToConstant: 30).isActive = true; w.heightAnchor.constraint(equalToConstant: 20).isActive = true }
@@ -185,21 +177,6 @@ final class SettingsWindow: NSObject, NSWindowDelegate, NSTextFieldDelegate {
         onChange()
     }
     func controlTextDidEndEditing(_ obj: Notification) { changed(nil) }
-    // Derive Claude budgets from the user's real % (read from `/usage`) and the current token sums,
-    // so the displayed % matches reality at the calibration point and tracks proportionally after.
-    @objc func calibrate() {
-        let sums = claudeCalibrationSums()
-        var done: [String] = []
-        if let p = Double(fReal5h.stringValue), p > 0, p <= 100, sums.five > 0 {
-            Cfg.claudePlan = "Custom"; Cfg.claude5hBudget = sums.five / (p / 100); done.append("5h≈\(tokLabel(Cfg.claude5hBudget))")
-        }
-        if let p = Double(fRealWk.stringValue), p > 0, p <= 100, sums.week > 0 {
-            Cfg.claudeWeekBudget = sums.week / (p / 100); done.append("wk≈\(tokLabel(Cfg.claudeWeekBudget))")
-        }
-        calStatus.stringValue = done.isEmpty ? "Enter a non-zero % (and use Claude first so there are tokens to anchor to)."
-                                             : "✓ Calibrated: \(done.joined(separator: " · ")) tokens/window"
-        load(); onChange()
-    }
     @objc func loginClaude() {
         claudeLogin.start(title: "Log in to Claude (claude.ai)", url: "https://claude.ai/login", domain: "claude.ai", cookieName: "sessionKey") { [weak self] val in
             Cfg.claudeSessionKey = val; Cfg.claudeOrgUuid = ""; self?.load(); self?.onChange()
