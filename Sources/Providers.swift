@@ -143,7 +143,7 @@ func readClaudeLocal() -> ProviderStatus {
     let weekTokens = claudeWeekTokens(events)
     let wb = Cfg.claudeWeekBudget
     st.weekly = WindowStat(remaining: max(0, min(100, Int((100 * (1 - weekTokens / wb)).rounded()))), note: "\(tokLabel(weekTokens))/7d")
-    st.details.append("7d used \(tokLabel(weekTokens)) / \(tokLabel(wb)) est. · calibrate in Settings")
+    st.details.append("7d used \(tokLabel(weekTokens)) / \(tokLabel(wb)) est. · calibrate: --set-week-used <%>")
     return st
 }
 
@@ -258,7 +258,8 @@ func readCodexOfficial() -> ProviderStatus {
           let u = try? JSONDecoder().decode(CodexUsageWire.self, from: ur.body) else { st.problem = "usage unavailable"; return st }
     func win(_ w: CodexWindowWire?) -> WindowStat? {
         guard let w = w else { return nil }
-        let reset = w.reset_at.map { Double($0) }
+        // Accept either an absolute reset_at or a relative reset_after_seconds.
+        let reset = w.reset_at.map { Double($0) } ?? w.reset_after_seconds.map { nowEpoch() + Double($0) }
         let refilled = (reset ?? .greatestFiniteMagnitude) <= nowEpoch()
         return WindowStat(remaining: refilled ? 100 : max(0, min(100, Int((100 - w.used_percent).rounded()))), resetEpoch: reset, refilled: refilled)
     }
@@ -269,22 +270,39 @@ func readCodexOfficial() -> ProviderStatus {
     return st
 }
 
+// ---- official result cache (stops the bar flapping between official ⇄ estimate on a
+//      transient network hiccup, and avoids hammering the web APIs on every 30s tick).
+let OFFICIAL_TTL: Double = 60          // reuse a good official reading without re-fetching for this long
+let OFFICIAL_MAX_AGE: Double = 30 * 60 // keep showing the last good official up to here when refresh fails
+struct CachedOfficial { var status: ProviderStatus; var at: Double }
+var officialCache: [String: CachedOfficial] = [:]
+let officialLock = NSLock()
+func cachedOfficial(_ k: String) -> CachedOfficial? { officialLock.lock(); defer { officialLock.unlock() }; return officialCache[k] }
+func storeOfficial(_ k: String, _ s: ProviderStatus) { officialLock.lock(); defer { officialLock.unlock() }; officialCache[k] = CachedOfficial(status: s, at: nowEpoch()) }
+func clearOfficial(_ k: String) { officialLock.lock(); defer { officialLock.unlock() }; officialCache[k] = nil }
+
+// Try official; on failure prefer the last good official over a divergent fallback. `fetch`
+// returns a ProviderStatus whose `.available` indicates success; `fallback` is the local reader.
+func officialOrCached(_ key: String, fetch: () -> ProviderStatus, fallback: () -> ProviderStatus, fallbackNote: (String) -> String) -> ProviderStatus {
+    if let c = cachedOfficial(key), nowEpoch() - c.at < OFFICIAL_TTL { return c.status }   // fresh enough: no network
+    let off = fetch()
+    if off.available { storeOfficial(key, off); return off }
+    if let c = cachedOfficial(key), nowEpoch() - c.at < OFFICIAL_MAX_AGE {                 // transient fail: hold last good
+        var s = c.status; s.details.append("↻ refresh failed (\(off.problem ?? "")) — last good \(ageLabel(nowEpoch() - c.at))"); return s
+    }
+    var local = fallback(); local.details.insert(fallbackNote(off.problem ?? "failed"), at: 0); return local
+}
+
 // ---- dispatchers: official (if a token is set) first, else local ----
 func readClaude() -> ProviderStatus {
-    guard !Cfg.claudeSessionKey.isEmpty else { return readClaudeLocal() }
-    let off = readClaudeOfficial()
-    if off.available { return off }
-    var local = readClaudeLocal()
-    local.details.insert("⚠︎ official login: \(off.problem ?? "failed") — showing estimate", at: 0)
-    return local
+    guard !Cfg.claudeSessionKey.isEmpty else { clearOfficial("Cl"); return readClaudeLocal() }
+    return officialOrCached("Cl", fetch: readClaudeOfficial, fallback: readClaudeLocal,
+                            fallbackNote: { "⚠︎ official login: \($0) — showing estimate" })
 }
 func readCodex() -> ProviderStatus {
-    guard !Cfg.codexSessionToken.isEmpty || codexCLIAccessToken() != nil else { return readCodexLocal() }
-    let off = readCodexOfficial()
-    if off.available { return off }
-    var local = readCodexLocal()   // disk rate_limits are also official, just updated only when codex runs
-    local.details.insert("⚠︎ live: \(off.problem ?? "failed") — showing last disk snapshot", at: 0)
-    return local
+    guard !Cfg.codexSessionToken.isEmpty || codexCLIAccessToken() != nil else { clearOfficial("Cx"); return readCodexLocal() }
+    return officialOrCached("Cx", fetch: readCodexOfficial, fallback: readCodexLocal,
+                            fallbackNote: { "⚠︎ live: \($0) — showing last disk snapshot" })
 }
 
 // MARK: - Gemini (best-effort status)

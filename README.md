@@ -76,6 +76,34 @@ Quit from the menu (**Quit AICreditsBar**) or `pkill -x aicreditsbar`. Print val
 
 Start at login (optional): `bash scripts/install-login-item.sh` (remove with `-u`).
 
+### Command-line flags
+
+All flags run headless (no GUI) against `aicreditsbar` in the app bundle:
+
+```bash
+B=./AICreditsBar.app/Contents/MacOS/aicreditsbar
+
+$B --once                    # print all providers' status once, then exit
+$B --dump-config             # print effective settings (then prints --once output)
+
+# Calibrate the Claude *estimate* to match what /usage actually shows.
+# Open Claude's /usage, read the "used" %, and pass it here — the budget is
+# back-solved from your real 7-day / current-5h-block token totals on disk.
+$B --set-week-used 35        # "weekly shows 35% used" → calibrates the 7-day budget
+$B --set-5h-used 60          # "5h block shows 60% used" → calibrates the 5-hour budget
+
+# Official exact-% logins (alternative to the in-app Settings → Log in flow):
+$B --set-claude-key <key>    # store a claude.ai sessionKey cookie
+$B --set-codex-token <tok>   # store a chatgpt.com session-token (Codex usually needs none)
+$B --clear-logins            # drop both official tokens; revert to local estimate/disk
+
+$B --render-settings out.png # render the Settings window to a PNG (design check)
+```
+
+> Calibration and the budget used for the Claude estimate live behind these CLI flags —
+> there is no plan/budget control in the Settings window (which covers display mode,
+> providers, thresholds, colors, and accurate login only).
+
 ### Project structure
 
 ```
@@ -173,6 +201,33 @@ open AICreditsBar.app  # 메뉴바 에이전트 실행 (Dock 아이콘 없음)
 ```
 
 로그인 시 자동 시작(선택): `bash scripts/install-login-item.sh` (제거는 `-u`).
+
+### 커맨드라인 플래그
+
+모든 플래그는 GUI 없이 앱 번들의 `aicreditsbar`를 실행합니다:
+
+```bash
+B=./AICreditsBar.app/Contents/MacOS/aicreditsbar
+
+$B --once                    # 모든 제공자 상태를 한 번 출력 후 종료
+$B --dump-config             # 적용된 설정 출력 (이어서 --once 출력)
+
+# Claude *추정치*를 /usage 실제 표시값에 맞춰 보정.
+# Claude의 /usage에서 "used" %를 읽어 넘기면, 디스크의 실제 7일 / 현재 5h 블록
+# 토큰 합계로부터 예산을 역산합니다.
+$B --set-week-used 35        # "주간 35% 사용" → 7일 예산 보정
+$B --set-5h-used 60          # "5h 블록 60% 사용" → 5시간 예산 보정
+
+# 공식 정확값 로그인 (인앱 Settings → Log in 대신 사용 가능):
+$B --set-claude-key <key>    # claude.ai sessionKey 쿠키 저장
+$B --set-codex-token <tok>   # chatgpt.com session-token 저장 (Codex는 보통 불필요)
+$B --clear-logins            # 두 공식 토큰 삭제; 로컬 추정치/디스크로 복귀
+
+$B --render-settings out.png # Settings 창을 PNG로 렌더 (디자인 확인)
+```
+
+> 보정과 Claude 추정치 예산은 위 CLI 플래그로만 설정합니다 — 설정 창에는 플랜/예산
+> 컨트롤이 없습니다(설정 창은 표시 모드·제공자·임계값·색상·정확 로그인만 다룸).
 
 ### 프로젝트 구조
 

@@ -92,7 +92,7 @@ def render_dropdown():
         ("det","   5h used 105.2M / 220.0M est.", SUB),
         ("det","   burn 1.2M/min · ~138M by reset", SUB),
         ("det","   7d: 47% left  (1.1B/7d)", SUB),
-        ("det","   7d used 1.1B / 2.2B est. · calibrate in Settings", SUB),
+        ("det","   7d used 1.1B / 2.2B est. · calibrate: --set-week-used <%>", SUB),
         ("sep",None,None),
         ("head","Gemini — logged in", WHITE),
         ("det","   no local quota API — % unavailable", SUB),
@@ -101,7 +101,7 @@ def render_dropdown():
         ("item","Refresh now","⌘R"),
         ("item","Quit AICreditsBar","⌘Q"),
     ]
-    pad=10; lh=20; W=430
+    pad=10; lh=20; W=470
     H = pad*2 + sum(8 if r[0]=="sep" else lh for r in rows)
     img = Image.new("RGB",(W*S,H*S),(0,0,0)); d=ImageDraw.Draw(img)
     rrect(d,(0,0,W-1,H-1),10,MENU_BG,outline=(90,90,96),w=1)

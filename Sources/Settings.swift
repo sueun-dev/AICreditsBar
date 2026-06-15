@@ -6,13 +6,12 @@ final class SettingsWindow: NSObject, NSWindowDelegate, NSTextFieldDelegate {
     var window: NSWindow?
     var onChange: () -> Void = {}
 
-    let modePopup = NSPopUpButton(); let planPopup = NSPopUpButton()
+    let modePopup = NSPopUpButton()
     let cCodex = NSButton(checkboxWithTitle: "Codex", target: nil, action: nil)
     let cClaude = NSButton(checkboxWithTitle: "Claude", target: nil, action: nil)
     let cGemini = NSButton(checkboxWithTitle: "Gemini", target: nil, action: nil)
     let cLabels = NSButton(checkboxWithTitle: "Show provider labels (Cx/Cl/Gm)", target: nil, action: nil)
     let fRefresh = NSTextField(); let fGreen = NSTextField(); let fYellow = NSTextField()
-    let f5hBudget = NSTextField(); let fWkBudget = NSTextField()
     let wHigh = NSColorWell(); let wMid = NSColorWell(); let wLow = NSColorWell(); let wUnknown = NSColorWell()
     let claudeLogin = WebLoginWindow(); let codexLogin = WebLoginWindow()
     let claudeStatus = NSTextField(labelWithString: ""); let codexStatus = NSTextField(labelWithString: "")
@@ -41,7 +40,6 @@ final class SettingsWindow: NSObject, NSWindowDelegate, NSTextFieldDelegate {
 
         // --- controls ---
         modePopup.addItems(withTitles: ["5-hour window", "Weekly window", "Both (5h/week)", "Lowest"]); modePopup.target = self; modePopup.action = #selector(changed(_:))
-        planPopup.addItems(withTitles: ["Pro", "Max 5x", "Max 20x", "Custom"]); planPopup.target = self; planPopup.action = #selector(changed(_:))
         for b in [cCodex, cClaude, cGemini, cLabels] { b.target = self; b.action = #selector(changed(_:)) }
         num(fRefresh, 56); num(fGreen, 46); num(fYellow, 46)
         for w in [wHigh, wMid, wLow, wUnknown] { well(w) }
@@ -133,10 +131,7 @@ final class SettingsWindow: NSObject, NSWindowDelegate, NSTextFieldDelegate {
         cCodex.state = Cfg.showCodex ? .on : .off; cClaude.state = Cfg.showClaude ? .on : .off
         cGemini.state = Cfg.showGemini ? .on : .off; cLabels.state = Cfg.showLabels ? .on : .off
         fRefresh.stringValue = String(Int(Cfg.refreshInterval)); fGreen.stringValue = String(Cfg.greenAbove); fYellow.stringValue = String(Cfg.yellowAbove)
-        f5hBudget.stringValue = String(format: "%g", Cfg.claude5hBudget/1_000_000); fWkBudget.stringValue = String(format: "%g", Cfg.claudeWeekBudget/1_000_000)
-        planPopup.selectItem(withTitle: Cfg.planBudgets[Cfg.claudePlan] != nil ? Cfg.claudePlan : "Custom")
         wHigh.color = Cfg.colorHigh; wMid.color = Cfg.colorMid; wLow.color = Cfg.colorLow; wUnknown.color = Cfg.colorUnknown
-        f5hBudget.isEnabled = (planPopup.titleOfSelectedItem == "Custom")
         claudeStatus.stringValue = Cfg.claudeSessionKey.isEmpty ? "not logged in — using estimate" : "✓ logged in — exact official %"
         claudeStatus.textColor = Cfg.claudeSessionKey.isEmpty ? .secondaryLabelColor : .systemGreen
         // Codex needs no browser login when the codex CLI is already authed — hide the button then.
@@ -159,12 +154,6 @@ final class SettingsWindow: NSObject, NSWindowDelegate, NSTextFieldDelegate {
         if let r = Double(fRefresh.stringValue) { Cfg.refreshInterval = r }
         if let g = Int(fGreen.stringValue) { Cfg.greenAbove = max(0, min(100, g)) }
         if let y = Int(fYellow.stringValue) { Cfg.yellowAbove = max(0, min(100, y)) }
-        if let plan = planPopup.titleOfSelectedItem {
-            Cfg.claudePlan = plan
-            if let b = Cfg.planBudgets[plan] { Cfg.claude5hBudget = b }
-            else if let m = Double(f5hBudget.stringValue), m > 0 { Cfg.claude5hBudget = m * 1_000_000 }
-        }
-        if let m = Double(fWkBudget.stringValue), m > 0 { Cfg.claudeWeekBudget = m * 1_000_000 }
         load(); onChange()
     }
     // Save ONLY the well the user actually changed, so untouched colors keep their

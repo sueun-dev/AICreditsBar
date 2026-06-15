@@ -59,6 +59,23 @@ eq(windowText(WindowStat(remaining: 54)), "54%", "windowText percent")
 eq(windowText(WindowStat(remaining: 100, refilled: true)), "↑", "windowText refilled glyph")
 eq(windowText(nil), "?", "windowText nil → ?")
 
+// ---- official cache: throttle + no flapping ----
+var fetches = 0
+func goodFetch() -> ProviderStatus { fetches += 1; var s = ProviderStatus(key: "T", name: "T", available: true); s.fiveHour = WindowStat(remaining: 73); return s }
+func locFetch() -> ProviderStatus { var s = ProviderStatus(key: "T", name: "T", available: true); s.fiveHour = WindowStat(remaining: 12); return s }
+func badFetch() -> ProviderStatus { ProviderStatus(key: "T", name: "T", available: false) }
+clearOfficial("UT")
+let oc1 = officialOrCached("UT", fetch: goodFetch, fallback: locFetch, fallbackNote: { _ in "fb" })
+eq(oc1.fiveHour?.remaining, 73, "official success returns the official value")
+eq(fetches, 1, "fetched exactly once")
+let oc2 = officialOrCached("UT", fetch: goodFetch, fallback: locFetch, fallbackNote: { _ in "fb" })
+eq(oc2.fiveHour?.remaining, 73, "within TTL returns cached value (no flap)")
+eq(fetches, 1, "no re-fetch within TTL (no hammering)")
+clearOfficial("UT2")
+let oc3 = officialOrCached("UT2", fetch: badFetch, fallback: locFetch, fallbackNote: { _ in "fb-note" })
+eq(oc3.fiveHour?.remaining, 12, "failure with no cache → fallback value")
+check(oc3.details.first == "fb-note", "fallback note is prepended on failure")
+
 let summary = "\(passed) passed, \(failures) failed"
 print(failures == 0 ? "✓ unit: \(summary)" : "✗ unit: \(summary)")
 exit(failures == 0 ? 0 : 1)
