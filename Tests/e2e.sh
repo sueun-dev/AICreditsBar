@@ -39,7 +39,7 @@ assert "$out" "Claude: 5h=99%" "Claude 5h estimate (1.5M / 220M default)"
 echo "2) --dump-config: defaults in the isolated suite"
 out="$(run --dump-config)"
 assert "$out" "displayMode=5h" "default display mode is 5h"
-assert "$out" "plan=Max 20x" "default Claude plan"
+assert "$out" "5h=220.0M" "default Claude 5h estimate budget"
 
 echo "3) empty HOME degrades gracefully (no crash, marks unavailable)"
 EMPTY="$(mktemp -d)"

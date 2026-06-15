@@ -42,7 +42,7 @@ func handleCLIFlags() {
     if let pct = argValue("--set-5h-used") {
         let sums = claudeCalibrationSums()
         guard pct > 0, pct <= 100, sums.five > 0 else { print("need 0<pct<=100 and an active Claude 5h block (5h tokens=\(tokLabel(sums.five)))"); exit(1) }
-        Cfg.claudePlan = "Custom"; Cfg.claude5hBudget = sums.five / (pct / 100); Cfg.d.synchronize()
+        Cfg.claude5hBudget = sums.five / (pct / 100); Cfg.d.synchronize()
         print("Claude 5h calibrated: 5h=\(tokLabel(sums.five)) tok @ \(Int(pct))% used → budget \(tokLabel(Cfg.claude5hBudget)), shows \(100 - Int(pct))% left")
         exit(0)
     }
@@ -52,7 +52,7 @@ func handleCLIFlags() {
             print("providers: Cx=\(Cfg.showCodex) Cl=\(Cfg.showClaude) Gm=\(Cfg.showGemini)")
             print("thresholds: green>\(Cfg.greenAbove) yellow>=\(Cfg.yellowAbove)")
             print("colors: high=\(Cfg.colorHigh.hexString) mid=\(Cfg.colorMid.hexString) low=\(Cfg.colorLow.hexString) unknown=\(Cfg.colorUnknown.hexString)")
-            print("claude: plan=\(Cfg.claudePlan) 5h=\(tokLabel(Cfg.claude5hBudget)) week=\(tokLabel(Cfg.claudeWeekBudget))")
+            print("claude: 5h=\(tokLabel(Cfg.claude5hBudget)) week=\(tokLabel(Cfg.claudeWeekBudget)) (estimate budgets)")
         }
         for p in [readCodex(), readClaude(), readGemini()] {
             var line = "\(p.name): "

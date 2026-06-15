@@ -31,19 +31,16 @@ enum Cfg {
     static var colorUnknown: NSColor { get { color("colorUnknown", .secondaryLabelColor) } set { d.set(newValue.hexString, forKey: "colorUnknown") } }
     static var claude5hBudget: Double { get { validBudget(dbl("claude5hBudget", 220_000_000), 220_000_000) } set { d.set(newValue, forKey: "claude5hBudget") } }
     static var claudeWeekBudget: Double { get { validBudget(dbl("claudeWeekBudget", 1_500_000_000), 1_500_000_000) } set { d.set(newValue, forKey: "claudeWeekBudget") } }
-    static var claudePlan: String { get { d.string(forKey: "claudePlan") ?? "Max 20x" } set { d.set(newValue, forKey: "claudePlan") } }
     // Official web-session tokens (exact %, like usage4claude). Empty = use local estimate/disk.
     // Stored in UserDefaults (no keychain prompt for an ad-hoc-built app). Local, revocable session cookies.
     static var claudeSessionKey: String { get { d.string(forKey: "claudeSessionKey") ?? "" } set { d.set(newValue, forKey: "claudeSessionKey") } }
     static var codexSessionToken: String { get { d.string(forKey: "codexSessionToken") ?? "" } set { d.set(newValue, forKey: "codexSessionToken") } }
     static var claudeOrgUuid: String { get { d.string(forKey: "claudeOrgUuid") ?? "" } set { d.set(newValue, forKey: "claudeOrgUuid") } }
 
-    static let planBudgets: [String: Double] = ["Pro": 19_000_000, "Max 5x": 88_000_000, "Max 20x": 220_000_000]
-
     static func resetAll() {
         for k in ["displayMode","showCodex","showClaude","showGemini","showLabels","refreshInterval",
                   "greenAbove","yellowAbove","colorHigh","colorMid","colorLow","colorUnknown",
-                  "claude5hBudget","claudeWeekBudget","claudePlan"] { d.removeObject(forKey: k) }
+                  "claude5hBudget","claudeWeekBudget"] { d.removeObject(forKey: k) }
     }
 }
 

@@ -28,10 +28,14 @@ func readCodexLocal() -> ProviderStatus {
     func win(_ k: String) -> WindowStat? {
         guard let w = rl[k] as? [String: Any], let used = (w["used_percent"] as? NSNumber)?.doubleValue else { return nil }
         let reset = (w["resets_at"] as? NSNumber)?.doubleValue
-        let refilled = reset.map { $0 <= nowEpoch() } ?? false      // missing reset -> NOT refilled
-        let stale = !refilled && (age ?? 0) > CODEX_STALE
+        // Scale staleness to the window length: a 90-min-old weekly snapshot is still fine,
+        // a 90-min-old 5h snapshot is not. (5h → ~90 min, weekly → ~50 h.)
+        let windowMin = (w["window_minutes"] as? NSNumber)?.doubleValue ?? 300
+        let aged = (age ?? 0) > max(CODEX_STALE, windowMin * 60 * 0.3)
+        // Don't trust an inferred refill from an aged snapshot (the new window may already be in use).
+        let refilled = (reset.map { $0 <= nowEpoch() } ?? false) && !aged
         return WindowStat(remaining: refilled ? 100 : max(0, min(100, Int((100 - used).rounded()))),
-                          resetEpoch: reset, refilled: refilled, stale: stale)
+                          resetEpoch: reset, refilled: refilled, stale: aged)
     }
     st.fiveHour = win("primary")
     st.weekly = win("secondary")
@@ -189,30 +193,46 @@ func claudeHeaders(_ key: String) -> [String: String] {
 
 func readClaudeOfficial() -> ProviderStatus {
     var st = ProviderStatus(key: "Cl", name: "Claude", available: false)
-    let key = Cfg.claudeSessionKey
-    let h = claudeHeaders(key)
-    var org = Cfg.claudeOrgUuid
-    if org.isEmpty {
-        guard let r = httpGet("https://claude.ai/api/organizations", headers: h) else { st.problem = "network error"; return st }
-        if r.status == 401 || r.status == 403 { st.problem = "login expired — update sessionKey"; return st }
+    let h = claudeHeaders(Cfg.claudeSessionKey)
+    func detectOrg() -> String? {
+        guard let r = httpGet("https://claude.ai/api/organizations", headers: h) else { st.problem = "network error"; return nil }
+        if r.status == 401 || r.status == 403 { st.problem = "login expired — update sessionKey"; return nil }
         guard r.status == 200, let orgs = try? JSONDecoder().decode([ClaudeOrgWire].self, from: r.body), !orgs.isEmpty else {
-            st.problem = "org lookup failed (HTTP \(r.status))"; return st
+            st.problem = "org lookup failed (HTTP \(r.status))"; return nil
         }
-        org = (orgs.first { ($0.capabilities ?? []).contains { $0.contains("claude") } } ?? orgs[0]).uuid
-        Cfg.claudeOrgUuid = org
+        let pref = ["claude_pro", "claude_max", "claude_team", "chat", "raven"]   // consumer-subscription markers
+        let chosen = orgs.first { o in (o.capabilities ?? []).contains { c in pref.contains { c.contains($0) } } }
+            ?? orgs.first { ($0.capabilities ?? []).contains { $0.contains("claude") } } ?? orgs[0]
+        return chosen.uuid
     }
-    guard let r = httpGet("https://claude.ai/api/organizations/\(org)/usage", headers: h) else { st.problem = "network error"; return st }
-    if r.status == 401 || r.status == 403 { Cfg.claudeOrgUuid = ""; st.problem = "login expired — update sessionKey"; return st }
-    guard r.status == 200, let u = try? JSONDecoder().decode(ClaudeUsageWire.self, from: r.body) else {
-        st.problem = "usage unavailable (HTTP \(r.status))"; return st
+    func fetchUsage(_ org: String) -> ClaudeUsageWire? {
+        guard let r = httpGet("https://claude.ai/api/organizations/\(org)/usage", headers: h) else { st.problem = "network error"; return nil }
+        if r.status == 401 || r.status == 403 || r.status == 404 { Cfg.claudeOrgUuid = ""; st.problem = "login expired — update sessionKey"; return nil }
+        guard r.status == 200, let u = try? JSONDecoder().decode(ClaudeUsageWire.self, from: r.body) else {
+            st.problem = "usage unavailable (HTTP \(r.status))"; return nil   // Cloudflare HTML / non-JSON lands here too
+        }
+        return u
     }
     func win(_ w: ClaudeLimitWire?) -> WindowStat? {
         guard let w = w else { return nil }
         return WindowStat(remaining: max(0, min(100, Int((100 - w.utilization).rounded()))), resetEpoch: parseISO(w.resets_at ?? ""), refilled: false)
     }
-    st.available = true; st.plan = "official"
-    st.fiveHour = win(u.five_hour)
-    st.weekly = win(u.seven_day)
+    func hasWindow(_ u: ClaudeUsageWire) -> Bool { u.five_hour != nil || u.seven_day != nil || u.seven_day_opus != nil || u.seven_day_sonnet != nil }
+
+    var org = Cfg.claudeOrgUuid
+    let fromCache = !org.isEmpty
+    if org.isEmpty { guard let o = detectOrg() else { return st }; org = o }
+    guard var u = fetchUsage(org) else { return st }
+    // A cached org that yields no windows may be the wrong/stale org — re-detect once.
+    if !hasWindow(u) && fromCache {
+        Cfg.claudeOrgUuid = ""
+        if let o = detectOrg(), let u2 = fetchUsage(o) { org = o; u = u2 }
+    }
+    st.fiveHour = win(u.five_hour); st.weekly = win(u.seven_day)
+    st.available = (st.fiveHour != nil || st.weekly != nil)
+    guard st.available else { st.problem = "usage payload empty/changed (HTTP 200)"; return st }
+    st.plan = "official"
+    Cfg.claudeOrgUuid = org   // cache only after confirming this org has usable windows
     if let o = u.seven_day_opus, !(o.utilization == 0 && o.resets_at == nil) { st.details.append("Opus 7d: \(Int((100 - o.utilization).rounded()))% left") }
     if let s = u.seven_day_sonnet, !(s.utilization == 0 && s.resets_at == nil) { st.details.append("Sonnet 7d: \(Int((100 - s.utilization).rounded()))% left") }
     return st
@@ -263,9 +283,11 @@ func readCodexOfficial() -> ProviderStatus {
         let refilled = (reset ?? .greatestFiniteMagnitude) <= nowEpoch()
         return WindowStat(remaining: refilled ? 100 : max(0, min(100, Int((100 - w.used_percent).rounded()))), resetEpoch: reset, refilled: refilled)
     }
-    st.available = true; st.plan = u.plan_type ?? "official"
     st.fiveHour = win(u.rate_limit?.primary_window)
     st.weekly = win(u.rate_limit?.secondary_window)
+    st.available = (st.fiveHour != nil || st.weekly != nil)   // a hollow 200 must not be cached as good
+    guard st.available else { st.problem = "usage payload empty/changed (HTTP 200)"; return st }
+    st.plan = u.plan_type ?? "official"
     st.throttled = (u.rate_limit?.limit_reached == true) && !(st.fiveHour?.refilled ?? false)
     return st
 }
@@ -288,7 +310,15 @@ func officialOrCached(_ key: String, fetch: () -> ProviderStatus, fallback: () -
     let off = fetch()
     if off.available { storeOfficial(key, off); return off }
     if let c = cachedOfficial(key), nowEpoch() - c.at < OFFICIAL_MAX_AGE {                 // transient fail: hold last good
-        var s = c.status; s.details.append("↻ refresh failed (\(off.problem ?? "")) — last good \(ageLabel(nowEpoch() - c.at))"); return s
+        let age = nowEpoch() - c.at
+        func held(_ w: WindowStat?) -> WindowStat? {           // re-derive time-dependent fields, flag as stale
+            guard var w = w else { return nil }
+            if let reset = w.resetEpoch, reset <= nowEpoch() { w.refilled = true; w.remaining = 100 }
+            w.stale = true; return w
+        }
+        var s = c.status; s.fiveHour = held(s.fiveHour); s.weekly = held(s.weekly); s.snapshotAge = age
+        s.details.append("↻ refresh failed (\(off.problem ?? "")) — last good \(ageLabel(age))")
+        return s
     }
     var local = fallback(); local.details.insert(fallbackNote(off.problem ?? "failed"), at: 0); return local
 }

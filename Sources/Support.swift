@@ -10,6 +10,7 @@ func resetLabel(_ ts: Double?) -> String {
     guard let ts = ts else { return "?" }
     let dd = ts - nowEpoch()
     if dd <= 0 { return "now" }
+    if dd < 60 { return "in <1m" }                       // avoid the nonsensical "in 0m"
     if dd < 3600 { return "in \(Int((dd/60).rounded()))m" }
     if dd < 86400 { let h = Int(dd/3600); let m = Int((dd - Double(h)*3600)/60); return "in \(h)h \(m)m" }
     let days = Int(dd/86400); let h = Int((dd - Double(days)*86400)/3600); return "in \(days)d \(h)h"

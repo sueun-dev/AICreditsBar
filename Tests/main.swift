@@ -76,6 +76,30 @@ let oc3 = officialOrCached("UT2", fetch: badFetch, fallback: locFetch, fallbackN
 eq(oc3.fiveHour?.remaining, 12, "failure with no cache → fallback value")
 check(oc3.details.first == "fb-note", "fallback note is prepended on failure")
 
+// ---- resetLabel sub-minute ----
+eq(resetLabel(nowEpoch() + 30), "in <1m", "resetLabel sub-minute is 'in <1m', not 'in 0m'")
+
+// ---- barInfo never substitutes the other window in single-window modes ----
+func prov(_ f: Int?, _ w: Int?) -> ProviderStatus {
+    var s = ProviderStatus(key: "Cx", name: "T", available: true)
+    if let f = f { s.fiveHour = WindowStat(remaining: f) }
+    if let w = w { s.weekly = WindowStat(remaining: w) }
+    return s
+}
+Cfg.displayMode = "week"
+eq(barInfo(prov(54, nil)).0, "?", "week mode → '?' when weekly absent (no 5h substitution)")
+eq(barInfo(prov(54, 31)).0, "31%", "week mode shows weekly")
+Cfg.displayMode = "5h"
+eq(barInfo(prov(nil, 70)).0, "?", "5h mode → '?' when 5h absent (no weekly substitution)")
+eq(barInfo(prov(88, 70)).0, "88%", "5h mode shows 5h")
+Cfg.displayMode = "both"
+eq(barInfo(prov(88, nil)).0, "88%/?", "both mode shows f/? when weekly absent")
+
+// ---- colorFor tolerates inverted thresholds (mid stays reachable) ----
+Cfg.greenAbove = 20; Cfg.yellowAbove = 50
+eq(colorFor(WindowStat(remaining: 35)).hexString, Cfg.colorMid.hexString, "inverted thresholds: mid still reachable at 35%")
+Cfg.resetAll()
+
 let summary = "\(passed) passed, \(failures) failed"
 print(failures == 0 ? "✓ unit: \(summary)" : "✗ unit: \(summary)")
 exit(failures == 0 ? 0 : 1)

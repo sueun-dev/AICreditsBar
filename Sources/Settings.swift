@@ -154,7 +154,7 @@ final class SettingsWindow: NSObject, NSWindowDelegate, NSTextFieldDelegate {
         if let r = Double(fRefresh.stringValue) { Cfg.refreshInterval = r }
         if let g = Int(fGreen.stringValue) { Cfg.greenAbove = max(0, min(100, g)) }
         if let y = Int(fYellow.stringValue) { Cfg.yellowAbove = max(0, min(100, y)) }
-        load(); onChange()
+        onChange()   // don't load() here — it would overwrite a field the user is mid-edit
     }
     // Save ONLY the well the user actually changed, so untouched colors keep their
     // dynamic (dark/light-aware) defaults instead of being frozen to a static hex.

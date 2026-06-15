@@ -7,8 +7,9 @@ func colorFor(_ w: WindowStat?) -> NSColor {
     if w.stale { return Cfg.colorUnknown }
     if w.refilled { return Cfg.colorHigh }
     guard let r = w.remaining else { return Cfg.colorUnknown }
-    if r > Cfg.greenAbove { return Cfg.colorHigh }
-    if r >= Cfg.yellowAbove { return Cfg.colorMid }
+    let hi = max(Cfg.greenAbove, Cfg.yellowAbove), lo = min(Cfg.greenAbove, Cfg.yellowAbove)   // tolerate inverted thresholds
+    if r > hi { return Cfg.colorHigh }
+    if r >= lo { return Cfg.colorMid }
     return Cfg.colorLow
 }
 func windowText(_ w: WindowStat?) -> String {
@@ -21,21 +22,15 @@ func barInfo(_ p: ProviderStatus) -> (String, NSColor) {
     guard p.available else { return ("—", Cfg.colorUnknown) }
     let f = p.fiveHour, w = p.weekly
     switch Cfg.displayMode {
-    case "week":
-        if w != nil { return (windowText(w), colorFor(w)) }
-        return (windowText(f), colorFor(f))
-    case "both":
-        if w != nil {
-            let worse = (f?.remaining ?? 101) <= (w?.remaining ?? 101) ? f : w
-            return ("\(windowText(f))/\(windowText(w))", colorFor(worse))
-        }
-        return (windowText(f), colorFor(f))
-    case "min":
-        let cands = [f, w].compactMap { $0 }
-        let worst = cands.min { ($0.remaining ?? 101) < ($1.remaining ?? 101) } ?? f
+    case "week":                                       // weekly only — "?" if absent, never substitute 5h
+        return (windowText(w), colorFor(w))
+    case "both":                                       // always show both windows ("?" for a missing one)
+        let worse = (f?.remaining ?? 101) <= (w?.remaining ?? 101) ? f : w
+        return ("\(windowText(f))/\(windowText(w))", colorFor(worse))
+    case "min":                                        // the lower of whatever windows exist
+        let worst = [f, w].compactMap { $0 }.min { ($0.remaining ?? 101) < ($1.remaining ?? 101) }
         return (windowText(worst), colorFor(worst))
-    default:
-        if f == nil && w != nil { return (windowText(w), colorFor(w)) }
+    default:                                           // "5h" — 5-hour only, "?" if absent
         return (windowText(f), colorFor(f))
     }
 }

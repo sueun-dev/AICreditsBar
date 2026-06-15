@@ -38,25 +38,33 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     @objc func manualRefresh() { refresh() }
     @objc func openSettings() { settings.show() }
 
+    var menuOpen = false
+    // Single source of truth for which providers are shown, so the bar and the dropdown never disagree.
+    func shownProviders(_ all: [ProviderStatus]) -> [ProviderStatus] {
+        zip(all, [Cfg.showCodex, Cfg.showClaude, Cfg.showGemini]).filter { $0.1 }.map { $0.0 }
+    }
     func refresh() {
         refreshQueue.async {
             let providers = [readCodex(), readClaude(), readGemini()]
-            DispatchQueue.main.async { self.latest = providers; self.renderTitle(providers) }
+            DispatchQueue.main.async {
+                self.latest = providers
+                self.renderTitle(providers)
+                if self.menuOpen { self.rebuildMenu(self.menu) }   // live-update an open dropdown
+            }
         }
     }
     func renderTitle(_ all: [ProviderStatus]) {
-        let shown = zip(all, [Cfg.showCodex, Cfg.showClaude, Cfg.showGemini]).filter { $0.1 }.map { $0.0 }
         let title = NSMutableAttributedString()
         let sep = NSAttributedString(string: "  ·  ", attributes: [.font: NSFont.monospacedDigitSystemFont(ofSize: 13, weight: .regular), .foregroundColor: NSColor.secondaryLabelColor])
-        for (i, p) in shown.enumerated() { if i > 0 { title.append(sep) }; title.append(barSegment(p)) }
+        for (i, p) in shownProviders(all).enumerated() { if i > 0 { title.append(sep) }; title.append(barSegment(p)) }
         if title.length == 0 { title.append(NSAttributedString(string: "AICreditsBar")) }
         statusItem.button?.attributedTitle = title
     }
 
-    // Build the dropdown lazily so it's never swapped while open.
-    func menuNeedsUpdate(_ menu: NSMenu) {
+    func menuNeedsUpdate(_ menu: NSMenu) { rebuildMenu(menu) }
+    func rebuildMenu(_ menu: NSMenu) {
         menu.removeAllItems()
-        for p in latest {
+        for p in shownProviders(latest) {
             let planTxt = p.plan.map { " — \($0)" } ?? ""
             menu.addItem(headerItem("\(p.name)\(planTxt)\(p.throttled ? "  ⚠︎ throttled" : "")"))
             if !p.available { menu.addItem(detail("   \(p.problem ?? "unavailable")")) }
@@ -72,7 +80,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         let refreshItem = NSMenuItem(title: "Refresh now", action: #selector(manualRefresh), keyEquivalent: "r"); refreshItem.target = self; menu.addItem(refreshItem)
         menu.addItem(NSMenuItem(title: "Quit AICreditsBar", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q"))
     }
-    func menuWillOpen(_ menu: NSMenu) { refresh() }   // freshen for next open + title
+    func menuWillOpen(_ menu: NSMenu) { menuOpen = true; refresh() }   // freshen; refresh() live-updates the open menu
+    func menuDidClose(_ menu: NSMenu) { menuOpen = false }
 
     func winLine(_ label: String, _ w: WindowStat, age: Double?) -> String {
         if w.refilled { return "\(label): refilled ✓" + (w.note.map { " (\($0))" } ?? "") }
