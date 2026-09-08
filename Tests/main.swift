@@ -100,6 +100,109 @@ Cfg.greenAbove = 20; Cfg.yellowAbove = 50
 eq(colorFor(WindowStat(remaining: 35)).hexString, Cfg.colorMid.hexString, "inverted thresholds: mid still reachable at 35%")
 Cfg.resetAll()
 
+// ---- malformed external values and expired observations ----
+eq(resetLabel(Double.greatestFiniteMagnitude), "?", "absurd reset must not trap converting to Int")
+eq(ageLabel(.infinity), "?", "infinite age rejected")
+eq(sanitizeEpoch(-1), nil, "negative reset rejected")
+eq(pctClamp(-1e300), 0, "huge negative percentage clamped before conversion")
+eq(pctClamp(1e300), 100, "huge positive percentage clamped before conversion")
+Cfg.refreshInterval = .nan
+eq(Cfg.refreshInterval, 15, "invalid refresh interval falls back to automatic cadence")
+Cfg.resetAll()
+var expired = prov(8, 44)
+expired.fiveHour?.resetEpoch = nowEpoch() - 1
+expired.snapshotAge = 2
+let aged = expired.aged(by: 8)
+eq(aged.fiveHour?.remaining, 8, "clock crossing reset never invents 100%")
+eq(aged.fiveHour?.stale, true, "expired window waits for a new reading")
+eq(aged.snapshotAge, 10, "snapshot age advances without network")
+eq(aged.fiveHour?.refilled, false, "expired snapshot is not confirmed refilled")
+
+// ---- forced refresh, backoff, held stale cache ----
+_ = officialOrCached("UT", force: true, fetch: goodFetch, fallback: locFetch, fallbackNote: { _ in "fb" })
+eq(fetches, 2, "manual refresh bypasses a fresh cache")
+var failedFetches = 0
+clearOfficial("FAIL")
+for _ in 0..<4 {
+    _ = officialOrCached("FAIL", fetch: { failedFetches += 1; return badFetch() }, fallback: locFetch, fallbackNote: { _ in "fb" })
+}
+eq(failedFetches, 1, "automatic failures back off instead of hammering API")
+_ = officialOrCached("FAIL", force: true, fetch: { failedFetches += 1; return badFetch() }, fallback: locFetch, fallbackNote: { _ in "fb" })
+eq(failedFetches, 2, "manual retry bypasses failure backoff")
+storeOfficial("HELD", expired)
+let held = officialOrCached("HELD", force: true, fetch: badFetch, fallback: locFetch, fallbackNote: { _ in "fb" })
+eq(held.fiveHour?.remaining, 8, "failed refresh keeps actual last quota after reset")
+eq(held.fiveHour?.refilled, false, "failed refresh cannot claim refill")
+eq(held.weekly?.stale, true, "held weekly quota is visibly stale")
+let heldAgain = officialOrCached("HELD", fetch: goodFetch, fallback: locFetch, fallbackNote: { _ in "fb" })
+eq(heldAgain.weekly?.stale, true, "cache hit after failed manual retry keeps the stale notice")
+clearOfficial("INVALIDATED")
+_ = officialOrCached("INVALIDATED", fetch: { clearOfficial("INVALIDATED"); return goodFetch() }, fallback: locFetch, fallbackNote: { _ in "fb" })
+eq(cachedOfficial("INVALIDATED")?.status.fiveHour?.remaining, nil, "in-flight result cannot repopulate cache after login changes")
+
+// ---- real run-loop timers read changed files with NO manual refresh ----
+func pump(until condition: () -> Bool, timeout: Double = 3) {
+    let deadline = Date().addingTimeInterval(timeout)
+    while !condition() && Date() < deadline { RunLoop.main.run(until: Date().addingTimeInterval(0.01)) }
+}
+let liveFile = NSTemporaryDirectory() + "aicb-live-\(UUID().uuidString).txt"
+try! "81".write(toFile: liveFile, atomically: true, encoding: .utf8)
+let automatic = RefreshController(readers: [.init(key: "T", fetch: { _ in
+    let value = Int((try? String(contentsOfFile: liveFile)) ?? "")
+    return prov(value, nil)
+})])
+var readings: [Int] = []
+automatic.onUpdate = { if let value = $0.fiveHour?.remaining { readings.append(value) } }
+automatic.start(interval: 0.05)
+pump(until: { readings.contains(81) })
+try! "27".write(toFile: liveFile, atomically: true, encoding: .utf8)
+pump(until: { readings.contains(27) })
+automatic.stop()
+check(readings.contains(81) && readings.contains(27), "timer alone publishes changed disk values")
+try? FileManager.default.removeItem(atPath: liveFile)
+
+// A deliberately blocked provider cannot block the fast provider; repeated
+// automatic ticks must not accumulate requests behind the blocked read.
+let releaseSlow = DispatchSemaphore(value: 0)
+let slowLock = NSLock(); var slowCalls = 0
+let independent = RefreshController(readers: [
+    .init(key: "slow", fetch: { _ in
+        slowLock.lock(); slowCalls += 1; slowLock.unlock()
+        _ = releaseSlow.wait(timeout: .now() + 3)
+        return ProviderStatus(key: "slow", name: "Slow", available: true)
+    }),
+    .init(key: "fast", fetch: { _ in ProviderStatus(key: "fast", name: "Fast", available: true) })
+])
+var receivedKeys: [String] = []
+independent.onUpdate = { receivedKeys.append($0.key) }
+independent.start(interval: 0.05)
+pump(until: { receivedKeys.filter { $0 == "fast" }.count >= 3 })
+check(receivedKeys.contains("fast") && !receivedKeys.contains("slow"), "fast provider updates while another request is blocked")
+independent.stop()
+slowLock.lock(); let callsBeforeRelease = slowCalls; slowLock.unlock()
+eq(callsBeforeRelease, 1, "automatic ticks never overlap the same provider")
+releaseSlow.signal()
+pump(until: { receivedKeys.contains("slow") })
+check(receivedKeys.contains("slow"), "slow provider eventually publishes its own result")
+
+// Forced requests coalesce to one follow-up and obsolete results are discarded.
+let releaseForce = DispatchSemaphore(value: 0)
+let forcedLock = NSLock(); var forcedCalls = 0
+let forced = RefreshController(readers: [.init(key: "forced", fetch: { force in
+    forcedLock.lock(); forcedCalls += 1; let index = forcedCalls; forcedLock.unlock()
+    if index == 1 { _ = releaseForce.wait(timeout: .now() + 3) }
+    return prov(force ? 92 : 10, nil)
+})])
+var forcedValues: [Int] = []
+forced.onUpdate = { if let value = $0.fiveHour?.remaining { forcedValues.append(value) } }
+forced.refresh()
+for _ in 0..<10 { forced.refresh(force: true) }
+releaseForce.signal()
+pump(until: { forcedValues.contains(92) })
+eq(forcedValues, [92], "forced refresh discards obsolete in-flight reading")
+forcedLock.lock(); let totalForced = forcedCalls; forcedLock.unlock()
+eq(totalForced, 2, "ten forced requests coalesce to one follow-up")
+
 let summary = "\(passed) passed, \(failures) failed"
 print(failures == 0 ? "✓ unit: \(summary)" : "✗ unit: \(summary)")
 exit(failures == 0 ? 0 : 1)

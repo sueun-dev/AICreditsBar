@@ -22,7 +22,10 @@ enum Cfg {
     static var showClaude: Bool { get { bool("showClaude", true) } set { d.set(newValue, forKey: "showClaude") } }
     static var showGemini: Bool { get { bool("showGemini", true) } set { d.set(newValue, forKey: "showGemini") } }
     static var showLabels: Bool { get { bool("showLabels", true) } set { d.set(newValue, forKey: "showLabels") } }
-    static var refreshInterval: Double { get { min(3600, max(5, dbl("refreshInterval", 30))) } set { d.set(newValue, forKey: "refreshInterval") } }
+    static var refreshInterval: Double {
+        get { let value = dbl("refreshInterval", 15); return value.isFinite ? min(3600, max(5, value)) : 15 }
+        set { d.set(newValue.isFinite ? min(3600, max(5, newValue)) : 15, forKey: "refreshInterval") }
+    }
     static var greenAbove: Int { get { int("greenAbove", 50) } set { d.set(newValue, forKey: "greenAbove") } }
     static var yellowAbove: Int { get { int("yellowAbove", 20) } set { d.set(newValue, forKey: "yellowAbove") } }
     static var colorHigh: NSColor { get { color("colorHigh", .systemGreen) }  set { d.set(newValue.hexString, forKey: "colorHigh") } }

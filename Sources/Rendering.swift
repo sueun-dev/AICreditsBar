@@ -20,6 +20,7 @@ func windowText(_ w: WindowStat?) -> String {
 }
 func barInfo(_ p: ProviderStatus) -> (String, NSColor) {
     guard p.available else { return ("—", Cfg.colorUnknown) }
+    if p.source == .statusOnly { return ("✓", Cfg.colorUnknown) }
     let f = p.fiveHour, w = p.weekly
     switch Cfg.displayMode {
     case "week":                                       // weekly only — "?" if absent, never substitute 5h
@@ -37,7 +38,13 @@ func barInfo(_ p: ProviderStatus) -> (String, NSColor) {
 // Monochrome menu-bar glyphs per provider (template images → tint to the bar appearance).
 var glyphCache: [String: NSImage] = [:]
 func providerGlyph(_ key: String, _ pt: CGFloat = 16) -> NSImage {
-    if let g = glyphCache[key] { return g }
+    let cacheKey = "\(key)-\(pt)"
+    if let g = glyphCache[cacheKey] { return g }
+    let symbol = key == "Cx" ? "terminal" : (key == "Cl" ? "sun.max.fill" : "sparkle")
+    if let image = NSImage(systemSymbolName: symbol, accessibilityDescription: key == "Cx" ? "Codex" : (key == "Cl" ? "Claude" : "Gemini"))?
+        .withSymbolConfiguration(NSImage.SymbolConfiguration(pointSize: pt, weight: .medium)) {
+        image.isTemplate = true; glyphCache[cacheKey] = image; return image
+    }
     // Bold monochrome marks → tint white like native menu-bar icons.
     let img = NSImage(size: NSSize(width: pt, height: pt)); img.lockFocus()
     NSColor.black.setFill(); NSColor.black.setStroke()
@@ -74,7 +81,7 @@ func providerGlyph(_ key: String, _ pt: CGFloat = 16) -> NSImage {
         NSBezierPath(ovalIn: NSRect(x: c.x-pt*0.115, y: c.y-pt*0.115, width: pt*0.23, height: pt*0.23)).fill()
         NSGraphicsContext.current?.compositingOperation = .sourceOver
     }
-    img.unlockFocus(); img.isTemplate = true; glyphCache[key] = img; return img
+    img.unlockFocus(); img.isTemplate = true; glyphCache[cacheKey] = img; return img
 }
 
 func barSegment(_ p: ProviderStatus) -> NSAttributedString {
@@ -86,6 +93,8 @@ func barSegment(_ p: ProviderStatus) -> NSAttributedString {
         s.append(NSAttributedString(string: " ", attributes: [.font: mono]))
     }
     let (txt, col) = barInfo(p)
-    s.append(NSAttributedString(string: txt, attributes: [.font: mono, .foregroundColor: col]))
+    let prefix = p.available && p.source == .estimate ? "~" : ""
+    let suffix = p.fiveHour?.stale == true || p.weekly?.stale == true ? "·" : ""
+    s.append(NSAttributedString(string: prefix + txt + suffix, attributes: [.font: mono, .foregroundColor: col]))
     return s
 }

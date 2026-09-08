@@ -27,15 +27,15 @@ func readCodexLocal() -> ProviderStatus {
     st.snapshotAge = age
     func win(_ k: String) -> WindowStat? {
         guard let w = rl[k] as? [String: Any], let used = (w["used_percent"] as? NSNumber)?.doubleValue else { return nil }
-        let reset = (w["resets_at"] as? NSNumber)?.doubleValue
+        let reset = sanitizeEpoch((w["resets_at"] as? NSNumber)?.doubleValue)
         // Scale staleness to the window length: a 90-min-old weekly snapshot is still fine,
         // a 90-min-old 5h snapshot is not. (5h → ~90 min, weekly → ~50 h.)
         let windowMin = (w["window_minutes"] as? NSNumber)?.doubleValue ?? 300
         let aged = (age ?? 0) > max(CODEX_STALE, windowMin * 60 * 0.3)
         // Don't trust an inferred refill from an aged snapshot (the new window may already be in use).
-        let refilled = (reset.map { $0 <= nowEpoch() } ?? false) && !aged
-        return WindowStat(remaining: refilled ? 100 : max(0, min(100, Int((100 - used).rounded()))),
-                          resetEpoch: reset, refilled: refilled, stale: aged)
+        let resetPassed = reset.map { $0 <= nowEpoch() } ?? false
+        return WindowStat(remaining: used.isFinite ? pctClamp(100 - used) : nil,
+                          resetEpoch: reset, stale: aged || resetPassed)
     }
     st.fiveHour = win("primary")
     st.weekly = win("secondary")
@@ -57,6 +57,9 @@ final class EventCache {
     func put(_ path: String, mtime: Double, size: Int, _ ev: [(Double, Double, String)]) {
         lock.lock(); defer { lock.unlock() }; cache[path] = (mtime, size, ev)
     }
+    func retain(paths: Set<String>) {
+        lock.lock(); defer { lock.unlock() }; cache = cache.filter { paths.contains($0.key) }
+    }
 }
 let claudeCache = EventCache()
 
@@ -75,6 +78,7 @@ func parseClaudeFile(_ path: String) -> [(Double, Double, String)] {   // (epoch
               let tsS = obj["timestamp"] as? String, let ep = parseISO(tsS) else { continue }
         func n(_ k: String) -> Double { (u[k] as? NSNumber)?.doubleValue ?? 0 }
         let tot = n("input_tokens") + n("output_tokens") + n("cache_creation_input_tokens") + n("cache_read_input_tokens")
+        guard tot.isFinite, tot >= 0 else { continue }
         out.append((ep, tot, "\(msg["id"] ?? "")|\(obj["requestId"] ?? "")"))
     }
     return out
@@ -86,6 +90,7 @@ func gatherClaudeEvents() -> [(Double, Double)] {
     guard FileManager.default.fileExists(atPath: base) else { return [] }
     let horizon = nowEpoch() - 7*86400 - 3600
     let files = filesByMtime(under: base, suffix: ".jsonl", newerThan: horizon).filter { !$0.path.contains("/subagents/") }
+    claudeCache.retain(paths: Set(files.map { $0.path }))
     var raw: [(Double, Double, String)] = []
     for f in files {
         let ev = claudeCache.get(f.path, mtime: f.mtime, size: f.size) ?? {
@@ -125,6 +130,7 @@ func claudeCalibrationSums() -> (five: Double, week: Double) {
 
 func readClaudeLocal() -> ProviderStatus {
     var st = ProviderStatus(key: "Cl", name: "Claude", available: false)
+    st.source = .estimate
     let base = (HOME as NSString).appendingPathComponent(".claude/projects")
     guard FileManager.default.fileExists(atPath: base) else { st.problem = "not installed (~/.claude/projects absent)"; return st }
     let events = gatherClaudeEvents()
@@ -136,7 +142,7 @@ func readClaudeLocal() -> ProviderStatus {
     st.available = true; st.plan = "est."
     if let blk = currentClaudeBlock(events), blk.active {
         let b = Cfg.claude5hBudget
-        st.fiveHour = WindowStat(remaining: max(0, min(100, Int((100 * (1 - blk.tokens / b)).rounded()))), resetEpoch: blk.reset, note: "\(tokLabel(blk.tokens)) tok")
+        st.fiveHour = WindowStat(remaining: pctClamp(100 * (1 - blk.tokens / b)), resetEpoch: blk.reset, note: "\(tokLabel(blk.tokens)) tok")
         let elapsedMin = max(1, (nowEpoch() - blk.firstEp) / 60)   // burn from first real event, not floored hour
         let burn = blk.tokens / elapsedMin
         st.details.append("5h used \(tokLabel(blk.tokens)) / \(tokLabel(b)) est.")
@@ -146,7 +152,7 @@ func readClaudeLocal() -> ProviderStatus {
     }
     let weekTokens = claudeWeekTokens(events)
     let wb = Cfg.claudeWeekBudget
-    st.weekly = WindowStat(remaining: max(0, min(100, Int((100 * (1 - weekTokens / wb)).rounded()))), note: "\(tokLabel(weekTokens))/7d")
+    st.weekly = WindowStat(remaining: pctClamp(100 * (1 - weekTokens / wb)), note: "\(tokLabel(weekTokens))/7d")
     st.details.append("7d used \(tokLabel(weekTokens)) / \(tokLabel(wb)) est. · calibrate: --set-week-used <%>")
     return st
 }
@@ -168,14 +174,21 @@ func httpGet(_ urlStr: String, headers: [String: String], timeout: TimeInterval 
     let session = URLSession(configuration: cfg)
     defer { session.finishTasksAndInvalidate() }
     let sem = DispatchSemaphore(value: 0)
-    var out: (Int, Data)? = nil
+    let result = HTTPResult()
     let task = session.dataTask(with: req) { data, resp, _ in
-        if let http = resp as? HTTPURLResponse { out = (http.statusCode, data ?? Data()) }
+        if let http = resp as? HTTPURLResponse { result.store((http.statusCode, data ?? Data())) }
         sem.signal()
     }
     task.resume()
-    if sem.wait(timeout: .now() + timeout + 2) == .timedOut { task.cancel() }
-    return out
+    if sem.wait(timeout: .now() + timeout + 2) == .timedOut { task.cancel(); return nil }
+    return result.load()
+}
+
+private final class HTTPResult {
+    private let lock = NSLock()
+    private var value: (Int, Data)?
+    func store(_ value: (Int, Data)) { lock.lock(); defer { lock.unlock() }; self.value = value }
+    func load() -> (Int, Data)? { lock.lock(); defer { lock.unlock() }; return value }
 }
 
 // ---- Claude (claude.ai) ----
@@ -215,7 +228,8 @@ func readClaudeOfficial() -> ProviderStatus {
     }
     func win(_ w: ClaudeLimitWire?) -> WindowStat? {
         guard let w = w else { return nil }
-        return WindowStat(remaining: max(0, min(100, Int((100 - w.utilization).rounded()))), resetEpoch: parseISO(w.resets_at ?? ""), refilled: false)
+        guard w.utilization.isFinite else { return nil }
+        return WindowStat(remaining: pctClamp(100 - w.utilization), resetEpoch: sanitizeEpoch(parseISO(w.resets_at ?? "")))
     }
     func hasWindow(_ u: ClaudeUsageWire) -> Bool { u.five_hour != nil || u.seven_day != nil || u.seven_day_opus != nil || u.seven_day_sonnet != nil }
 
@@ -233,8 +247,8 @@ func readClaudeOfficial() -> ProviderStatus {
     guard st.available else { st.problem = "usage payload empty/changed (HTTP 200)"; return st }
     st.plan = "official"
     Cfg.claudeOrgUuid = org   // cache only after confirming this org has usable windows
-    if let o = u.seven_day_opus, !(o.utilization == 0 && o.resets_at == nil) { st.details.append("Opus 7d: \(Int((100 - o.utilization).rounded()))% left") }
-    if let s = u.seven_day_sonnet, !(s.utilization == 0 && s.resets_at == nil) { st.details.append("Sonnet 7d: \(Int((100 - s.utilization).rounded()))% left") }
+    if let o = u.seven_day_opus, !(o.utilization == 0 && o.resets_at == nil) { st.details.append("Opus 7d: \(pctClamp(100 - o.utilization))% left") }
+    if let s = u.seven_day_sonnet, !(s.utilization == 0 && s.resets_at == nil) { st.details.append("Sonnet 7d: \(pctClamp(100 - s.utilization))% left") }
     return st
 }
 
@@ -279,9 +293,10 @@ func readCodexOfficial() -> ProviderStatus {
     func win(_ w: CodexWindowWire?) -> WindowStat? {
         guard let w = w else { return nil }
         // Accept either an absolute reset_at or a relative reset_after_seconds.
-        let reset = w.reset_at.map { Double($0) } ?? w.reset_after_seconds.map { nowEpoch() + Double($0) }
-        let refilled = (reset ?? .greatestFiniteMagnitude) <= nowEpoch()
-        return WindowStat(remaining: refilled ? 100 : max(0, min(100, Int((100 - w.used_percent).rounded()))), resetEpoch: reset, refilled: refilled)
+        guard w.used_percent.isFinite else { return nil }
+        let reset = sanitizeEpoch(w.reset_at.map { Double($0) } ?? w.reset_after_seconds.map { nowEpoch() + Double($0) })
+        return WindowStat(remaining: pctClamp(100 - w.used_percent), resetEpoch: reset,
+                          stale: reset.map { $0 <= nowEpoch() } ?? false)
     }
     st.fiveHour = win(u.rate_limit?.primary_window)
     st.weekly = win(u.rate_limit?.secondary_window)
@@ -294,26 +309,61 @@ func readCodexOfficial() -> ProviderStatus {
 
 // ---- official result cache (stops the bar flapping between official ⇄ estimate on a
 //      transient network hiccup, and avoids hammering the web APIs on every 30s tick).
-let OFFICIAL_TTL: Double = 60          // reuse a good official reading without re-fetching for this long
+let OFFICIAL_TTL: Double = 30          // poll APIs at most twice per minute automatically
 let OFFICIAL_MAX_AGE: Double = 30 * 60 // keep showing the last good official up to here when refresh fails
 struct CachedOfficial { var status: ProviderStatus; var at: Double }
 var officialCache: [String: CachedOfficial] = [:]
+private var officialFailures: [String: (retryAt: Double, count: Int, problem: String)] = [:]
+private var officialGeneration: [String: UInt64] = [:]
 let officialLock = NSLock()
 func cachedOfficial(_ k: String) -> CachedOfficial? { officialLock.lock(); defer { officialLock.unlock() }; return officialCache[k] }
 func storeOfficial(_ k: String, _ s: ProviderStatus) { officialLock.lock(); defer { officialLock.unlock() }; officialCache[k] = CachedOfficial(status: s, at: nowEpoch()) }
-func clearOfficial(_ k: String) { officialLock.lock(); defer { officialLock.unlock() }; officialCache[k] = nil }
+func clearOfficial(_ k: String) {
+    officialLock.lock(); defer { officialLock.unlock() }
+    officialCache[k] = nil; officialFailures[k] = nil
+    officialGeneration[k, default: 0] &+= 1
+}
+
+private func fetchWithBackoff(_ key: String, force: Bool, fetch: () -> ProviderStatus) -> ProviderStatus {
+    officialLock.lock(); let failure = officialFailures[key]; let generation = officialGeneration[key, default: 0]; officialLock.unlock()
+    if !force, let failure = failure, failure.retryAt > nowEpoch() {
+        return ProviderStatus(key: key, name: key, available: false, problem: failure.problem)
+    }
+    let status = fetch()
+    officialLock.lock(); defer { officialLock.unlock() }
+    guard generation == officialGeneration[key, default: 0] else { return status }
+    if status.available { officialFailures[key] = nil }
+    else {
+        let count = min(4, (failure?.count ?? 0) + 1)
+        officialFailures[key] = (nowEpoch() + min(300, OFFICIAL_TTL * pow(2, Double(count - 1))), count, status.problem ?? "unavailable")
+    }
+    return status
+}
 
 // Try official; on failure prefer the last good official over a divergent fallback. `fetch`
 // returns a ProviderStatus whose `.available` indicates success; `fallback` is the local reader.
-func officialOrCached(_ key: String, fetch: () -> ProviderStatus, fallback: () -> ProviderStatus, fallbackNote: (String) -> String) -> ProviderStatus {
-    if let c = cachedOfficial(key), nowEpoch() - c.at < OFFICIAL_TTL { return c.status }   // fresh enough: no network
-    let off = fetch()
-    if off.available { storeOfficial(key, off); return off }
+func officialOrCached(_ key: String, force: Bool = false, fetch: () -> ProviderStatus, fallback: () -> ProviderStatus, fallbackNote: (String) -> String) -> ProviderStatus {
+    officialLock.lock()
+    let hasFailure = officialFailures[key] != nil
+    let generation = officialGeneration[key, default: 0]
+    officialLock.unlock()
+    if !force, !hasFailure, let c = cachedOfficial(key), nowEpoch() - c.at < OFFICIAL_TTL {
+        return c.status.aged(by: max(0, nowEpoch() - c.at))
+    }
+    var off = fetchWithBackoff(key, force: force, fetch: fetch)
+    if off.available {
+        off.source = .official; off.snapshotAge = 0
+        off = off.aged(by: 0)
+        officialLock.lock()
+        if generation == officialGeneration[key, default: 0] { officialCache[key] = CachedOfficial(status: off, at: nowEpoch()) }
+        officialLock.unlock()
+        return off
+    }
     if let c = cachedOfficial(key), nowEpoch() - c.at < OFFICIAL_MAX_AGE {                 // transient fail: hold last good
         let age = nowEpoch() - c.at
         func held(_ w: WindowStat?) -> WindowStat? {           // re-derive time-dependent fields, flag as stale
             guard var w = w else { return nil }
-            if let reset = w.resetEpoch, reset <= nowEpoch() { w.refilled = true; w.remaining = 100 }
+            w.refilled = false
             w.stale = true; return w
         }
         var s = c.status; s.fiveHour = held(s.fiveHour); s.weekly = held(s.weekly); s.snapshotAge = age
@@ -324,14 +374,14 @@ func officialOrCached(_ key: String, fetch: () -> ProviderStatus, fallback: () -
 }
 
 // ---- dispatchers: official (if a token is set) first, else local ----
-func readClaude() -> ProviderStatus {
+func readClaude(force: Bool = false) -> ProviderStatus {
     guard !Cfg.claudeSessionKey.isEmpty else { clearOfficial("Cl"); return readClaudeLocal() }
-    return officialOrCached("Cl", fetch: readClaudeOfficial, fallback: readClaudeLocal,
+    return officialOrCached("Cl", force: force, fetch: readClaudeOfficial, fallback: readClaudeLocal,
                             fallbackNote: { "⚠︎ official login: \($0) — showing estimate" })
 }
-func readCodex() -> ProviderStatus {
+func readCodex(force: Bool = false) -> ProviderStatus {
     guard !Cfg.codexSessionToken.isEmpty || codexCLIAccessToken() != nil else { clearOfficial("Cx"); return readCodexLocal() }
-    return officialOrCached("Cx", fetch: readCodexOfficial, fallback: readCodexLocal,
+    return officialOrCached("Cx", force: force, fetch: readCodexOfficial, fallback: readCodexLocal,
                             fallbackNote: { "⚠︎ live: \($0) — showing last disk snapshot" })
 }
 
@@ -339,22 +389,22 @@ func readCodex() -> ProviderStatus {
 
 func readGemini() -> ProviderStatus {
     var st = ProviderStatus(key: "Gm", name: "Gemini", available: false)
+    st.source = .statusOnly
     let gdir = (HOME as NSString).appendingPathComponent(".gemini")
     var isDir: ObjCBool = false
     guard FileManager.default.fileExists(atPath: gdir, isDirectory: &isDir), isDir.boolValue else { st.problem = "not installed (~/.gemini absent)"; return st }
     let creds = (gdir as NSString).appendingPathComponent("oauth_creds.json")
     if FileManager.default.fileExists(atPath: creds) {
         st.available = true
-        var who = "logged in"
+        var who = "local login found"
         let acct = (gdir as NSString).appendingPathComponent("google_accounts.json")
         if let data = FileManager.default.contents(atPath: acct),
            let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
            let active = obj["active"] as? String { who = active }
         st.plan = who
-        st.details = ["no local quota API — % unavailable", "free OAuth tier ~1000 req/day (not tracked locally)"]
+        st.details = ["Local login file found · quota and session validity are not verified"]
     } else {
         st.problem = "installed, not logged in"
     }
     return st
 }
-

@@ -14,6 +14,10 @@ func argString(_ flag: String) -> String? {
 
 /// Handle any CLI flag and exit; returns if there's nothing to do but launch the GUI.
 func handleCLIFlags() {
+    if let path = argString("--render-preview") {
+        do { try renderPreview(to: path); print("Rendered native preview with sample data → \(path)"); exit(0) }
+        catch { fputs("Preview failed: \(error.localizedDescription)\n", stderr); exit(1) }
+    }
     if let path = argString("--render-settings") {
         _ = NSApplication.shared
         NSApplication.shared.setActivationPolicy(.accessory)
@@ -64,7 +68,9 @@ func handleCLIFlags() {
                 if p.throttled { line += "  THROTTLED" }
                 if let a = p.snapshotAge { line += "  (snapshot \(ageLabel(a)))" }
             }
+            line += "  source=\(p.source.rawValue)"
             print(line)
+            for detail in p.details where detail.contains("⚠") || detail.contains("failed") { print("  \(detail)") }
         }
         exit(0)
     }

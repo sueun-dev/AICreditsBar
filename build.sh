@@ -3,7 +3,11 @@
 set -euo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
 APP="$HERE/AICreditsBar.app"
-CONTENTS="$APP/Contents"
+STAGING="$(mktemp -d "$HERE/.build-XXXXXX")"
+STAGED_APP="$STAGING/AICreditsBar.app"
+CONTENTS="$STAGED_APP/Contents"
+trap 'rm -rf "$STAGING"' EXIT
+export CLANG_MODULE_CACHE_PATH="${CLANG_MODULE_CACHE_PATH:-${TMPDIR:-/tmp}/aicb-module-cache}"
 
 if ! command -v swiftc >/dev/null 2>&1; then
   echo "error: 'swiftc' not found — install Xcode Command Line Tools first:" >&2
@@ -11,7 +15,6 @@ if ! command -v swiftc >/dev/null 2>&1; then
   exit 1
 fi
 
-rm -rf "$APP"
 mkdir -p "$CONTENTS/MacOS" "$CONTENTS/Resources"
 
 echo "compiling…"
@@ -42,6 +45,13 @@ cat > "$CONTENTS/Info.plist" <<'PLIST'
 PLIST
 
 # Ad-hoc sign so it launches cleanly. Surface real failures instead of hiding them.
-codesign --force --sign - "$APP" || echo "warning: ad-hoc codesign failed (app still runs locally)" >&2
+codesign --force --sign - "$STAGED_APP"
+
+# Replace the installed bundle only after compilation and signing succeed.
+if [ -e "$APP" ]; then mv "$APP" "$STAGING/previous.app"; fi
+if ! mv "$STAGED_APP" "$APP"; then
+  if [ -e "$STAGING/previous.app" ]; then mv "$STAGING/previous.app" "$APP"; fi
+  exit 1
+fi
 
 echo "Built $APP"

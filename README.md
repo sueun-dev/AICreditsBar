@@ -6,7 +6,7 @@
 
 ![macOS 11+](https://img.shields.io/badge/macOS-11%2B-111?logo=apple&logoColor=white)
 ![Swift 5](https://img.shields.io/badge/Swift-5-F05138?logo=swift&logoColor=white)
-![No network](https://img.shields.io/badge/network-none%20by%20default-2EA043)
+![Local + online](https://img.shields.io/badge/data-local%20%2B%20online-2EA043)
 ![License: MIT](https://img.shields.io/badge/License-MIT-3B82F6)
 
 ![menu bar](docs/images/menubar.png)
@@ -20,9 +20,12 @@
 ## English
 
 A tiny native macOS **menu-bar** widget that continuously shows how much token/quota is
-left for **Codex**, **Claude**, and **Gemini** — and flags when a window has refilled.
-Auto-detects which CLIs you use, refreshes every 30 s, and (by default) makes **zero network
-calls** — everything is read from the local data those tools already keep on disk.
+left for **Codex** and **Claude**, plus **Gemini** connection status.
+Checks run automatically every 15 s by default, even with the menu closed. Each provider
+updates independently; online successes are cached for 30 s and failures retry with
+exponential backoff (30–240 s). Existing custom check intervals are preserved.
+Codex automatically reuses an existing CLI login for online usage; Claude uses online
+usage when an in-app login is saved. Otherwise, readings come from local CLI files.
 
 |  |  |
 |---|---|
@@ -31,8 +34,15 @@ calls** — everything is read from the local data those tools already keep on d
 
 ### ✨ Features
 
-- **At-a-glance bar** — each provider's logo mark + remaining %, color-coded
-  (🟢 > 50 · 🟡 20–50 · 🔴 < 20 · ⚪️ unknown/stale · ↑ just refilled).
+- **At-a-glance bar** — native terminal / sun / sparkle symbols + remaining %, color-coded
+  (green > 50 · yellow 20–50 · red < 20 · gray unknown/stale). `~` means estimate;
+  a trailing dot means at least one window is stale. Gemini shows connection status.
+- **Live fuel gauges** — 5-hour and weekly remaining bars, reset countdowns, source labels,
+  and freshness. The next known reset is summarized below the cards. Hover a card for full details.
+- **Always checking** — wake resumes checks; open menus update without losing keyboard
+  focus. Slow providers do not block others, and duplicate refresh requests do not pile up.
+- **Honest reset handling** — a passed reset time is marked stale until refreshed, never
+  silently converted into 100% quota. Manual refresh bypasses the online cache and backoff.
 - **Auto-detect** — reads `~/.codex`, `~/.claude`, `~/.gemini`; nothing to set up.
 - **Exact official %** via a one-time in-app login (optional) — or a local estimate offline.
 - **Fully configurable** — display mode (5h / weekly / both / lowest), per-provider toggles,
@@ -98,6 +108,7 @@ $B --set-codex-token <tok>   # store a chatgpt.com session-token (Codex usually 
 $B --clear-logins            # drop both official tokens; revert to local estimate/disk
 
 $B --render-settings out.png # render the Settings window to a PNG (design check)
+$B --render-preview out.png  # native usage cards with explicitly labeled SAMPLE values
 ```
 
 > Calibration and the budget used for the Claude estimate live behind these CLI flags —
@@ -116,6 +127,9 @@ Sources/        Swift modules
   WebLogin.swift      in-app WKWebView login (captures the session cookie)
   Settings.swift      Liquid-Glass settings window
   AppDelegate.swift   status item, timer, dropdown menu
+  RefreshController.swift  independent provider workers + automatic checks
+  ProviderCardView.swift    native fuel gauges + next reset summary
+  Preview.swift       render actual native cards with sample data for QA
   CLI.swift           --once / --dump-config / --set-* / --render-settings
   main.swift          entry point
 Tests/          UnitTests + e2e (run with: bash Tests/run.sh)
@@ -136,9 +150,10 @@ or tokens.
 
 ### Privacy
 
-AICreditsBar makes no network requests unless you opt into Accurate login. It reads only the
-usage data the CLIs already write under `~/.codex`, `~/.claude`, and `~/.gemini`, computes the
-numbers locally, and draws them in the menu bar. No telemetry.
+AICreditsBar reads local usage under `~/.codex`, `~/.claude`, and `~/.gemini`.
+When a Codex CLI login or saved in-app login is present, it also contacts that provider's
+usage endpoint using the existing credentials. No telemetry. A saved credential is not
+proof of a working login: check the menu's source and failure notice for the live result.
 
 ### License
 
@@ -149,8 +164,10 @@ MIT — see [LICENSE](LICENSE).
 ## 한국어
 
 Codex · Claude · Gemini의 남은 토큰/한도를 macOS **메뉴바**에 계속 띄워주는 작은 네이티브 위젯입니다.
-한도 창이 리필되면 알려주고, 쓰는 CLI를 자동 감지하며, 30초마다 갱신합니다. 기본값은 **네트워크 호출
-0** — 도구들이 디스크에 남긴 로컬 데이터만 읽습니다.
+쓰는 CLI를 자동 감지하며, 메뉴가 닫혀 있어도 기본 15초마다 독립적으로 확인합니다.
+공식 조회 성공값은 30초간 캐시하고, 실패 시 30~240초 간격으로 자동 재시도합니다.
+기존에 설정한 갱신 간격은 유지됩니다. Codex CLI 로그인 또는 저장된 인앱 로그인이 있으면
+해당 서비스의 온라인 사용량도 조회합니다. Gemini는 연결 상태만 표시합니다.
 
 |  |  |
 |---|---|
@@ -159,12 +176,15 @@ Codex · Claude · Gemini의 남은 토큰/한도를 macOS **메뉴바**에 계�
 
 ### ✨ 기능
 
-- **한눈에** — 제공자별 로고 마크 + 남은 % (🟢 50%↑ · 🟡 20–50 · 🔴 20%↓ · ⚪️ 모름/오래됨 · ↑ 방금 리필).
+- **한눈에** — 터미널·태양·반짝임 아이콘과 남은 %. `~`는 추정값, 뒤의 점은 오래된 창이 있음을 뜻합니다.
+- **잔량 게이지** — 5시간·주간 잔량 막대, 리셋까지 남은 시간, 공식/로컬/추정 출처, 마지막 데이터 시각.
+- **자동 갱신** — 잠자기 복귀 시 다시 확인하고, 한 서비스가 느려도 다른 서비스는 갱신됩니다.
+- **리셋 확인** — 예정 시간이 지났다고 100%로 바꾸지 않습니다. 새 값을 받을 때까지 오래된 값으로 표시합니다.
 - **자동 감지** — `~/.codex`, `~/.claude`, `~/.gemini`를 읽음. 설정할 것 없음.
 - **정확한 공식 %** — 인앱 로그인 한 번(선택). 오프라인이면 로컬 추정치.
 - **완전 커스터마이즈** — 표시 모드(5h / 주간 / 둘 다 / 최저), 제공자 토글, 색상·임계값 —
   네이티브 **Liquid Glass** 설정창(macOS 26).
-- **프라이버시** — 텔레메트리 없음, 로그인 전엔 자격증명 안 건드림, 토큰은 로컬 보관.
+- **프라이버시** — 텔레메트리 없음. 기존 Codex CLI 로그인 또는 저장된 인앱 로그인으로 사용량을 조회하며 토큰은 로컬 보관.
 
 ### 각 제공자가 보여주는 것
 
@@ -250,8 +270,9 @@ e2e는 실제 바이너리를 **가짜 HOME + 격리된 UserDefaults**에서 합
 
 ### 프라이버시
 
-Accurate login을 켜지 않는 한 네트워크 요청을 하지 않습니다. CLI들이 이미 `~/.codex`, `~/.claude`,
-`~/.gemini`에 남긴 사용량 데이터만 읽어 로컬에서 계산해 메뉴바에 그립니다. 텔레메트리 없음.
+`~/.codex`, `~/.claude`, `~/.gemini`의 로컬 사용량을 읽습니다. Codex CLI 로그인이나 저장된
+인앱 로그인이 있으면 해당 서비스의 사용량 API에도 요청합니다. 텔레메트리는 없습니다.
+설정의 로그인 저장 표시는 인증 성공을 보장하지 않으며, 실제 결과는 메뉴의 출처·오류 표시로 확인합니다.
 
 ### 라이선스
 

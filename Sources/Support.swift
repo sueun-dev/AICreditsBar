@@ -6,8 +6,15 @@ let HOME = ProcessInfo.processInfo.environment["HOME"] ?? FileManager.default.ho
 func nowEpoch() -> Double { Date().timeIntervalSince1970 }
 func floorToHour(_ ep: Double) -> Double { ep - ep.truncatingRemainder(dividingBy: 3600) }
 
+// Double → Int clamped to [0,100]. NEVER call Int() on an unvalidated Double: Int(NaN/inf/out-of-range)
+// is a hard trap, and these inputs come from JSON we don't control. Clamp in Double space first.
+func pctClamp(_ d: Double) -> Int { d.isFinite ? Int(min(100, max(0, d)).rounded()) : 0 }
+
+// Drop a non-finite or absurd (> year 2100) reset epoch from unvalidated JSON.
+func sanitizeEpoch(_ e: Double?) -> Double? { e.flatMap { ($0.isFinite && $0 > 0 && $0 < 4_102_444_800) ? $0 : nil } }
+
 func resetLabel(_ ts: Double?) -> String {
-    guard let ts = ts else { return "?" }
+    guard let ts = sanitizeEpoch(ts) else { return "?" }
     let dd = ts - nowEpoch()
     if dd <= 0 { return "now" }
     if dd < 60 { return "in <1m" }                       // avoid the nonsensical "in 0m"
@@ -16,7 +23,7 @@ func resetLabel(_ ts: Double?) -> String {
     let days = Int(dd/86400); let h = Int((dd - Double(days)*86400)/3600); return "in \(days)d \(h)h"
 }
 func ageLabel(_ secs: Double?) -> String {
-    guard let s = secs, s >= 0 else { return "?" }
+    guard let s = secs, s.isFinite, s >= 0 else { return "?" }
     if s < 90 { return "just now" }
     if s < 3600 { return "\(Int(s/60))m ago" }
     if s < 86400 { return String(format: "%.1fh ago", s/3600) }

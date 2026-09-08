@@ -1,102 +1,125 @@
 import AppKit
 
-// MARK: - App
-
 final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     var statusItem: NSStatusItem!
-    var timer: Timer?
     let settings = SettingsWindow()
     let menu = NSMenu()
-    let refreshQueue = DispatchQueue(label: "aicreditsbar.refresh", qos: .utility)
+    let refreshController = RefreshController()
     var latest: [ProviderStatus] = []
+    private var receivedAt: [String: Double] = [:]
+    private var displayTimer: Timer?
+    private var refreshing = false
+    private var cards: [String: ProviderCardView] = [:]
+    private var activityItem: NSMenuItem?
+    private var insightItem: NSMenuItem?
+    var menuOpen = false
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
-        statusItem.button?.font = .monospacedDigitSystemFont(ofSize: 13, weight: .regular)
         statusItem.button?.title = "AI …"
-        menu.delegate = self
-        statusItem.menu = menu
-        settings.onChange = { [weak self] in self?.refresh(); self?.rescheduleTimer() }
-        refresh(); rescheduleTimer()
-        if CommandLine.arguments.contains("--settings") {
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in self?.openSettings() }
+        menu.delegate = self; statusItem.menu = menu
+        latest = [("Cx", "Codex"), ("Cl", "Claude"), ("Gm", "Gemini")].map {
+            ProviderStatus(key: $0.0, name: $0.1, available: false, problem: "Checking…")
         }
-        if CommandLine.arguments.contains("--login-claude") {
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in self?.settings.loginClaude() }
+        refreshController.onUpdate = { [weak self] status in
+            guard let self = self else { return }
+            if let index = self.latest.firstIndex(where: { $0.key == status.key }) { self.latest[index] = status }
+            self.receivedAt[status.key] = nowEpoch()
+            self.updateDisplay()
         }
-        if CommandLine.arguments.contains("--login-codex") {
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in self?.settings.loginCodex() }
+        refreshController.onActivity = { [weak self] active in
+            self?.refreshing = active; self?.updateDisplay()
         }
+        settings.onChange = { [weak self] in
+            guard let self = self else { return }
+            self.refreshController.refresh(force: true)
+            self.refreshController.start(interval: Cfg.refreshInterval)
+            self.rebuildMenu(self.menu); self.updateDisplay()
+        }
+        NSWorkspace.shared.notificationCenter.addObserver(self, selector: #selector(wake), name: NSWorkspace.didWakeNotification, object: nil)
+        NSWorkspace.shared.notificationCenter.addObserver(self, selector: #selector(wake), name: NSWorkspace.screensDidWakeNotification, object: nil)
+        refreshController.start(interval: Cfg.refreshInterval)
+        let timer = Timer(timeInterval: 1, repeats: true) { [weak self] _ in self?.updateDisplay() }
+        timer.tolerance = 0.2; RunLoop.main.add(timer, forMode: .common); displayTimer = timer
+        if CommandLine.arguments.contains("--settings") { openSettings() }
+        if CommandLine.arguments.contains("--login-claude") { settings.loginClaude() }
+        if CommandLine.arguments.contains("--login-codex") { settings.loginCodex() }
     }
-    func rescheduleTimer() {
-        timer?.invalidate()
-        let t = Timer(timeInterval: Cfg.refreshInterval, repeats: true) { [weak self] _ in self?.refresh() }
-        t.tolerance = 5
-        RunLoop.main.add(t, forMode: .common)
-        timer = t
+
+    func applicationWillTerminate(_ notification: Notification) {
+        refreshController.stop(); displayTimer?.invalidate()
+        NSWorkspace.shared.notificationCenter.removeObserver(self)
     }
-    @objc func manualRefresh() { refresh() }
+    @objc func wake() { refreshController.refresh(force: true) }
+    @objc func manualRefresh() { refreshController.refresh(force: true) }
     @objc func openSettings() { settings.show() }
 
-    var menuOpen = false
-    // Single source of truth for which providers are shown, so the bar and the dropdown never disagree.
     func shownProviders(_ all: [ProviderStatus]) -> [ProviderStatus] {
-        zip(all, [Cfg.showCodex, Cfg.showClaude, Cfg.showGemini]).filter { $0.1 }.map { $0.0 }
-    }
-    func refresh() {
-        refreshQueue.async {
-            let providers = [readCodex(), readClaude(), readGemini()]
-            DispatchQueue.main.async {
-                self.latest = providers
-                self.renderTitle(providers)
-                if self.menuOpen { self.rebuildMenu(self.menu) }   // live-update an open dropdown
-            }
+        all.filter { p in
+            switch p.key { case "Cx": return Cfg.showCodex; case "Cl": return Cfg.showClaude; case "Gm": return Cfg.showGemini; default: return false }
         }
     }
-    func renderTitle(_ all: [ProviderStatus]) {
+    private var displayed: [ProviderStatus] {
+        shownProviders(latest).map { $0.aged(by: max(0, nowEpoch() - (receivedAt[$0.key] ?? nowEpoch()))) }
+    }
+    private var activityText: String {
+        refreshing ? "Checking sources… · automatic" : "Auto every \(Int(Cfg.refreshInterval))s · API ≥30s"
+    }
+    private func updateDisplay() {
+        guard statusItem != nil else { return }
+        let providers = displayed
+        renderTitle(providers)
+        statusItem.button?.toolTip = (["AICreditsBar · " + activityText] + providers.map {
+            "\($0.name): \(barInfo($0).0) · \($0.source.rawValue)"
+        }).joined(separator: "\n")
+        statusItem.button?.setAccessibilityLabel(statusItem.button?.toolTip)
+        if menuOpen {
+            // Preserve the tracking menu items and keyboard focus while updating.
+            for p in providers { cards[p.key]?.update(p, checkedAt: receivedAt[p.key]) }
+            activityItem?.title = activityText
+            insightItem?.title = nextResetInsight(providers)
+        }
+    }
+    func renderTitle(_ providers: [ProviderStatus]) {
         let title = NSMutableAttributedString()
-        let sep = NSAttributedString(string: "  ·  ", attributes: [.font: NSFont.monospacedDigitSystemFont(ofSize: 13, weight: .regular), .foregroundColor: NSColor.secondaryLabelColor])
-        for (i, p) in shownProviders(all).enumerated() { if i > 0 { title.append(sep) }; title.append(barSegment(p)) }
-        if title.length == 0 { title.append(NSAttributedString(string: "AICreditsBar")) }
+        for (i, provider) in providers.enumerated() {
+            if i > 0 { title.append(NSAttributedString(string: "   ")) }
+            title.append(barSegment(provider))
+        }
+        if title.length == 0 { title.append(NSAttributedString(string: "AI")) }
         statusItem.button?.attributedTitle = title
     }
-
     func menuNeedsUpdate(_ menu: NSMenu) { rebuildMenu(menu) }
     func rebuildMenu(_ menu: NSMenu) {
-        menu.removeAllItems()
-        for p in shownProviders(latest) {
-            let planTxt = p.plan.map { " — \($0)" } ?? ""
-            menu.addItem(headerItem("\(p.name)\(planTxt)\(p.throttled ? "  ⚠︎ throttled" : "")"))
-            if !p.available { menu.addItem(detail("   \(p.problem ?? "unavailable")")) }
-            else {
-                if let f = p.fiveHour { menu.addItem(detail("   " + winLine("5h", f, age: p.snapshotAge))) }
-                if let w = p.weekly { menu.addItem(detail("   " + winLine(p.name == "Claude" ? "7d" : "week", w, age: p.snapshotAge))) }
-                for dd in p.details { menu.addItem(detail("   \(dd)")) }
-                if let a = p.snapshotAge { menu.addItem(detail("   snapshot \(ageLabel(a))")) }
-            }
-            menu.addItem(.separator())
+        menu.removeAllItems(); cards.removeAll()
+        menu.addItem(headerItem("AICreditsBar"))
+        let activity = detail(activityText); activityItem = activity; menu.addItem(activity)
+        menu.addItem(.separator())
+        for p in displayed {
+            let item = NSMenuItem(title: p.name, action: nil, keyEquivalent: "")
+            let card = ProviderCardView(status: p, checkedAt: receivedAt[p.key])
+            item.view = card; cards[p.key] = card; menu.addItem(item)
         }
-        let setItem = NSMenuItem(title: "Settings…", action: #selector(openSettings), keyEquivalent: ","); setItem.target = self; menu.addItem(setItem)
-        let refreshItem = NSMenuItem(title: "Refresh now", action: #selector(manualRefresh), keyEquivalent: "r"); refreshItem.target = self; menu.addItem(refreshItem)
+        if displayed.isEmpty { menu.addItem(detail("Enable a provider in Settings.")) }
+        menu.addItem(.separator())
+        let insight = detail(nextResetInsight(displayed)); insightItem = insight; menu.addItem(insight)
+        menu.addItem(.separator())
+        let settings = NSMenuItem(title: "Settings…", action: #selector(openSettings), keyEquivalent: ",")
+        settings.image = NSImage(systemSymbolName: "slider.horizontal.3", accessibilityDescription: nil)
+        settings.target = self; menu.addItem(settings)
+        let refresh = NSMenuItem(title: "Refresh now", action: #selector(manualRefresh), keyEquivalent: "r")
+        refresh.image = NSImage(systemSymbolName: "arrow.clockwise", accessibilityDescription: nil)
+        refresh.target = self; menu.addItem(refresh)
         menu.addItem(NSMenuItem(title: "Quit AICreditsBar", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q"))
     }
-    func menuWillOpen(_ menu: NSMenu) { menuOpen = true; refresh() }   // freshen; refresh() live-updates the open menu
+    func menuWillOpen(_ menu: NSMenu) { menuOpen = true; refreshController.refresh(); updateDisplay() }
     func menuDidClose(_ menu: NSMenu) { menuOpen = false }
-
-    func winLine(_ label: String, _ w: WindowStat, age: Double?) -> String {
-        if w.refilled { return "\(label): refilled ✓" + (w.note.map { " (\($0))" } ?? "") }
-        if w.stale { return "\(label): \(w.remaining ?? 0)% — stale (data \(ageLabel(age)))" }
-        var s = "\(label): \(w.remaining ?? 0)% left"
-        if let n = w.note { s += "  (\(n))" }
-        if w.resetEpoch != nil { s += "  · reset \(resetLabel(w.resetEpoch))" }
-        return s
+    func headerItem(_ text: String) -> NSMenuItem {
+        let item = detail(text)
+        item.attributedTitle = NSAttributedString(string: text, attributes: [.font: NSFont.systemFont(ofSize: 13, weight: .semibold), .foregroundColor: NSColor.labelColor])
+        return item
     }
-    func headerItem(_ s: String) -> NSMenuItem {
-        let it = NSMenuItem(title: s, action: nil, keyEquivalent: ""); it.isEnabled = false
-        it.attributedTitle = NSAttributedString(string: s, attributes: [.font: NSFont.boldSystemFont(ofSize: 12), .foregroundColor: NSColor.labelColor]); return it
-    }
-    func detail(_ s: String) -> NSMenuItem {
-        let it = NSMenuItem(title: s, action: nil, keyEquivalent: ""); it.isEnabled = false
-        it.attributedTitle = NSAttributedString(string: s, attributes: [.font: NSFont.monospacedDigitSystemFont(ofSize: 12, weight: .regular), .foregroundColor: NSColor.secondaryLabelColor]); return it
+    func detail(_ text: String) -> NSMenuItem {
+        let item = NSMenuItem(title: text, action: nil, keyEquivalent: ""); item.isEnabled = false; return item
     }
 }

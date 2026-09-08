@@ -10,7 +10,7 @@ final class SettingsWindow: NSObject, NSWindowDelegate, NSTextFieldDelegate {
     let cCodex = NSButton(checkboxWithTitle: "Codex", target: nil, action: nil)
     let cClaude = NSButton(checkboxWithTitle: "Claude", target: nil, action: nil)
     let cGemini = NSButton(checkboxWithTitle: "Gemini", target: nil, action: nil)
-    let cLabels = NSButton(checkboxWithTitle: "Show provider labels (Cx/Cl/Gm)", target: nil, action: nil)
+    let cLabels = NSButton(checkboxWithTitle: "Show provider icons", target: nil, action: nil)
     let fRefresh = NSTextField(); let fGreen = NSTextField(); let fYellow = NSTextField()
     let wHigh = NSColorWell(); let wMid = NSColorWell(); let wLow = NSColorWell(); let wUnknown = NSColorWell()
     let claudeLogin = WebLoginWindow(); let codexLogin = WebLoginWindow()
@@ -103,7 +103,7 @@ final class SettingsWindow: NSObject, NSWindowDelegate, NSTextFieldDelegate {
 
         let loginCard = card("key.fill", "Accurate login", [formGrid([("Claude", claudeCtl), ("Codex", codexCtl)]),
             sub("Log in once, in-app, for the exact official % — no DevTools. Tokens expire occasionally → just log in again.")])
-        let displayCard = card("slider.horizontal.3", "Menu bar", [formGrid([("Show", modePopup), ("Providers", providers), ("", cLabels), ("Refresh (s)", fRefresh)])])
+        let displayCard = card("slider.horizontal.3", "Menu bar", [formGrid([("Show", modePopup), ("Providers", providers), ("", cLabels), ("Auto-check (s)", fRefresh)]), sub("Checks continue with the menu closed. Online readings refresh at most every 30s automatically; wake resumes checks.")])
         let colorsCard = card("paintpalette.fill", "Appearance", [formGrid([("Thresholds", thresholds), ("Colors", colors)])])
 
         let resetBtn = NSButton(title: "Reset to defaults", target: self, action: #selector(resetDefaults)); resetBtn.bezelStyle = .rounded
@@ -132,15 +132,15 @@ final class SettingsWindow: NSObject, NSWindowDelegate, NSTextFieldDelegate {
         cGemini.state = Cfg.showGemini ? .on : .off; cLabels.state = Cfg.showLabels ? .on : .off
         fRefresh.stringValue = String(Int(Cfg.refreshInterval)); fGreen.stringValue = String(Cfg.greenAbove); fYellow.stringValue = String(Cfg.yellowAbove)
         wHigh.color = Cfg.colorHigh; wMid.color = Cfg.colorMid; wLow.color = Cfg.colorLow; wUnknown.color = Cfg.colorUnknown
-        claudeStatus.stringValue = Cfg.claudeSessionKey.isEmpty ? "not logged in — using estimate" : "✓ logged in — exact official %"
-        claudeStatus.textColor = Cfg.claudeSessionKey.isEmpty ? .secondaryLabelColor : .systemGreen
+        claudeStatus.stringValue = Cfg.claudeSessionKey.isEmpty ? "No saved login · local estimate" : "Login saved · see menu for live status"
+        claudeStatus.textColor = .secondaryLabelColor
         // Codex needs no browser login when the codex CLI is already authed — hide the button then.
         let codexCLI = codexCLIAccessToken() != nil
         if codexCLI {
-            codexStatus.stringValue = "✓ official — via your codex CLI (no login needed)"; codexStatus.textColor = .systemGreen
+            codexStatus.stringValue = "CLI login found · see menu for live status"; codexStatus.textColor = .secondaryLabelColor
             codexLoginBtn?.isHidden = true; codexLogoutBtn?.isHidden = true
         } else if !Cfg.codexSessionToken.isEmpty {
-            codexStatus.stringValue = "✓ logged in (ChatGPT) — exact official %"; codexStatus.textColor = .systemGreen
+            codexStatus.stringValue = "Login saved · see menu for live status"; codexStatus.textColor = .secondaryLabelColor
             codexLoginBtn?.isHidden = false; codexLogoutBtn?.isHidden = false
         } else {
             codexStatus.stringValue = "not logged in — log in to your codex CLI, or ChatGPT here"; codexStatus.textColor = .secondaryLabelColor
@@ -168,12 +168,12 @@ final class SettingsWindow: NSObject, NSWindowDelegate, NSTextFieldDelegate {
     func controlTextDidEndEditing(_ obj: Notification) { changed(nil) }
     @objc func loginClaude() {
         claudeLogin.start(title: "Log in to Claude (claude.ai)", url: "https://claude.ai/login", domain: "claude.ai", cookieName: "sessionKey") { [weak self] val in
-            Cfg.claudeSessionKey = val; Cfg.claudeOrgUuid = ""; self?.load(); self?.onChange()
+            clearOfficial("Cl"); Cfg.claudeSessionKey = val; Cfg.claudeOrgUuid = ""; self?.load(); self?.onChange()
         }
     }
     @objc func loginCodex() {
         codexLogin.start(title: "Log in to ChatGPT (Codex)", url: "https://chatgpt.com/auth/login", domain: "chatgpt.com", cookieName: "__Secure-next-auth.session-token") { [weak self] val in
-            Cfg.codexSessionToken = val; self?.load(); self?.onChange()
+            clearOfficial("Cx"); Cfg.codexSessionToken = val; self?.load(); self?.onChange()
         }
     }
     @objc func logoutClaude() { Cfg.claudeSessionKey = ""; Cfg.claudeOrgUuid = ""; load(); onChange() }

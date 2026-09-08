@@ -3,9 +3,11 @@
 set -euo pipefail
 HERE="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$HERE"
+export CLANG_MODULE_CACHE_PATH="${CLANG_MODULE_CACHE_PATH:-${TMPDIR:-/tmp}/aicb-module-cache}"
 
 echo "── build ──"
-bash build.sh >/dev/null && echo "built ✓"
+bash build.sh >/dev/null
+echo "built ✓"
 
 echo "── unit ──"
 # Compile the Sources modules (minus the app entry point) together with the unit
