@@ -1,27 +1,26 @@
 #!/bin/bash
-# Build, then run unit + end-to-end tests. Usage: bash Tests/run.sh
+# Unit + end-to-end tests. Builds throwaway binaries in a temp dir, so the
+# installed AICreditsBar.app and its login item are never touched.
+# Usage: bash Tests/run.sh
 set -euo pipefail
 HERE="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$HERE"
 export CLANG_MODULE_CACHE_PATH="${CLANG_MODULE_CACHE_PATH:-${TMPDIR:-/tmp}/aicb-module-cache}"
-
-echo "── build ──"
-bash build.sh >/dev/null
-echo "built ✓"
+OUT="$(mktemp -d)"
+trap 'rm -rf "$OUT"' EXIT
+SWIFTC=(/usr/bin/swiftc -swift-version 5 -target "$(uname -m)-apple-macos11" -framework AppKit)
 
 echo "── unit ──"
-# Compile the Sources modules (minus the app entry point) together with the unit
-# tests, whose top-level code becomes the test binary's main.
+# The Sources (minus the app entry point) plus the tests, whose top-level code is the test main.
 SRC=$(ls Sources/*.swift | grep -v 'Sources/main.swift$')
-ARCH="$(uname -m)"
-/usr/bin/swiftc -swift-version 5 -target "${ARCH}-apple-macos11" -framework AppKit -framework WebKit \
-  $SRC Tests/main.swift -o /tmp/aicb-unittests
-USUITE="aicb-unit-$$"   # isolated defaults so Cfg-touching tests don't read/clobber real settings
-AICB_DEFAULTS_SUITE="$USUITE" /tmp/aicb-unittests; rc=$?
-defaults delete "$USUITE" >/dev/null 2>&1 || true
+"${SWIFTC[@]}" $SRC Tests/main.swift -o "$OUT/unittests"
+SUITE="aicb-unit-$$"   # isolated defaults so tests never read or change the real settings
+rc=0; AICB_DEFAULTS_SUITE="$SUITE" AICB_SKIP_KEYCHAIN=1 "$OUT/unittests" || rc=$?
+defaults delete "$SUITE" >/dev/null 2>&1 || true
 [ $rc -eq 0 ] || exit $rc
 
 echo "── e2e ──"
-bash Tests/e2e.sh
+"${SWIFTC[@]}" -O Sources/*.swift -o "$OUT/aicreditsbar"
+bash Tests/e2e.sh "$OUT/aicreditsbar"
 
 echo "── ✓ all tests passed ──"

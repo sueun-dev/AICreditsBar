@@ -1,15 +1,15 @@
 <div align="center">
 
-# 🎛️ AICreditsBar
+# AICreditsBar
 
-**Your Codex · Claude · Gemini usage limits — live in the macOS menu bar.**
+**How much of your Codex and Claude plan limits is left — in the macOS menu bar.**
 
 ![macOS 11+](https://img.shields.io/badge/macOS-11%2B-111?logo=apple&logoColor=white)
 ![Swift 5](https://img.shields.io/badge/Swift-5-F05138?logo=swift&logoColor=white)
-![Local + online](https://img.shields.io/badge/data-local%20%2B%20online-2EA043)
+![Official data only](https://img.shields.io/badge/data-official%20APIs%20only-2EA043)
 ![License: MIT](https://img.shields.io/badge/License-MIT-3B82F6)
 
-![menu bar](docs/images/menubar.png)
+<img src="docs/images/menu.png" width="312" alt="Menu bar and dropdown, rendered by the app with live data">
 
 **[English](#english) · [한국어](#한국어)**
 
@@ -19,141 +19,98 @@
 
 ## English
 
-A tiny native macOS **menu-bar** widget that continuously shows how much token/quota is
-left for **Codex** and **Claude**, plus **Gemini** connection status.
-Checks run automatically every 15 s by default, even with the menu closed. Each provider
-updates independently; online successes are cached for 30 s and failures retry with
-exponential backoff (30–240 s). Existing custom check intervals are preserved.
-Codex automatically reuses an existing CLI login for online usage; Claude uses online
-usage when an in-app login is saved. Otherwise, readings come from local CLI files.
+A small native menu-bar app. Each provider's mark sits in a thin ring that fills with the
+remaining % of the limit you'll hit first. Hover for the exact numbers; click for every
+limit, its reset countdown, and your plan.
 
-|  |  |
-|---|---|
-| ![dropdown](docs/images/dropdown.png) | ![settings](docs/images/settings.png) |
-| **Dropdown** — full per-provider breakdown | **Settings** — Liquid-Glass, all in one place |
+### Where the numbers come from
 
-### ✨ Features
-
-- **At-a-glance bar** — native terminal / sun / sparkle symbols + remaining %, color-coded
-  (green > 50 · yellow 20–50 · red < 20 · gray unknown/stale). `~` means estimate;
-  a trailing dot means at least one window is stale. Gemini shows connection status.
-- **Live fuel gauges** — 5-hour and weekly remaining bars, reset countdowns, source labels,
-  and freshness. The next known reset is summarized below the cards. Hover a card for full details.
-- **Always checking** — wake resumes checks; open menus update without losing keyboard
-  focus. Slow providers do not block others, and duplicate refresh requests do not pile up.
-- **Honest reset handling** — a passed reset time is marked stale until refreshed, never
-  silently converted into 100% quota. Manual refresh bypasses the online cache and backoff.
-- **Auto-detect** — reads `~/.codex`, `~/.claude`, `~/.gemini`; nothing to set up.
-- **Exact official %** via a one-time in-app login (optional) — or a local estimate offline.
-- **Fully configurable** — display mode (5h / weekly / both / lowest), per-provider toggles,
-  custom colors & thresholds — in a native **Liquid Glass** settings window (macOS 26).
-- **Private** — no telemetry, no credentials touched unless *you* log in; tokens stay local.
-
-### What each provider shows
-
-| Provider | Source | Accuracy |
+| Provider | Source | Signed in with |
 |---|---|---|
-| **Codex** | `~/.codex` rate-limits / ChatGPT usage API | **Exact official %** — 5-hour + weekly, with real reset times. |
-| **Claude** | claude.ai usage API *(if logged in)* · else `~/.claude` transcripts | **Exact official %** when logged in; otherwise a calibratable token **estimate**. |
-| **Gemini** | `~/.gemini` | Install / login status only — no local quota API. |
+| **Codex** | `chatgpt.com/backend-api/wham/usage` | your Codex CLI login (`~/.codex/auth.json`) |
+| **Claude** | `api.anthropic.com/api/oauth/usage` | your Claude Code login (macOS Keychain) |
 
-### Accurate login — exact official % (recommended)
+These are the official usage endpoints — the same numbers as Codex's `/status` and
+Claude Code's `/usage`. Nothing is estimated:
 
-By default Claude is a local **estimate**. For the **exact official %** (identical to `/usage`),
-open **Settings → Accurate login → Log in** and sign in to claude.ai in the popup — the session
-is captured automatically (no DevTools, no API keys). **Codex needs no extra login**: it reuses
-your `codex` CLI sign-in (`~/.codex/auth.json`) automatically. Session tokens are stored locally
-and are revocable (log out of claude.ai to invalidate); if a login expires the bar falls back to
-the estimate and shows a notice.
+- Each plan limit is shown as the provider reports it. Codex windows are named by their real
+  length (a Pro plan currently has a single 7-day window, so there is no 5-hour row).
+  Claude's per-model weekly limits (e.g. *Weekly (Fable)*) get their own row. Codex's separate
+  code-review limit isn't shown.
+- If a refresh fails, the last reading stays visible but greyed, with its age and the reason.
+- A window whose reset time has passed shows **—** until the next reading. It is never
+  assumed to be back at 100%.
+- Not signed in, or a login expired? The menu says so and shows no numbers.
+
+### The menu bar
+
+- One ring per provider. It shows the **lowest remaining** limit by default (Settings can
+  pin it to the 5-hour or weekly window). Per-model limits are left out of the ring.
+- Drawn in the menu bar's own text color while healthy, **orange** below 30 %, **red**
+  below 10 %, faded when the reading isn't current. Thresholds are adjustable.
+- Checks every 5 minutes, when the menu opens (at most every 2 minutes), and after the Mac
+  wakes. The usage endpoints rate-limit hard — Anthropic's especially — so a service that
+  answers HTTP 429 is left alone for 5, 10, 20, then 30 minutes.
+- The last good reading is saved, so after a restart it shows right away (faded, with its
+  age) until a fresh one arrives.
 
 ### Requirements
 
-- **macOS 11+** (Intel or Apple Silicon — you build a native binary on your own Mac).
-- **Xcode Command Line Tools** (provides `swiftc`). If missing: `xcode-select --install`.
+- macOS 11 or later, Intel or Apple Silicon.
+- Xcode Command Line Tools for `swiftc` (`xcode-select --install`).
+- The Codex CLI and/or Claude Code, signed in with a ChatGPT / Claude plan.
 
 ### Build & run
 
 ```bash
-bash build.sh          # compiles Sources/*.swift → AICreditsBar.app
-open AICreditsBar.app  # launches the menu-bar agent (no Dock icon)
+bash build.sh          # compile Sources/*.swift → AICreditsBar.app
+open AICreditsBar.app  # menu-bar only, no Dock icon
 ```
 
-Quit from the menu (**Quit AICreditsBar**) or `pkill -x aicreditsbar`. Print values without the GUI:
+Start at login: `bash scripts/install-login-item.sh` (remove with `-u`); it also brings the
+app back if it ever crashes. macOS ties a login item to the exact ad-hoc-signed build, so
+`build.sh` re-registers it — and restarts the app — after every rebuild.
 
-```bash
-./AICreditsBar.app/Contents/MacOS/aicreditsbar --once
-```
-
-Start at login (optional): `bash scripts/install-login-item.sh` (remove with `-u`).
-
-### Command-line flags
-
-All flags run headless (no GUI) against `aicreditsbar` in the app bundle:
+### Command line
 
 ```bash
 B=./AICreditsBar.app/Contents/MacOS/aicreditsbar
-
-$B --once                    # print all providers' status once, then exit
-$B --dump-config             # print effective settings (then prints --once output)
-
-# Calibrate the Claude *estimate* to match what /usage actually shows.
-# Open Claude's /usage, read the "used" %, and pass it here — the budget is
-# back-solved from your real 7-day / current-5h-block token totals on disk.
-$B --set-week-used 35        # "weekly shows 35% used" → calibrates the 7-day budget
-$B --set-5h-used 60          # "5h block shows 60% used" → calibrates the 5-hour budget
-
-# Official exact-% logins (alternative to the in-app Settings → Log in flow):
-$B --set-claude-key <key>    # store a claude.ai sessionKey cookie
-$B --set-codex-token <tok>   # store a chatgpt.com session-token (Codex usually needs none)
-$B --clear-logins            # drop both official tokens; revert to local estimate/disk
-
-$B --render-settings out.png # render the Settings window to a PNG (design check)
-$B --render-preview out.png  # native usage cards with explicitly labeled SAMPLE values
+$B --once                     # check every limit now (live requests), print, exit
+$B --dump-config              # settings, then the same report
+$B --render-preview menu.png  # the menu bar + dropdown as the app last saw them, as a PNG
+$B --render-settings out.png  # the Settings window as a PNG
+$B --settings                 # open Settings (launches the app if needed)
 ```
 
-> Calibration and the budget used for the Claude estimate live behind these CLI flags —
-> there is no plan/budget control in the Settings window (which covers display mode,
-> providers, thresholds, colors, and accurate login only).
+### Privacy
+
+The app reads the two logins above locally and sends each only to its own provider's
+usage endpoint. No telemetry, no other servers, no cookies or cache written to disk.
+If macOS asks whether it may read "Claude Code-credentials" from the Keychain, choose
+**Always Allow** (Claude Code normally stores it in a way that needs no prompt).
 
 ### Project structure
 
 ```
-Sources/        Swift modules
-  Config.swift        settings (UserDefaults) + color helpers
-  Models.swift        WindowStat, ProviderStatus
-  Support.swift       file / JSON / time helpers
-  Providers.swift     Codex · Claude · Gemini readers (local + official API)
-  Rendering.swift     menu-bar glyphs, colors, formatting
-  WebLogin.swift      in-app WKWebView login (captures the session cookie)
-  Settings.swift      Liquid-Glass settings window
-  AppDelegate.swift   status item, timer, dropdown menu
-  RefreshController.swift  independent provider workers + automatic checks
-  ProviderCardView.swift    native fuel gauges + next reset summary
-  Preview.swift       render actual native cards with sample data for QA
-  CLI.swift           --once / --dump-config / --set-* / --render-settings
-  main.swift          entry point
-Tests/          UnitTests + e2e (run with: bash Tests/run.sh)
-scripts/        install-login-item.sh, probe.py (reference reader)
-docs/           README images + render_images.py
-build.sh        compile + assemble the .app bundle
+Sources/
+  Codex.swift          Codex login + usage API + parsing
+  Claude.swift         Claude Code login + usage API + parsing
+  Models.swift         UsageWindow, Reading, ProviderState
+  Support.swift        formatting, JSON, HTTP and Keychain helpers
+  RefreshController.swift  background checks, one request per provider at a time
+  Rendering.swift      menu-bar rings, colors, provider marks
+  ProviderCardView.swift   the dropdown cards
+  AppDelegate.swift    status item and menu
+  Settings.swift       Settings window
+  Config.swift         settings storage
+  CLI.swift / Preview.swift / main.swift
+Tests/                 unit + end-to-end tests: bash Tests/run.sh
+scripts/               install-login-item.sh
 ```
 
-### Development & tests
-
-```bash
-bash Tests/run.sh      # build + unit tests + end-to-end tests
-```
-
-The e2e suite runs the real binary against synthetic `~/.codex` / `~/.claude` fixtures in a
-throwaway `HOME` and an isolated `UserDefaults` suite, so it never touches your real settings
-or tokens.
-
-### Privacy
-
-AICreditsBar reads local usage under `~/.codex`, `~/.claude`, and `~/.gemini`.
-When a Codex CLI login or saved in-app login is present, it also contacts that provider's
-usage endpoint using the existing credentials. No telemetry. A saved credential is not
-proof of a working login: check the menu's source and failure notice for the live result.
+`bash Tests/run.sh` builds throwaway binaries, runs the unit tests (including real API
+replies as fixtures) and an end-to-end pass in a scratch `HOME` with no Keychain access. It
+never touches the installed app or your settings.
 
 ### License
 
@@ -163,116 +120,75 @@ MIT — see [LICENSE](LICENSE).
 
 ## 한국어
 
-Codex · Claude · Gemini의 남은 토큰/한도를 macOS **메뉴바**에 계속 띄워주는 작은 네이티브 위젯입니다.
-쓰는 CLI를 자동 감지하며, 메뉴가 닫혀 있어도 기본 15초마다 독립적으로 확인합니다.
-공식 조회 성공값은 30초간 캐시하고, 실패 시 30~240초 간격으로 자동 재시도합니다.
-기존에 설정한 갱신 간격은 유지됩니다. Codex CLI 로그인 또는 저장된 인앱 로그인이 있으면
-해당 서비스의 온라인 사용량도 조회합니다. Gemini는 연결 상태만 표시합니다.
+Codex와 Claude 요금제 한도가 얼마나 남았는지 macOS 메뉴바에 보여주는 작은 네이티브 앱입니다.
+각 서비스 아이콘을 감싼 얇은 링이 **가장 먼저 닿을 한도의 남은 %** 만큼 채워집니다. 마우스를
+올리면 정확한 숫자, 클릭하면 모든 한도와 리셋까지 남은 시간, 요금제를 보여줍니다.
 
-|  |  |
-|---|---|
-| ![드롭다운](docs/images/dropdown.png) | ![설정](docs/images/settings.png) |
-| **드롭다운** — 제공자별 상세 | **설정** — Liquid Glass, 한 곳에서 |
+### 숫자의 출처
 
-### ✨ 기능
-
-- **한눈에** — 터미널·태양·반짝임 아이콘과 남은 %. `~`는 추정값, 뒤의 점은 오래된 창이 있음을 뜻합니다.
-- **잔량 게이지** — 5시간·주간 잔량 막대, 리셋까지 남은 시간, 공식/로컬/추정 출처, 마지막 데이터 시각.
-- **자동 갱신** — 잠자기 복귀 시 다시 확인하고, 한 서비스가 느려도 다른 서비스는 갱신됩니다.
-- **리셋 확인** — 예정 시간이 지났다고 100%로 바꾸지 않습니다. 새 값을 받을 때까지 오래된 값으로 표시합니다.
-- **자동 감지** — `~/.codex`, `~/.claude`, `~/.gemini`를 읽음. 설정할 것 없음.
-- **정확한 공식 %** — 인앱 로그인 한 번(선택). 오프라인이면 로컬 추정치.
-- **완전 커스터마이즈** — 표시 모드(5h / 주간 / 둘 다 / 최저), 제공자 토글, 색상·임계값 —
-  네이티브 **Liquid Glass** 설정창(macOS 26).
-- **프라이버시** — 텔레메트리 없음. 기존 Codex CLI 로그인 또는 저장된 인앱 로그인으로 사용량을 조회하며 토큰은 로컬 보관.
-
-### 각 제공자가 보여주는 것
-
-| 제공자 | 출처 | 정확도 |
+| 서비스 | 출처 | 로그인 |
 |---|---|---|
-| **Codex** | `~/.codex` rate-limits / ChatGPT usage API | **정확한 공식 %** — 5시간 + 주간, 실제 리셋 시각 포함. |
-| **Claude** | claude.ai usage API *(로그인 시)* · 아니면 `~/.claude` 트랜스크립트 | 로그인 시 **정확한 공식 %**, 아니면 보정 가능한 토큰 **추정치**. |
-| **Gemini** | `~/.gemini` | 설치/로그인 상태만 — 로컬 한도 API 없음. |
+| **Codex** | `chatgpt.com/backend-api/wham/usage` | Codex CLI 로그인 (`~/.codex/auth.json`) |
+| **Claude** | `api.anthropic.com/api/oauth/usage` | Claude Code 로그인 (macOS 키체인) |
 
-### 정확한 로그인 — 공식값 그대로 (권장)
+두 서비스의 공식 사용량 API이며, Codex의 `/status`, Claude Code의 `/usage`와 같은 숫자입니다.
+추정치는 없습니다.
 
-기본적으로 Claude는 로컬 **추정치**입니다. **공식 정확값**(`/usage`와 동일)을 원하면
-**Settings → Accurate login → Log in**에서 팝업에 claude.ai 로그인을 하세요 — 세션이 자동 캡처됩니다
-(DevTools·API 키 불필요). **Codex는 추가 로그인 불필요**: `codex` CLI 로그인(`~/.codex/auth.json`)을
-자동 재사용합니다. 세션 토큰은 로컬에 저장되며 취소 가능(claude.ai 로그아웃 시 무효), 만료되면 추정치로
-폴백하고 알림을 띄웁니다.
+- 요금제 한도는 서비스가 보고한 그대로 표시합니다. Codex 창 이름은 실제 길이로 정합니다
+  (현재 Pro 요금제는 7일 창 하나뿐이라 5시간 줄이 없습니다). Claude의 모델별 주간 한도
+  (예: *Weekly (Fable)*)는 별도 줄로 보여줍니다. Codex의 별도 코드리뷰 한도는 표시하지 않습니다.
+- 갱신에 실패하면 마지막 값을 회색으로 남기고, 몇 분 전 값인지와 실패 이유를 표시합니다.
+- 리셋 시각이 지난 창은 새 값을 받을 때까지 **—** 로 표시합니다. 100%로 가정하지 않습니다.
+- 로그인이 없거나 만료되면 그렇게 알려주고 숫자는 표시하지 않습니다.
+
+### 메뉴바
+
+- 서비스마다 링 하나. 기본값은 **가장 적게 남은 한도**이며, 설정에서 5시간/주간 창으로
+  고정할 수 있습니다. 모델별 한도는 링에서 제외합니다.
+- 여유가 있으면 메뉴바 글자색, 30% 미만 **주황**, 10% 미만 **빨강**, 최신 값이 아니면 흐리게.
+  기준값은 설정에서 바꿀 수 있습니다.
+- 5분마다, 메뉴를 열 때(최대 2분에 한 번), 잠자기에서 깨어날 때 확인합니다. 사용량 API는
+  호출 제한이 엄격해서(특히 Anthropic) HTTP 429를 받으면 그 서비스는 5→10→20→30분 쉽니다.
+- 마지막 정상 값을 저장해 두어, 재시작 직후에도 (흐리게, 몇 분 전 값인지와 함께) 바로 보여줍니다.
 
 ### 요구 사항
 
-- **macOS 11+** (Intel 또는 Apple Silicon — 자기 맥에서 네이티브 바이너리를 직접 빌드).
-- **Xcode Command Line Tools** (`swiftc`). 없으면: `xcode-select --install`.
+- macOS 11 이상 (Intel / Apple Silicon).
+- `swiftc`용 Xcode Command Line Tools (`xcode-select --install`).
+- ChatGPT/Claude 요금제로 로그인한 Codex CLI 또는 Claude Code.
 
 ### 빌드 & 실행
 
 ```bash
 bash build.sh          # Sources/*.swift 컴파일 → AICreditsBar.app
-open AICreditsBar.app  # 메뉴바 에이전트 실행 (Dock 아이콘 없음)
+open AICreditsBar.app  # 메뉴바 전용 (Dock 아이콘 없음)
 ```
 
-메뉴의 **Quit AICreditsBar** 또는 `pkill -x aicreditsbar`로 종료. GUI 없이 값 출력:
+로그인 시 자동 실행: `bash scripts/install-login-item.sh` (제거는 `-u`, 앱이 비정상 종료되면 다시 띄움). macOS는 로그인 항목을
+등록 당시의 ad-hoc 서명 빌드에 묶어두기 때문에, `build.sh`가 재빌드 후 다시 등록하고 앱을
+재시작합니다.
 
-```bash
-./AICreditsBar.app/Contents/MacOS/aicreditsbar --once
-```
-
-로그인 시 자동 시작(선택): `bash scripts/install-login-item.sh` (제거는 `-u`).
-
-### 커맨드라인 플래그
-
-모든 플래그는 GUI 없이 앱 번들의 `aicreditsbar`를 실행합니다:
+### 커맨드라인
 
 ```bash
 B=./AICreditsBar.app/Contents/MacOS/aicreditsbar
-
-$B --once                    # 모든 제공자 상태를 한 번 출력 후 종료
-$B --dump-config             # 적용된 설정 출력 (이어서 --once 출력)
-
-# Claude *추정치*를 /usage 실제 표시값에 맞춰 보정.
-# Claude의 /usage에서 "used" %를 읽어 넘기면, 디스크의 실제 7일 / 현재 5h 블록
-# 토큰 합계로부터 예산을 역산합니다.
-$B --set-week-used 35        # "주간 35% 사용" → 7일 예산 보정
-$B --set-5h-used 60          # "5h 블록 60% 사용" → 5시간 예산 보정
-
-# 공식 정확값 로그인 (인앱 Settings → Log in 대신 사용 가능):
-$B --set-claude-key <key>    # claude.ai sessionKey 쿠키 저장
-$B --set-codex-token <tok>   # chatgpt.com session-token 저장 (Codex는 보통 불필요)
-$B --clear-logins            # 두 공식 토큰 삭제; 로컬 추정치/디스크로 복귀
-
-$B --render-settings out.png # Settings 창을 PNG로 렌더 (디자인 확인)
+$B --once                     # 모든 한도를 지금 조회(실제 요청)해 출력하고 종료
+$B --dump-config              # 설정 출력 후 같은 보고
+$B --render-preview menu.png  # 앱이 마지막으로 받은 값으로 메뉴바 + 드롭다운을 PNG 렌더
+$B --render-settings out.png  # 설정 창을 PNG로 렌더
+$B --settings                 # 설정 창 열기 (필요하면 앱 실행)
 ```
 
-> 보정과 Claude 추정치 예산은 위 CLI 플래그로만 설정합니다 — 설정 창에는 플랜/예산
-> 컨트롤이 없습니다(설정 창은 표시 모드·제공자·임계값·색상·정확 로그인만 다룸).
+### 개인정보
 
-### 프로젝트 구조
+위 두 로그인 정보를 로컬에서 읽어 각 서비스의 사용량 API에만 보냅니다. 텔레메트리, 다른 서버,
+디스크에 쓰는 쿠키·캐시가 없습니다. macOS가 키체인의 "Claude Code-credentials" 접근을 물으면
+**항상 허용**을 선택하세요 (보통 Claude Code가 묻지 않아도 되게 저장합니다).
 
-```
-Sources/   Swift 모듈 (Config·Models·Support·Providers·Rendering·WebLogin·Settings·AppDelegate·CLI·main)
-Tests/     단위 + e2e 테스트 — 실행: bash Tests/run.sh
-scripts/   install-login-item.sh, probe.py (참조 리더)
-docs/      README 이미지 + render_images.py
-build.sh   컴파일 + .app 번들 조립
-```
+### 테스트
 
-### 개발 & 테스트
-
-```bash
-bash Tests/run.sh      # 빌드 + 단위 테스트 + e2e 테스트
-```
-
-e2e는 실제 바이너리를 **가짜 HOME + 격리된 UserDefaults**에서 합성 픽스처로 돌리므로, 당신의 실제
-설정/토큰을 절대 건드리지 않습니다.
-
-### 프라이버시
-
-`~/.codex`, `~/.claude`, `~/.gemini`의 로컬 사용량을 읽습니다. Codex CLI 로그인이나 저장된
-인앱 로그인이 있으면 해당 서비스의 사용량 API에도 요청합니다. 텔레메트리는 없습니다.
-설정의 로그인 저장 표시는 인증 성공을 보장하지 않으며, 실제 결과는 메뉴의 출처·오류 표시로 확인합니다.
+`bash Tests/run.sh` — 임시 바이너리를 빌드해 단위 테스트(실제 API 응답을 픽스처로 사용)와
+e2e(키체인 접근 없는 임시 `HOME`)를 실행합니다. 설치된 앱과 설정은 건드리지 않습니다.
 
 ### 라이선스
 

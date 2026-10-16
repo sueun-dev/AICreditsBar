@@ -1,55 +1,39 @@
 #!/bin/bash
-# End-to-end tests: run the built binary against synthetic ~/.codex and ~/.claude
-# fixtures in a throwaway HOME with an isolated UserDefaults suite (never touches
-# your real settings/tokens), and assert the computed output.
+# End-to-end: run the real binary in a throwaway HOME with an isolated defaults
+# suite and no Keychain access, and check what it reports. No network needed.
+# Usage: bash Tests/e2e.sh <path-to-aicreditsbar-binary>
 set -uo pipefail
-HERE="$(cd "$(dirname "$0")/.." && pwd)"
-BIN="$HERE/AICreditsBar.app/Contents/MacOS/aicreditsbar"
-[ -x "$BIN" ] || { echo "build first: bash build.sh" >&2; exit 1; }
-
+BIN="${1:?usage: e2e.sh <binary>}"
 FAKE="$(mktemp -d)"; SUITE="aicb-e2e-$$"; fail=0
 cleanup() { defaults delete "$SUITE" >/dev/null 2>&1 || true; rm -rf "$FAKE"; }
 trap cleanup EXIT
-assert() { if printf '%s' "$1" | grep -qF "$2"; then echo "  ok: $3"; else echo "  FAIL: $3"; echo "      want substring: $2"; echo "      in output:      $1"; fail=1; fi }
-run() { HOME="$FAKE" AICB_DEFAULTS_SUITE="$SUITE" "$BIN" "$@"; }
+run() { HOME="$FAKE" AICB_DEFAULTS_SUITE="$SUITE" AICB_SKIP_KEYCHAIN=1 "$BIN" "$@" 2>&1; }
+check() {   # check <output> <expected substring> <description>
+  if printf '%s' "$1" | grep -qF -- "$2"; then echo "  ok: $3"
+  else echo "  FAIL: $3"; echo "      want: $2"; echo "      got:  $1"; fail=1; fi
+}
 
-python3 - "$FAKE" <<'PY'
-import os, sys, json, time
-fake = sys.argv[1]; now = time.time()
-def iso(t): return time.strftime('%Y-%m-%dT%H:%M:%S.000Z', time.gmtime(t))
-d = os.path.join(fake, ".codex/sessions/2026/06/09"); os.makedirs(d)
-with open(os.path.join(d, "rollout-test.jsonl"), "w") as f:
-    f.write(json.dumps({"timestamp": iso(now-7200)}) + "\n")
-    f.write(json.dumps({"timestamp": iso(now-30), "payload": {"type": "token_count", "rate_limits": {
-        "primary":   {"used_percent": 40.0, "window_minutes": 300,   "resets_at": int(now + 3600)},
-        "secondary": {"used_percent": 70.0, "window_minutes": 10080, "resets_at": int(now + 5*86400)},
-        "plan_type": "pro"}}}) + "\n")
-p = os.path.join(fake, ".claude/projects/proj"); os.makedirs(p)
-with open(os.path.join(p, "s.jsonl"), "w") as f:
-    f.write(json.dumps({"type": "assistant", "timestamp": iso(now-600), "requestId": "r1",
-        "message": {"id": "m1", "usage": {"input_tokens": 1000000, "output_tokens": 500000,
-        "cache_creation_input_tokens": 0, "cache_read_input_tokens": 0}}}) + "\n")
-PY
-
-echo "1) --once: official Codex from disk rate_limits + Claude 5h estimate"
+echo "1) nothing signed in → says so, no numbers"
 out="$(run --once)"
-assert "$out" "Codex: 5h=60%  week=30%  [pro]" "Codex official 60% (5h) / 30% (week)"
-assert "$out" "Claude: 5h=99%" "Claude 5h estimate (1.5M / 220M default)"
+check "$out" "Codex: Not signed in to Codex — Run \`codex login\` in Terminal." "Codex asks for codex login"
+check "$out" "Claude: Not signed in to Claude Code — Run \`claude\` in Terminal and sign in." "Claude asks for Claude Code login"
+if printf '%s' "$out" | grep -q '% left'; then echo "  FAIL: printed a percentage with no data"; fail=1; else echo "  ok: no invented percentages"; fi
 
-echo "2) --dump-config: defaults in the isolated suite"
-out="$(run --dump-config)"
-assert "$out" "displayMode=5h" "default display mode is 5h"
-assert "$out" "5h=220.0M" "default Claude 5h estimate budget"
+echo "2) expired Claude Code login → no request, clear message"
+mkdir -p "$FAKE/.claude"
+printf '{"claudeAiOauth":{"accessToken":"sk-ant-oat-test","expiresAt":1000,"subscriptionType":"max","rateLimitTier":"default_claude_max_20x"}}' > "$FAKE/.claude/.credentials.json"
+check "$(run --once)" "Claude: Claude Code login expired — Open Claude Code once to renew it." "expired login is reported"
 
-echo "3) empty HOME degrades gracefully (no crash, marks unavailable)"
-EMPTY="$(mktemp -d)"
-out="$(HOME="$EMPTY" AICB_DEFAULTS_SUITE="$SUITE" "$BIN" --once)"
-assert "$out" "Codex: [unavailable]" "Codex unavailable with no data"
-assert "$out" "Claude: [unavailable]" "Claude unavailable with no data"
-rm -rf "$EMPTY"
+echo "3) Codex signed in with an API key → explains there are no plan limits"
+mkdir -p "$FAKE/.codex"
+printf '{"auth_mode":"apikey","OPENAI_API_KEY":"sk-test"}' > "$FAKE/.codex/auth.json"
+check "$(run --once)" "Codex: Codex is signed in with an API key" "API-key login is reported"
 
-echo "4) --set-week-used calibrates the weekly budget"
-out="$(run --set-week-used 50)"; assert "$out" "Claude weekly calibrated" "calibration ran"
-out="$(run --once)";             assert "$out" "7d=50%" "weekly reads 50% left after calibrating to 50% used"
+echo "4) defaults"
+check "$(run --dump-config)" "display=min refresh=300s warn<30% critical<10%" "default settings"
+
+echo "5) renders the menu and the settings window"
+run --render-preview "$FAKE/preview.png" >/dev/null && [ -s "$FAKE/preview.png" ] && echo "  ok: preview PNG" || { echo "  FAIL: preview PNG"; fail=1; }
+run --render-settings "$FAKE/settings.png" >/dev/null && [ -s "$FAKE/settings.png" ] && echo "  ok: settings PNG" || { echo "  FAIL: settings PNG"; fail=1; }
 
 [ $fail -eq 0 ] && { echo "✓ e2e: all passed"; exit 0; } || { echo "✗ e2e: failures above"; exit 1; }

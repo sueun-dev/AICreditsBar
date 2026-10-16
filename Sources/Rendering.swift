@@ -1,100 +1,162 @@
 import AppKit
 
-// MARK: - Rendering
+// MARK: - Levels and colors
 
-func colorFor(_ w: WindowStat?) -> NSColor {
-    guard let w = w else { return Cfg.colorUnknown }
-    if w.stale { return Cfg.colorUnknown }
-    if w.refilled { return Cfg.colorHigh }
-    guard let r = w.remaining else { return Cfg.colorUnknown }
-    let hi = max(Cfg.greenAbove, Cfg.yellowAbove), lo = min(Cfg.greenAbove, Cfg.yellowAbove)   // tolerate inverted thresholds
-    if r > hi { return Cfg.colorHigh }
-    if r >= lo { return Cfg.colorMid }
-    return Cfg.colorLow
-}
-func windowText(_ w: WindowStat?) -> String {
-    guard let w = w else { return "?" }
-    if w.refilled { return "↑" }
-    if let r = w.remaining { return "\(r)%" }
-    return "?"
-}
-func barInfo(_ p: ProviderStatus) -> (String, NSColor) {
-    guard p.available else { return ("—", Cfg.colorUnknown) }
-    if p.source == .statusOnly { return ("✓", Cfg.colorUnknown) }
-    let f = p.fiveHour, w = p.weekly
-    switch Cfg.displayMode {
-    case "week":                                       // weekly only — "?" if absent, never substitute 5h
-        return (windowText(w), colorFor(w))
-    case "both":                                       // always show both windows ("?" for a missing one)
-        let worse = (f?.remaining ?? 101) <= (w?.remaining ?? 101) ? f : w
-        return ("\(windowText(f))/\(windowText(w))", colorFor(worse))
-    case "min":                                        // the lower of whatever windows exist
-        let worst = [f, w].compactMap { $0 }.min { ($0.remaining ?? 101) < ($1.remaining ?? 101) }
-        return (windowText(worst), colorFor(worst))
-    default:                                           // "5h" — 5-hour only, "?" if absent
-        return (windowText(f), colorFor(f))
-    }
-}
-// Monochrome menu-bar glyphs per provider (template images → tint to the bar appearance).
-var glyphCache: [String: NSImage] = [:]
-func providerGlyph(_ key: String, _ pt: CGFloat = 16) -> NSImage {
-    let cacheKey = "\(key)-\(pt)"
-    if let g = glyphCache[cacheKey] { return g }
-    let symbol = key == "Cx" ? "terminal" : (key == "Cl" ? "sun.max.fill" : "sparkle")
-    if let image = NSImage(systemSymbolName: symbol, accessibilityDescription: key == "Cx" ? "Codex" : (key == "Cl" ? "Claude" : "Gemini"))?
-        .withSymbolConfiguration(NSImage.SymbolConfiguration(pointSize: pt, weight: .medium)) {
-        image.isTemplate = true; glyphCache[cacheKey] = image; return image
-    }
-    // Bold monochrome marks → tint white like native menu-bar icons.
-    let img = NSImage(size: NSSize(width: pt, height: pt)); img.lockFocus()
-    NSColor.black.setFill(); NSColor.black.setStroke()
-    let c = NSPoint(x: pt/2, y: pt/2)
-    switch key {
-    case "Cl": // Claude — Anthropic sunburst
-        let rays = 11, rOut = pt*0.49, rIn = pt*0.12, w = pt*0.085
-        for i in 0..<rays {
-            let a = CGFloat(i)/CGFloat(rays)*2 * .pi
-            let d = NSPoint(x: cos(a), y: sin(a)), pp = NSPoint(x: -sin(a), y: cos(a))
-            let tip = NSPoint(x: c.x + d.x*rOut, y: c.y + d.y*rOut)
-            let b1 = NSPoint(x: c.x + d.x*rIn + pp.x*w, y: c.y + d.y*rIn + pp.y*w)
-            let b2 = NSPoint(x: c.x + d.x*rIn - pp.x*w, y: c.y + d.y*rIn - pp.y*w)
-            let p = NSBezierPath(); p.move(to: tip); p.line(to: b1); p.line(to: b2); p.close(); p.fill()
-        }
-        NSBezierPath(ovalIn: NSRect(x: c.x-rIn*1.4, y: c.y-rIn*1.4, width: rIn*2.8, height: rIn*2.8)).fill()
-    case "Gm": // Gemini — 4-point sparkle
-        let R = pt*0.5, r = pt*0.11
-        let pts = [(0.0,R),(r,r),(R,0.0),(r,-r),(0.0,-R),(-r,-r),(-R,0.0),(-r,r)]
-        let p = NSBezierPath()
-        for (i,(x,y)) in pts.enumerated() {
-            let q = NSPoint(x: c.x+CGFloat(x), y: c.y+CGFloat(y)); i==0 ? p.move(to:q) : p.line(to:q)
-        }
-        p.close(); p.fill()
-    default: // "Cx" Codex — OpenAI blossom (6 rounded petals)
-        let petalR = pt*0.235, ring = pt*0.255
-        for i in 0..<6 {
-            let a = (CGFloat(i)*60 - 90) * .pi/180
-            let pxc = c.x + cos(a)*ring, pyc = c.y + sin(a)*ring
-            NSBezierPath(ovalIn: NSRect(x: pxc-petalR, y: pyc-petalR, width: petalR*2, height: petalR*2)).fill()
-        }
-        // knot center punched out for the flower look
-        NSGraphicsContext.current?.compositingOperation = .clear
-        NSBezierPath(ovalIn: NSRect(x: c.x-pt*0.115, y: c.y-pt*0.115, width: pt*0.23, height: pt*0.23)).fill()
-        NSGraphicsContext.current?.compositingOperation = .sourceOver
-    }
-    img.unlockFocus(); img.isTemplate = true; glyphCache[cacheKey] = img; return img
+enum Level { case normal, warning, critical }
+
+func level(forLeft left: Int) -> Level {
+    let critical = min(Cfg.criticalBelow, Cfg.warnBelow), warning = max(Cfg.criticalBelow, Cfg.warnBelow)
+    if left < critical { return .critical }
+    if left < warning { return .warning }
+    return .normal
 }
 
-func barSegment(_ p: ProviderStatus) -> NSAttributedString {
-    let mono = NSFont.monospacedDigitSystemFont(ofSize: 13, weight: .regular)
-    let s = NSMutableAttributedString()
-    if Cfg.showLabels {
-        let att = NSTextAttachment(); att.image = providerGlyph(p.key); att.bounds = NSRect(x: 0, y: -3.5, width: 16, height: 16)
-        s.append(NSAttributedString(attachment: att))
-        s.append(NSAttributedString(string: " ", attributes: [.font: mono]))
+/// Bar fill in the menu: green, orange, red.
+func barColor(_ level: Level) -> NSColor {
+    switch level {
+    case .normal: return .systemGreen
+    case .warning: return .systemOrange
+    case .critical: return .systemRed
     }
-    let (txt, col) = barInfo(p)
-    let prefix = p.available && p.source == .estimate ? "~" : ""
-    let suffix = p.fiveHour?.stale == true || p.weekly?.stale == true ? "·" : ""
-    s.append(NSAttributedString(string: prefix + txt + suffix, attributes: [.font: mono, .foregroundColor: col]))
-    return s
+}
+
+/// Number color in the menu: plain text while healthy.
+func numberColor(_ level: Level) -> NSColor { level == .normal ? .labelColor : barColor(level) }
+
+// MARK: - Menu bar
+
+/// The window whose remaining % goes in the menu bar: the chosen kind if the
+/// provider has it, otherwise its tightest current limit. Limits for a single
+/// model are left out — they don't stop you using the others.
+func menuBarWindow(_ reading: Reading, now: Double) -> UsageWindow? {
+    let general = reading.windows.filter { !$0.modelScoped }
+    let preferred: WindowKind? = Cfg.displayMode == "5h" ? .session : Cfg.displayMode == "week" ? .weekly : nil
+    if let kind = preferred, let window = general.first(where: { $0.kind == kind }) { return window }
+    let current = general.filter { !$0.isExpired(now: now) }
+    return current.min { $0.leftPercent < $1.leftPercent } ?? general.first
+}
+
+/// What the menu bar shows for one provider.
+struct MenuBarGauge: Equatable {
+    var left: Int?           // nil: nothing current to show (first check, no data, window past its reset)
+    var level: Level = .normal
+    var isCurrent = true     // false: the last good reading, kept after a failed refresh
+    var checking = false     // the first check is still running
+    var text: String { left.map { "\($0)%" } ?? (checking ? "…" : "—") }
+}
+
+func menuBarGauge(_ state: ProviderState, now: Double) -> MenuBarGauge {
+    guard let reading = state.reading else { return MenuBarGauge(left: nil, checking: state.error == nil) }
+    guard let window = menuBarWindow(reading, now: now), !window.isExpired(now: now) else { return MenuBarGauge(left: nil) }
+    return MenuBarGauge(left: window.leftPercent, level: level(forLeft: window.leftPercent), isCurrent: state.isCurrent(now: now))
+}
+
+/// The status-item image: each provider's mark inside a thin ring whose arc is
+/// the remaining %, clockwise from 12 o'clock. The menu bar doesn't tint images it
+/// isn't given as templates, so everything is painted in its text color for
+/// `appearance` — orange or red when low, faded when the number isn't current.
+func menuBarImage(_ items: [(Provider, ProviderState)], appearance: NSAppearance, now: Double = nowEpoch()) -> NSImage {
+    var ink = NSColor.labelColor
+    appearance.performAsCurrentDrawingAppearance { ink = NSColor.labelColor.usingColorSpace(.sRGB) ?? .labelColor }
+    let gauges = items.map { ($0.0, menuBarGauge($0.1, now: now)) }
+    let size: CGFloat = 19, gap: CGFloat = 6
+    let width = CGFloat(gauges.count) * (size + gap) - gap
+    let image = NSImage(size: NSSize(width: max(size, width), height: size), flipped: false) { _ in
+        for (index, (provider, gauge)) in gauges.enumerated() {
+            drawRing(provider, gauge, in: NSRect(x: CGFloat(index) * (size + gap), y: 0, width: size, height: size), ink: ink)
+        }
+        return true
+    }
+    image.accessibilityDescription = gauges.map { "\($0.0.rawValue) \($0.1.text)" }.joined(separator: ", ")
+    return image
+}
+
+private func drawRing(_ provider: Provider, _ gauge: MenuBarGauge, in rect: NSRect, ink: NSColor) {
+    let line: CGFloat = 1.5
+    let tint = gauge.isCurrent && gauge.level != .normal ? barColor(gauge.level) : ink
+    let ring = rect.insetBy(dx: line / 2 + 0.25, dy: line / 2 + 0.25)
+    let track = NSBezierPath(ovalIn: ring)
+    track.lineWidth = line
+    tint.withAlphaComponent(0.3).setStroke()
+    track.stroke()
+    if let left = gauge.left, left > 0 {
+        let arc = NSBezierPath()
+        arc.appendArc(withCenter: NSPoint(x: rect.midX, y: rect.midY), radius: ring.width / 2,
+                      startAngle: 90, endAngle: 90 - 360 * CGFloat(left) / 100, clockwise: true)
+        arc.lineWidth = line
+        arc.lineCapStyle = .round
+        tint.withAlphaComponent(gauge.isCurrent ? 1 : 0.45).setStroke()
+        arc.stroke()
+    }
+    let mark = rect.width * 0.55
+    let faded = gauge.left == nil || !gauge.isCurrent
+    painted(providerGlyph(provider, size: mark), ink.withAlphaComponent(faded ? 0.5 : 1))
+        .draw(in: NSRect(x: rect.midX - mark / 2, y: rect.midY - mark / 2, width: mark, height: mark))
+}
+
+// MARK: - Provider marks
+
+/// A copy of a template image in one solid color.
+func painted(_ template: NSImage, _ color: NSColor) -> NSImage {
+    let image = NSImage(size: template.size, flipped: false) { rect in
+        template.draw(in: rect)
+        color.set()
+        rect.fill(using: .sourceAtop)
+        return true
+    }
+    image.accessibilityDescription = template.accessibilityDescription
+    return image
+}
+
+/// Monochrome template mark (tinted by an image view, or painted for the menu bar).
+func providerGlyph(_ provider: Provider, size: CGFloat = 15) -> NSImage {
+    let image = NSImage(size: NSSize(width: size, height: size), flipped: false) { rect in
+        NSColor.black.setFill()
+        NSColor.black.setStroke()
+        switch provider {
+        case .claude: drawClaudeSpark(in: rect)
+        case .codex: drawOpenAIBlossom(in: rect)
+        }
+        return true
+    }
+    image.isTemplate = true
+    image.accessibilityDescription = provider.rawValue
+    return image
+}
+
+/// Claude's spark: tapered rays of slightly uneven length around a small hub.
+private func drawClaudeSpark(in rect: NSRect) {
+    let center = NSPoint(x: rect.midX, y: rect.midY), size = rect.width
+    let lengths: [CGFloat] = [1.0, 0.82, 0.96, 0.78, 1.0, 0.86, 0.94, 0.8, 0.98, 0.84]
+    let baseHalfWidth = size * 0.09, tipRadius = size * 0.045
+    for (index, length) in lengths.enumerated() {
+        let angle = CGFloat(index) / CGFloat(lengths.count) * 2 * .pi + .pi / 2
+        let along = NSPoint(x: cos(angle), y: sin(angle)), across = NSPoint(x: -sin(angle), y: cos(angle))
+        let reach = size * 0.5 * length - tipRadius
+        let tip = NSPoint(x: center.x + along.x * reach, y: center.y + along.y * reach)
+        let ray = NSBezierPath()
+        ray.move(to: NSPoint(x: center.x + across.x * baseHalfWidth, y: center.y + across.y * baseHalfWidth))
+        ray.line(to: NSPoint(x: tip.x + across.x * tipRadius, y: tip.y + across.y * tipRadius))
+        ray.appendArc(withCenter: tip, radius: tipRadius, startAngle: (angle + .pi / 2) * 180 / .pi,
+                      endAngle: (angle - .pi / 2) * 180 / .pi, clockwise: true)
+        ray.line(to: NSPoint(x: center.x - across.x * baseHalfWidth, y: center.y - across.y * baseHalfWidth))
+        ray.close()
+        ray.fill()
+    }
+    NSBezierPath(ovalIn: NSRect(x: center.x - size * 0.12, y: center.y - size * 0.12, width: size * 0.24, height: size * 0.24)).fill()
+}
+
+/// OpenAI's blossom: six rounded links turned 60° apart.
+private func drawOpenAIBlossom(in rect: NSRect) {
+    let size = rect.width
+    for index in 0..<6 {
+        let turn = NSAffineTransform()
+        turn.translateX(by: rect.midX, yBy: rect.midY)
+        turn.rotate(byDegrees: CGFloat(index) * 60)
+        let link = NSBezierPath(roundedRect: NSRect(x: -size * 0.115, y: -size * 0.40, width: size * 0.23, height: size * 0.50),
+                                xRadius: size * 0.115, yRadius: size * 0.115)
+        link.transform(using: turn as AffineTransform)
+        link.lineWidth = max(size * 0.085, 1.2)   // thicker at small sizes so the links don't blur together
+        link.stroke()
+    }
 }

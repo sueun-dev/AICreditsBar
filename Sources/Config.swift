@@ -1,60 +1,65 @@
-import AppKit
+import Foundation
 
-// MARK: - Config (UserDefaults-backed, with defaults)
+// MARK: - Settings (UserDefaults, with defaults)
 
 enum Cfg {
-    // Defaults store. Tests/e2e set AICB_DEFAULTS_SUITE to an isolated suite so they
-    // never read or clobber the real user's settings/tokens.
+    // Tests set AICB_DEFAULTS_SUITE to an isolated suite so they never touch the real settings.
     static let d: UserDefaults = {
-        if let s = ProcessInfo.processInfo.environment["AICB_DEFAULTS_SUITE"], let u = UserDefaults(suiteName: s) { return u }
+        if let suite = ProcessInfo.processInfo.environment["AICB_DEFAULTS_SUITE"], let defaults = UserDefaults(suiteName: suite) {
+            return defaults
+        }
         return .standard
     }()
-    static func dbl(_ k: String, _ def: Double) -> Double { d.object(forKey: k) == nil ? def : d.double(forKey: k) }
-    static func int(_ k: String, _ def: Int) -> Int { d.object(forKey: k) == nil ? def : d.integer(forKey: k) }
-    static func bool(_ k: String, _ def: Bool) -> Bool { d.object(forKey: k) == nil ? def : d.bool(forKey: k) }
-    static func color(_ k: String, _ def: NSColor) -> NSColor {
-        if let s = d.string(forKey: k), let c = NSColor(hex: s) { return c }; return def
-    }
-    static func validBudget(_ v: Double, _ def: Double) -> Double { (v.isFinite && v >= 1 && v <= 1e15) ? v : def }
 
-    static var displayMode: String { get { d.string(forKey: "displayMode") ?? "5h" } set { d.set(newValue, forKey: "displayMode") } }   // 5h | week | both | min
-    static var showCodex: Bool  { get { bool("showCodex", true) }  set { d.set(newValue, forKey: "showCodex") } }
-    static var showClaude: Bool { get { bool("showClaude", true) } set { d.set(newValue, forKey: "showClaude") } }
-    static var showGemini: Bool { get { bool("showGemini", true) } set { d.set(newValue, forKey: "showGemini") } }
-    static var showLabels: Bool { get { bool("showLabels", true) } set { d.set(newValue, forKey: "showLabels") } }
-    static var refreshInterval: Double {
-        get { let value = dbl("refreshInterval", 15); return value.isFinite ? min(3600, max(5, value)) : 15 }
-        set { d.set(newValue.isFinite ? min(3600, max(5, newValue)) : 15, forKey: "refreshInterval") }
+    private static func int(_ key: String, _ fallback: Int) -> Int { d.object(forKey: key) == nil ? fallback : d.integer(forKey: key) }
+
+    /// Which window the menu bar shows: "min" (lowest remaining), "5h" or "week".
+    static var displayMode: String {
+        get { let mode = d.string(forKey: "displayMode") ?? ""; return ["5h", "week"].contains(mode) ? mode : "min" }
+        set { d.set(newValue, forKey: "displayMode") }
     }
-    static var greenAbove: Int { get { int("greenAbove", 50) } set { d.set(newValue, forKey: "greenAbove") } }
-    static var yellowAbove: Int { get { int("yellowAbove", 20) } set { d.set(newValue, forKey: "yellowAbove") } }
-    static var colorHigh: NSColor { get { color("colorHigh", .systemGreen) }  set { d.set(newValue.hexString, forKey: "colorHigh") } }
-    static var colorMid: NSColor  { get { color("colorMid", .systemYellow) }  set { d.set(newValue.hexString, forKey: "colorMid") } }
-    static var colorLow: NSColor  { get { color("colorLow", .systemRed) }     set { d.set(newValue.hexString, forKey: "colorLow") } }
-    static var colorUnknown: NSColor { get { color("colorUnknown", .secondaryLabelColor) } set { d.set(newValue.hexString, forKey: "colorUnknown") } }
-    static var claude5hBudget: Double { get { validBudget(dbl("claude5hBudget", 220_000_000), 220_000_000) } set { d.set(newValue, forKey: "claude5hBudget") } }
-    static var claudeWeekBudget: Double { get { validBudget(dbl("claudeWeekBudget", 1_500_000_000), 1_500_000_000) } set { d.set(newValue, forKey: "claudeWeekBudget") } }
-    // Official web-session tokens (exact %, like usage4claude). Empty = use local estimate/disk.
-    // Stored in UserDefaults (no keychain prompt for an ad-hoc-built app). Local, revocable session cookies.
-    static var claudeSessionKey: String { get { d.string(forKey: "claudeSessionKey") ?? "" } set { d.set(newValue, forKey: "claudeSessionKey") } }
-    static var codexSessionToken: String { get { d.string(forKey: "codexSessionToken") ?? "" } set { d.set(newValue, forKey: "codexSessionToken") } }
-    static var claudeOrgUuid: String { get { d.string(forKey: "claudeOrgUuid") ?? "" } set { d.set(newValue, forKey: "claudeOrgUuid") } }
+
+    static func isShown(_ provider: Provider) -> Bool { d.object(forKey: "show\(provider.rawValue)") as? Bool ?? true }
+    static func setShown(_ provider: Provider, _ shown: Bool) { d.set(shown, forKey: "show\(provider.rawValue)") }
+
+    /// Seconds between automatic checks. The usage endpoints rate-limit hard, so
+    /// the default is 5 minutes (the menu also checks when it opens).
+    static var refreshInterval: Double {
+        get { let value = d.double(forKey: "refreshInterval"); return value.isFinite && value > 0 ? min(3600, max(60, value)) : 300 }
+        set { d.set(newValue, forKey: "refreshInterval") }
+    }
+
+    /// Remaining % below which the number turns orange / red.
+    static var warnBelow: Int {
+        get { min(100, max(0, int("warnBelow", 30))) }
+        set { d.set(newValue, forKey: "warnBelow") }
+    }
+    static var criticalBelow: Int {
+        get { min(100, max(0, int("criticalBelow", 10))) }
+        set { d.set(newValue, forKey: "criticalBelow") }
+    }
+
+    /// The last good reading per provider, so a restart shows it (with its age) right away.
+    static func savedReading(_ provider: Provider) -> Reading? {
+        d.data(forKey: "lastReading\(provider.rawValue)").flatMap { try? JSONDecoder().decode(Reading.self, from: $0) }
+    }
+    static func save(_ reading: Reading, for provider: Provider) {
+        d.set(try? JSONEncoder().encode(reading), forKey: "lastReading\(provider.rawValue)")
+    }
+
+    /// Version 1 settings and logins nothing reads any more — among them a claude.ai
+    /// session cookie, which shouldn't sit around in plain text.
+    static func removeLegacyKeys() {
+        for key in ["claudeSessionKey", "codexSessionToken", "claudeOrgUuid", "claudePlan", "claude5hBudget",
+                    "claudeWeekBudget", "showGemini", "showLabels", "greenAbove", "yellowAbove",
+                    "colorHigh", "colorMid", "colorLow", "colorUnknown"] {
+            d.removeObject(forKey: key)
+        }
+    }
 
     static func resetAll() {
-        for k in ["displayMode","showCodex","showClaude","showGemini","showLabels","refreshInterval",
-                  "greenAbove","yellowAbove","colorHigh","colorMid","colorLow","colorUnknown",
-                  "claude5hBudget","claudeWeekBudget"] { d.removeObject(forKey: k) }
-    }
-}
-
-extension NSColor {
-    var hexString: String {
-        let c = usingColorSpace(.sRGB) ?? self
-        return String(format: "#%02X%02X%02X", Int(round(c.redComponent*255)), Int(round(c.greenComponent*255)), Int(round(c.blueComponent*255)))
-    }
-    convenience init?(hex: String) {
-        var s = hex.trimmingCharacters(in: .whitespaces); if s.hasPrefix("#") { s.removeFirst() }
-        guard s.count == 6, let v = Int(s, radix: 16) else { return nil }
-        self.init(srgbRed: CGFloat((v>>16)&0xFF)/255, green: CGFloat((v>>8)&0xFF)/255, blue: CGFloat(v&0xFF)/255, alpha: 1)
+        for key in ["displayMode", "showCodex", "showClaude", "refreshInterval", "warnBelow", "criticalBelow"] {
+            d.removeObject(forKey: key)
+        }
     }
 }

@@ -1,77 +1,62 @@
 import AppKit
 
-// Headless command-line interface. Returns normally for the GUI to start;
-// handlers that fully service a flag call exit() themselves.
+// Headless command-line interface. Returns normally when the menu-bar app
+// should start; every flag it handles exits.
 
-func argValue(_ flag: String) -> Double? {
-    guard let i = CommandLine.arguments.firstIndex(of: flag), i + 1 < CommandLine.arguments.count else { return nil }
-    return Double(CommandLine.arguments[i + 1])
-}
-func argString(_ flag: String) -> String? {
-    guard let i = CommandLine.arguments.firstIndex(of: flag), i + 1 < CommandLine.arguments.count else { return nil }
-    return CommandLine.arguments[i + 1]
+private func argument(after flag: String) -> String? {
+    let args = CommandLine.arguments
+    guard let index = args.firstIndex(of: flag), index + 1 < args.count else { return nil }
+    return args[index + 1]
 }
 
-/// Handle any CLI flag and exit; returns if there's nothing to do but launch the GUI.
 func handleCLIFlags() {
-    if let path = argString("--render-preview") {
-        do { try renderPreview(to: path); print("Rendered native preview with sample data → \(path)"); exit(0) }
-        catch { fputs("Preview failed: \(error.localizedDescription)\n", stderr); exit(1) }
+    let args = CommandLine.arguments
+    if let path = argument(after: "--render-preview") {
+        run { try renderPreview(to: path); print("Rendered the menu → \(path)") }
     }
-    if let path = argString("--render-settings") {
-        _ = NSApplication.shared
-        NSApplication.shared.setActivationPolicy(.accessory)
-        SettingsWindow().renderToPNG(path)
-        print("rendered settings → \(path)"); exit(0)
-    }
-    if let k = argString("--set-claude-key") {
-        Cfg.claudeSessionKey = k; Cfg.claudeOrgUuid = ""; Cfg.d.synchronize()
-        print("Claude sessionKey saved (\(k.count) chars). Restart the app to use official data."); exit(0)
-    }
-    if let t = argString("--set-codex-token") {
-        Cfg.codexSessionToken = t; Cfg.d.synchronize()
-        print("Codex session-token saved (\(t.count) chars). Restart the app to use official data."); exit(0)
-    }
-    if CommandLine.arguments.contains("--clear-logins") {
-        Cfg.claudeSessionKey = ""; Cfg.claudeOrgUuid = ""; Cfg.codexSessionToken = ""; Cfg.d.synchronize()
-        print("cleared official logins; back to local estimate/disk."); exit(0)
-    }
-    if let pct = argValue("--set-week-used") {
-        let sums = claudeCalibrationSums()
-        guard pct > 0, pct <= 100, sums.week > 0 else { print("need 0<pct<=100 and some Claude usage (7d tokens=\(tokLabel(sums.week)))"); exit(1) }
-        Cfg.claudeWeekBudget = sums.week / (pct / 100); Cfg.d.synchronize()
-        print("Claude weekly calibrated: 7d=\(tokLabel(sums.week)) tok @ \(Int(pct))% used → budget \(tokLabel(Cfg.claudeWeekBudget)), shows \(100 - Int(pct))% left")
-        exit(0)
-    }
-    if let pct = argValue("--set-5h-used") {
-        let sums = claudeCalibrationSums()
-        guard pct > 0, pct <= 100, sums.five > 0 else { print("need 0<pct<=100 and an active Claude 5h block (5h tokens=\(tokLabel(sums.five)))"); exit(1) }
-        Cfg.claude5hBudget = sums.five / (pct / 100); Cfg.d.synchronize()
-        print("Claude 5h calibrated: 5h=\(tokLabel(sums.five)) tok @ \(Int(pct))% used → budget \(tokLabel(Cfg.claude5hBudget)), shows \(100 - Int(pct))% left")
-        exit(0)
-    }
-    if CommandLine.arguments.contains("--once") || CommandLine.arguments.contains("--dump-config") {
-        if CommandLine.arguments.contains("--dump-config") {
-            print("displayMode=\(Cfg.displayMode) labels=\(Cfg.showLabels) refresh=\(Int(Cfg.refreshInterval))s")
-            print("providers: Cx=\(Cfg.showCodex) Cl=\(Cfg.showClaude) Gm=\(Cfg.showGemini)")
-            print("thresholds: green>\(Cfg.greenAbove) yellow>=\(Cfg.yellowAbove)")
-            print("colors: high=\(Cfg.colorHigh.hexString) mid=\(Cfg.colorMid.hexString) low=\(Cfg.colorLow.hexString) unknown=\(Cfg.colorUnknown.hexString)")
-            print("claude: 5h=\(tokLabel(Cfg.claude5hBudget)) week=\(tokLabel(Cfg.claudeWeekBudget)) (estimate budgets)")
+    if let path = argument(after: "--render-settings") {
+        run {
+            _ = NSApplication.shared
+            NSApp.setActivationPolicy(.accessory)
+            try SettingsWindow().renderToPNG(path)
+            print("Rendered settings → \(path)")
         }
-        for p in [readCodex(), readClaude(), readGemini()] {
-            var line = "\(p.name): "
-            if !p.available { line += "[unavailable] \(p.problem ?? "")" }
-            else {
-                if let f = p.fiveHour { line += "5h=" + (f.refilled ? "refilled" : (f.stale ? "\(f.remaining ?? 0)%(stale)" : "\(f.remaining ?? 0)%")) + (f.note.map { " (\($0))" } ?? "") }
-                if let w = p.weekly { line += "  \(p.name == "Claude" ? "7d" : "week")=" + (w.refilled ? "refilled" : "\(w.remaining ?? 0)%") }
-                if let pl = p.plan { line += "  [\(pl)]" }
-                if p.throttled { line += "  THROTTLED" }
-                if let a = p.snapshotAge { line += "  (snapshot \(ageLabel(a)))" }
-            }
-            line += "  source=\(p.source.rawValue)"
-            print(line)
-            for detail in p.details where detail.contains("⚠") || detail.contains("failed") { print("  \(detail)") }
+    }
+    if args.contains("--dump-config") {
+        print("display=\(Cfg.displayMode) refresh=\(Int(Cfg.refreshInterval))s warn<\(Cfg.warnBelow)% critical<\(Cfg.criticalBelow)%")
+        print("providers: " + Provider.allCases.map { "\($0.rawValue)=\(Cfg.isShown($0) ? "on" : "off")" }.joined(separator: " "))
+    }
+    if args.contains("--once") || args.contains("--dump-config") {
+        let now = nowEpoch()
+        for (provider, fetch) in [(Provider.codex, fetchCodexReading), (.claude, fetchClaudeReading)] {
+            var state = ProviderState()
+            state.record(Result { try fetch() })
+            print(describe(provider, state, now: now))
         }
         exit(0)
+    }
+}
+
+/// Plain-text report used by --once.
+func describe(_ provider: Provider, _ state: ProviderState, now: Double) -> String {
+    guard let reading = state.reading else {
+        return "\(provider.rawValue): \(state.error?.description ?? "no data")"
+    }
+    var lines = [provider.rawValue + (reading.plan.map { " · \($0)" } ?? "") + (reading.limitReached ? " · LIMIT REACHED" : "")]
+    let width = reading.windows.map { $0.label.count }.max() ?? 0
+    for window in reading.windows {
+        let name = window.label.padding(toLength: width, withPad: " ", startingAt: 0)
+        if window.isExpired(now: now) { lines.append("  \(name)     —       reset passed, awaiting a new reading"); continue }
+        let reset = window.resetsAt.map { "resets " + countdown(to: $0, now: now) } ?? "no reset time"
+        lines.append("  \(name)  \(String(format: "%3d", window.leftPercent))% left  \(reset)")
+    }
+    lines += reading.notes.map { "  " + $0 }
+    return lines.joined(separator: "\n")
+}
+
+private func run(_ body: () throws -> Void) -> Never {
+    do { try body(); exit(0) } catch {
+        fputs("error: \(error)\n", stderr)
+        exit(1)
     }
 }

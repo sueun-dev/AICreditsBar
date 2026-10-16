@@ -22,7 +22,7 @@ echo "compiling…"
 # so the binary is portable and the compiler flags any too-new API at build time.
 ARCH="$(uname -m)"
 /usr/bin/swiftc -swift-version 5 -O -target "${ARCH}-apple-macos11" \
-  -framework AppKit -framework WebKit \
+  -framework AppKit \
   -o "$CONTENTS/MacOS/aicreditsbar" "$HERE"/Sources/*.swift
 
 cat > "$CONTENTS/Info.plist" <<'PLIST'
@@ -34,8 +34,8 @@ cat > "$CONTENTS/Info.plist" <<'PLIST'
     <key>CFBundleDisplayName</key>        <string>AICreditsBar</string>
     <key>CFBundleIdentifier</key>         <string>com.sueun.aicreditsbar</string>
     <key>CFBundleExecutable</key>         <string>aicreditsbar</string>
-    <key>CFBundleVersion</key>            <string>1</string>
-    <key>CFBundleShortVersionString</key> <string>1.0</string>
+    <key>CFBundleVersion</key>            <string>2</string>
+    <key>CFBundleShortVersionString</key> <string>2.0</string>
     <key>CFBundlePackageType</key>        <string>APPL</string>
     <key>LSMinimumSystemVersion</key>     <string>11.0</string>
     <key>LSUIElement</key>                <true/>
@@ -55,3 +55,18 @@ if ! mv "$STAGED_APP" "$APP"; then
 fi
 
 echo "Built $APP"
+
+# Restart a running copy on the new build. macOS ties a registered login item to
+# the exact (ad-hoc signed) binary it was registered with and refuses to launch a
+# rebuilt one, so the login item is re-registered rather than just relaunched.
+PLIST="$HOME/Library/LaunchAgents/com.sueun.aicreditsbar.plist"
+if [ -f "$PLIST" ] && grep -q "$APP/" "$PLIST"; then
+  launchctl bootout "gui/$(id -u)/com.sueun.aicreditsbar" 2>/dev/null || true
+  pkill -x aicreditsbar 2>/dev/null || true   # a copy started with `open` would keep the new one out
+  launchctl bootstrap "gui/$(id -u)" "$PLIST" 2>/dev/null || { sleep 1; launchctl bootstrap "gui/$(id -u)" "$PLIST"; }
+  echo "Restarted the login item on the new build"
+elif pkill -x aicreditsbar 2>/dev/null; then
+  sleep 1
+  open "$APP"
+  echo "Restarted AICreditsBar on the new build"
+fi

@@ -1,7 +1,7 @@
 #!/bin/bash
 # Register (or remove with -u) a LaunchAgent so AICreditsBar starts at login.
 set -euo pipefail
-HERE="$(cd "$(dirname "$0")" && pwd)"
+HERE="$(cd "$(dirname "$0")/.." && pwd)"   # project root (this script lives in scripts/)
 LABEL="com.sueun.aicreditsbar"
 PLIST="$HOME/Library/LaunchAgents/$LABEL.plist"
 BIN="$HERE/AICreditsBar.app/Contents/MacOS/aicreditsbar"
@@ -9,7 +9,7 @@ BIN="$HERE/AICreditsBar.app/Contents/MacOS/aicreditsbar"
 if [[ "${1:-}" == "-u" || "${1:-}" == "--uninstall" ]]; then
     launchctl bootout "gui/$(id -u)/$LABEL" 2>/dev/null || true
     rm -f "$PLIST"
-    pkill -f aicreditsbar 2>/dev/null || true
+    pkill -x aicreditsbar 2>/dev/null || true
     echo "Removed login item."
     exit 0
 fi
@@ -26,7 +26,7 @@ cat > "$PLIST" <<PLIST
     <key>ProgramArguments</key>
     <array><string>$BIN</string></array>
     <key>RunAtLoad</key>        <true/>
-    <key>KeepAlive</key>        <false/>
+    <key>KeepAlive</key>        <dict><key>SuccessfulExit</key><false/></dict>
     <key>ProcessType</key>      <string>Interactive</string>
 </dict>
 </plist>

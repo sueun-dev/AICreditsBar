@@ -1,49 +1,80 @@
-import AppKit
+import Foundation
 
 // MARK: - Model
 
-struct WindowStat {
-    var remaining: Int?        // percent remaining (0-100), nil = unknown
-    var resetEpoch: Double?    // unix seconds when window resets
-    var refilled: Bool = false // reserved for a confirmed refill, never inferred from a clock alone
-    var stale: Bool = false    // snapshot too old to trust (window not yet reset)
-    var note: String?
+enum Provider: String, CaseIterable {
+    case codex = "Codex"
+    case claude = "Claude"
 }
 
-struct ProviderStatus {
-    var key: String
-    var name: String
-    var available: Bool
-    var fiveHour: WindowStat?
-    var weekly: WindowStat?
+/// What a usage window measures, independent of how the provider names it.
+/// The raw value is the display order (short windows first).
+enum WindowKind: Int, Codable {
+    case session   // a few hours (Claude's 5-hour "session")
+    case weekly
+    case other
+}
+
+/// One rate-limit window exactly as the provider reported it.
+struct UsageWindow: Equatable, Codable {
+    var label: String              // "5-hour", "Weekly", "Weekly (Fable)"
+    var kind: WindowKind
+    var usedPercent: Double        // 0–100, as reported
+    var resetsAt: Double?          // unix seconds
+    var modelScoped = false        // limit for one model only; not used for the menu-bar number
+
+    var leftPercent: Int { pctClamp(100 - usedPercent) }
+
+    /// Once the reset time passes, the reported figure no longer describes the
+    /// window. It is never assumed to be 100% — the next reading says what it is.
+    func isExpired(now: Double) -> Bool { resetsAt.map { $0 <= now } ?? false }
+}
+
+/// A successful reading from a provider's official usage endpoint.
+struct Reading: Codable {
+    var windows: [UsageWindow]
     var plan: String?
-    var snapshotAge: Double?
-    var throttled: Bool = false
-    var details: [String] = []
-    var problem: String?
-    var source: UsageSource = .local
+    var limitReached = false
+    var notes: [String] = []       // other official facts, e.g. "58,600 credits"
+    var fetchedAt: Double
 }
 
-enum UsageSource: String {
-    case official = "Official"
-    case local = "Local snapshot"
-    case estimate = "Estimate"
-    case statusOnly = "Connection only"
+/// A failed refresh, worded for the menu.
+struct UsageError: Error, CustomStringConvertible {
+    var message: String
+    var hint: String?
+    var rateLimited = false   // HTTP 429: ask this provider less often for a while
+    init(_ message: String, hint: String? = nil, rateLimited: Bool = false) {
+        self.message = message
+        self.hint = hint
+        self.rateLimited = rateLimited
+    }
+    var description: String { hint.map { "\(message) — \($0)" } ?? message }
 }
 
-extension ProviderStatus {
-    // Age a reading without inventing new quota after a scheduled reset.
-    func aged(by elapsed: Double) -> ProviderStatus {
-        var result = self
-        if let age = snapshotAge { result.snapshotAge = max(0, age + elapsed) }
-        func ageWindow(_ window: WindowStat?) -> WindowStat? {
-            guard var window = window else { return nil }
-            if let reset = window.resetEpoch, reset <= nowEpoch() {
-                window.stale = true; window.refilled = false
-            }
-            return window
+/// What the app knows about one provider: the last good reading, kept (and
+/// shown as not current) when a later refresh fails, and why it failed.
+struct ProviderState {
+    var reading: Reading?
+    var error: UsageError?
+
+    /// True when the reading is what the provider says now: the last refresh
+    /// worked and it isn't old (a reading restored from the previous run is).
+    func isCurrent(now: Double) -> Bool {
+        guard error == nil, let reading = reading else { return false }
+        return now - reading.fetchedAt < 2 * Cfg.refreshInterval + 60
+    }
+
+    /// The provider says the limit is hit — and that's still what it says now.
+    func limitReached(now: Double) -> Bool { isCurrent(now: now) && reading?.limitReached == true }
+
+    mutating func record(_ result: Result<Reading, Error>) {
+        switch result {
+        case .success(let reading):
+            self.reading = reading
+            error = nil
+        case .failure(let failure):
+            error = failure as? UsageError ?? UsageError(failure.localizedDescription)
         }
-        result.fiveHour = ageWindow(fiveHour); result.weekly = ageWindow(weekly)
-        return result
     }
 }
