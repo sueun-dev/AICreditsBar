@@ -21,6 +21,7 @@ incorrectly stayed white; afterward all four renders have contrasting ink.
 | One launch, 12 status-button appearance changes | 104 image assignments | 1 image assignment |
 | Five launches with Settings, 60 total appearance changes | 394 image assignments | 5 image assignments |
 | Historical layout-recursion warning in those five launches | 0 reproduced | 0 reproduced |
+| Five further launches, each with 40 synthetic provider results and 12 appearance changes | 746 image assignments | 205 image assignments |
 
 These probes used cached fixtures and disabled usage requests in a temporary copy
 of AppDelegate. The counts include initialization. They measure image assignments,
@@ -28,6 +29,12 @@ not GPU frames or battery consumption. The historical layout warning itself is
 still unreproduced; removing this reentrant path does **not** prove its cause or cure.
 Earlier experiments changed only `NSApp.appearance`, which did not adequately
 exercise status-button appearance changes.
+
+The additional provider-result probe exercises callbacks arriving during startup
+using offline fixtures above the alert threshold. Both implementations processed
+200 callbacks across five successful launches, without hitting the layout-recursion
+breakpoint. The updated version assigns one initial image plus one per changed
+provider result. This stress case also did not recover the original warning's trigger.
 
 The App Intents failures had a separate cause. Server-side `linkd` logs rejected the
 ad-hoc binary because it had no Team ID. Re-signing the same probe with the locally
@@ -86,6 +93,17 @@ fresh battery or performance measurements of this revision.
 
 The final rebuilt PID 38772 also successfully refreshed both providers at about
 05:22:19 UTC, over five minutes after its launch, without a manual refresh.
+
+## Available OS update
+
+The host's Software Update check offered macOS 27.0.1 (26A434), a 3,235,867 KiB
+download requiring a restart. The update has not been installed by this task.
+[Apple's release listing](https://developer.apple.com/news/releases/?id=09282026c)
+confirms that build. Its [general release notes](https://support.apple.com/en-us/127257)
+state that it contains bug fixes, and the
+[enterprise notes](https://support.apple.com/en-us/148830) identify a Platform SSO
+lock-screen fix. Neither inspected page identifies these AppKit warnings as repaired.
+An update would therefore be a new environment to test, not an established fix.
 
 All log streams remained enabled. No private framework was patched or called to
 alter behavior. The OS faults and the unreproduced historical warning above are

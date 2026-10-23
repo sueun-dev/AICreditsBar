@@ -224,5 +224,40 @@
     },
     "app_intents_error_count": 0,
     "layout_warning_count": 0
+  },
+  "startup_fixture_burst": {
+    "conditions": "Five launches per implementation with Settings open; each launch injects 40 synthetic provider results and 12 status-button appearance changes. Usage requests are disabled; fixture percentages stay above the alert threshold.",
+    "results": {
+      "baseline": {
+        "successful_launches": 5,
+        "fixture_quota_callbacks": 200,
+        "appearance_steps": 60,
+        "image_assignments": 746,
+        "layout_warning_count": 0,
+        "layout_breakpoint_hits": 0
+      },
+      "candidate": {
+        "successful_launches": 5,
+        "fixture_quota_callbacks": 200,
+        "appearance_steps": 60,
+        "image_assignments": 205,
+        "layout_warning_count": 0,
+        "layout_breakpoint_hits": 0
+      }
+    },
+    "limit": "No historical layout-recursion reproduction; zero hits cannot establish a repair."
+  },
+  "os_update_check": {
+    "installed": "27.0 (26A428)",
+    "offered_label": "macOS 27.0.1-26A434",
+    "size_kib": 3235867,
+    "restart_required": true,
+    "installed_by_this_task": false,
+    "sources": [
+      "https://developer.apple.com/news/releases/?id=09282026c",
+      "https://support.apple.com/en-us/127257",
+      "https://support.apple.com/en-us/148830"
+    ],
+    "claim_limit": "Apple lists general bug fixes and a Platform SSO lock-screen fix; it does not identify the observed AppKit diagnostics as repaired."
   }
 }
