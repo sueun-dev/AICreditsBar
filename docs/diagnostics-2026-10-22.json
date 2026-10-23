@@ -1,0 +1,1434 @@
+{
+  "local_date": "2026-10-22",
+  "timezone": "America/Chicago",
+  "recorded_at_utc": "2026-10-23T04:47:59.769996+00:00",
+  "starting_repository_commit": "d2ad5e6d448ead8fb33cad4f3f5ca11ee2111236",
+  "app_source_commit": "cd257615f68c5a7885a587e57b691735bb305d32",
+  "app_source_changed": false,
+  "binary_sha256": "1fead906c9754deae9d61be6fc838236f7c02ea73885c510423192a68e183747",
+  "environment": {
+    "macos": "27.0",
+    "architecture": "arm64",
+    "processor": "Apple M5 Max"
+  },
+  "diagnostics_resolved": false,
+  "probes": [
+    {
+      "variant": "plain",
+      "pid": 4899,
+      "started_at_utc": "2026-10-23T04:21:29.672033+00:00",
+      "error_or_fault_entry_count": 22,
+      "messages": [
+        {
+          "subsystem": "com.apple.appintents",
+          "message": "Unable to get synchronousRemoteObjectProxy, error: Error Domain=NSCocoaErrorDomain Code=4097 \"connection to service named com.apple.linkd.autoShortcut\" UserInfo={NSDebugDescription=connection to service named com.apple.linkd.autoShortcut}",
+          "count": 4
+        },
+        {
+          "subsystem": "com.apple.AppKit",
+          "message": "Error registering app with intents framework: Error Domain=NSCocoaErrorDomain Code=4097 UserInfo={NSDebugDescription=<private>}",
+          "count": 1
+        },
+        {
+          "subsystem": "com.apple.appintents",
+          "message": "Unable to re-register with Process Instance Registry, error: Error Domain=NSCocoaErrorDomain Code=4097 \"connection to service named com.apple.linkd.autoShortcut\" UserInfo={NSDebugDescription=connection to service named com.apple.linkd.autoShortcut}",
+          "count": 3
+        },
+        {
+          "subsystem": "com.apple.appintents",
+          "message": "Will NOT re-try to establish the connection",
+          "count": 1
+        },
+        {
+          "subsystem": "com.apple.BaseBoard",
+          "message": "Unable to obtain a task name port right for pid 418: (os/kern) failure (0x5)",
+          "count": 1
+        },
+        {
+          "subsystem": "com.apple.runtime-issues",
+          "message": "Invalid view geometry: width is negative.",
+          "count": 6
+        },
+        {
+          "subsystem": "com.apple.runtime-issues",
+          "message": "Invalid view geometry: height is negative.",
+          "count": 6
+        }
+      ]
+    },
+    {
+      "variant": "plain-resizable",
+      "pid": 4979,
+      "started_at_utc": "2026-10-23T04:22:02.729094+00:00",
+      "error_or_fault_entry_count": 22,
+      "messages": [
+        {
+          "subsystem": "com.apple.appintents",
+          "message": "Unable to get synchronousRemoteObjectProxy, error: Error Domain=NSCocoaErrorDomain Code=4097 \"connection to service named com.apple.linkd.autoShortcut\" UserInfo={NSDebugDescription=connection to service named com.apple.linkd.autoShortcut}",
+          "count": 4
+        },
+        {
+          "subsystem": "com.apple.AppKit",
+          "message": "Error registering app with intents framework: Error Domain=NSCocoaErrorDomain Code=4097 UserInfo={NSDebugDescription=<private>}",
+          "count": 1
+        },
+        {
+          "subsystem": "com.apple.appintents",
+          "message": "Unable to re-register with Process Instance Registry, error: Error Domain=NSCocoaErrorDomain Code=4097 \"connection to service named com.apple.linkd.autoShortcut\" UserInfo={NSDebugDescription=connection to service named com.apple.linkd.autoShortcut}",
+          "count": 3
+        },
+        {
+          "subsystem": "com.apple.appintents",
+          "message": "Will NOT re-try to establish the connection",
+          "count": 1
+        },
+        {
+          "subsystem": "com.apple.BaseBoard",
+          "message": "Unable to obtain a task name port right for pid 418: (os/kern) failure (0x5)",
+          "count": 1
+        },
+        {
+          "subsystem": "com.apple.runtime-issues",
+          "message": "Invalid view geometry: width is negative.",
+          "count": 6
+        },
+        {
+          "subsystem": "com.apple.runtime-issues",
+          "message": "Invalid view geometry: height is negative.",
+          "count": 6
+        }
+      ]
+    },
+    {
+      "variant": "standard-unique",
+      "pid": 6712,
+      "started_at_utc": "2026-10-23T04:32:23.637868+00:00",
+      "error_or_fault_entry_count": 23,
+      "messages": [
+        {
+          "subsystem": "com.apple.appintents",
+          "message": "Unable to get synchronousRemoteObjectProxy, error: Error Domain=NSCocoaErrorDomain Code=4097 \"connection to service named com.apple.linkd.autoShortcut\" UserInfo={NSDebugDescription=connection to service named com.apple.linkd.autoShortcut}",
+          "count": 4
+        },
+        {
+          "subsystem": "com.apple.AppKit",
+          "message": "Error registering app with intents framework: Error Domain=NSCocoaErrorDomain Code=4097 UserInfo={NSDebugDescription=<private>}",
+          "count": 1
+        },
+        {
+          "subsystem": "com.apple.appintents",
+          "message": "Unable to re-register with Process Instance Registry, error: Error Domain=NSCocoaErrorDomain Code=4097 \"connection to service named com.apple.linkd.autoShortcut\" UserInfo={NSDebugDescription=connection to service named com.apple.linkd.autoShortcut}",
+          "count": 3
+        },
+        {
+          "subsystem": "com.apple.appintents",
+          "message": "Will NOT re-try to establish the connection",
+          "count": 1
+        },
+        {
+          "subsystem": "com.apple.BaseBoard",
+          "message": "Unable to obtain a task name port right for pid 418: (os/kern) failure (0x5)",
+          "count": 1
+        },
+        {
+          "subsystem": "",
+          "message": "fopen failed for data file: errno = 2 (No such file or directory)",
+          "count": 1
+        },
+        {
+          "subsystem": "com.apple.runtime-issues",
+          "message": "Invalid view geometry: width is negative.",
+          "count": 6
+        },
+        {
+          "subsystem": "com.apple.runtime-issues",
+          "message": "Invalid view geometry: height is negative.",
+          "count": 6
+        }
+      ]
+    },
+    {
+      "variant": "minimal-appkit",
+      "pid": 7170,
+      "started_at_utc": "2026-10-23T04:34:04.244632+00:00",
+      "error_or_fault_entry_count": 22,
+      "messages": [
+        {
+          "subsystem": "com.apple.appintents",
+          "message": "Unable to get synchronousRemoteObjectProxy, error: Error Domain=NSCocoaErrorDomain Code=4097 \"connection to service named com.apple.linkd.autoShortcut\" UserInfo={NSDebugDescription=connection to service named com.apple.linkd.autoShortcut}",
+          "count": 4
+        },
+        {
+          "subsystem": "com.apple.AppKit",
+          "message": "Error registering app with intents framework: Error Domain=NSCocoaErrorDomain Code=4097 UserInfo={NSDebugDescription=<private>}",
+          "count": 1
+        },
+        {
+          "subsystem": "com.apple.appintents",
+          "message": "Unable to re-register with Process Instance Registry, error: Error Domain=NSCocoaErrorDomain Code=4097 \"connection to service named com.apple.linkd.autoShortcut\" UserInfo={NSDebugDescription=connection to service named com.apple.linkd.autoShortcut}",
+          "count": 3
+        },
+        {
+          "subsystem": "com.apple.appintents",
+          "message": "Will NOT re-try to establish the connection",
+          "count": 1
+        },
+        {
+          "subsystem": "com.apple.BaseBoard",
+          "message": "Unable to obtain a task name port right for pid 418: (os/kern) failure (0x5)",
+          "count": 1
+        },
+        {
+          "subsystem": "com.apple.runtime-issues",
+          "message": "Invalid view geometry: width is negative.",
+          "count": 6
+        },
+        {
+          "subsystem": "com.apple.runtime-issues",
+          "message": "Invalid view geometry: height is negative.",
+          "count": 6
+        }
+      ]
+    },
+    {
+      "variant": "minimal-launchservices",
+      "pid": 8123,
+      "started_at_utc": "2026-10-23T04:40:36.131604+00:00",
+      "error_or_fault_entry_count": 10,
+      "messages": [
+        {
+          "subsystem": "com.apple.appintents",
+          "message": "Unable to get synchronousRemoteObjectProxy, error: Error Domain=NSCocoaErrorDomain Code=4097 \"connection to service named com.apple.linkd.autoShortcut\" UserInfo={NSDebugDescription=connection to service named com.apple.linkd.autoShortcut}",
+          "count": 4
+        },
+        {
+          "subsystem": "com.apple.AppKit",
+          "message": "Error registering app with intents framework: Error Domain=NSCocoaErrorDomain Code=4097 UserInfo={NSDebugDescription=<private>}",
+          "count": 1
+        },
+        {
+          "subsystem": "com.apple.appintents",
+          "message": "Unable to re-register with Process Instance Registry, error: Error Domain=NSCocoaErrorDomain Code=4097 \"connection to service named com.apple.linkd.autoShortcut\" UserInfo={NSDebugDescription=connection to service named com.apple.linkd.autoShortcut}",
+          "count": 3
+        },
+        {
+          "subsystem": "com.apple.appintents",
+          "message": "Will NOT re-try to establish the connection",
+          "count": 1
+        },
+        {
+          "subsystem": "com.apple.BaseBoard",
+          "message": "Unable to obtain a task name port right for pid 418: (os/kern) failure (0x5)",
+          "count": 1
+        }
+      ]
+    }
+  ],
+  "independent_reproduction_source": "Tests/diagnostics/main.swift",
+  "independent_reproduction_sha256": "ce9cf964fefe29666dbe6834cacccf28b0238d84a4d62d654d84114f2dc7010f",
+  "independent_geometry_stack": [
+    "_NSViewValidateGeometry (in AppKit) + 656",
+    "NSViewValidateSize (in AppKit) + 32",
+    "-[NSView setFrameSize:] (in AppKit) + 64",
+    "-[NSThemeFrame _positionSharingIndicator] (in AppKit) + 64",
+    "-[NSWindowSharingSessionRecipientIndicator invalidateIntrinsicContentSize] (in AppKit) + 80",
+    "-[NSView _viewDidChangeAppearance:] (in AppKit) + 248",
+    "-[NSView _setSuperview:] (in AppKit) + 1412",
+    "-[NSView addSubview:] (in AppKit) + 180",
+    "-[NSThemeFrame addTitlebarSubview:] (in AppKit) + 80",
+    "-[NSThemeFrame _updateButtons] (in AppKit) + 2096",
+    "-[NSWindow _updateButtonsForWindowSharingSession] (in AppKit) + 28",
+    "-[NSWindow _setIsSelectivelyShared:] (in AppKit) + 420",
+    "___windowSelectiveSharingStateChangedNotification_block_invoke (in AppKit) + 292",
+    "_withUncaughtExceptionHandler (in AppKit) + 28",
+    "_windowSelectiveSharingStateChangedNotification (in AppKit) + 112",
+    "_DPSBlockUntilNextEventMatchingListInMode (in AppKit) + 292",
+    "_DPSNextEvent (in AppKit) + 580",
+    "-[NSApplication(NSEventRouting) _nextEventMatchingEventMask:untilDate:inMode:dequeue:] (in AppKit) + 780",
+    "-[NSApplication(NSEventRouting) nextEventMatchingMask:untilDate:inMode:dequeue:] (in AppKit) + 292",
+    "-[NSApplication run] (in AppKit) + 396"
+  ],
+  "rejected_workaround": {
+    "first_standard_titlebar_run": "No geometry fault observed, but the capture did not show a sharing indicator.",
+    "repeat_with_new_app_identifier": "Sharing indicator visible and twelve geometry faults; the initial clean run is not a successful workaround."
+  },
+  "other_diagnostics": {
+    "historical_private_appkit_message_sender": "_NSAccessibilityLogUnsafeToVendElement (in AppKit) + 128",
+    "historical_layout_recursion": "One startup warning; three isolated debugger experiments and one installed-app debugger launch did not reproduce it.",
+    "frontboard_scenes": "Prior errors coincide with recorded DarkWake at 22:32:36 local; exact cause and remedy remain unconfirmed.",
+    "window_server_task_port": "Target resolved to WindowServer; same denial observed in the independent AppKit app.",
+    "linkd_registration": "Same failures in the independent app, including Launch Services startup; no app-local repair established."
+  },
+  "installed_debugger_run": {
+    "started_at_utc": "2026-10-23T04:38:02.116659+00:00",
+    "debugger_timed_out": true,
+    "restored_at_utc": "2026-10-23T04:38:22.253120+00:00"
+  },
+  "restored_app": {
+    "checked_at_utc": "2026-10-23T04:43:53.261708+00:00",
+    "providers": {
+      "Codex": {
+        "fetched_at_utc": "2026-10-23T04:43:24.645609+00:00"
+      },
+      "Claude": {
+        "fetched_at_utc": "2026-10-23T04:43:24.492672+00:00"
+      }
+    },
+    "automatic_interval_seconds": 300.0,
+    "providers_enabled": {
+      "Codex": true,
+      "Claude": true
+    }
+  },
+  "energy_measurement": {
+    "pid": 91886,
+    "process_start_identity": 836635454319,
+    "started_at_utc": "2026-10-23T04:26:43.999059+00:00",
+    "completed": true,
+    "error": null,
+    "requested_seconds": 600.0,
+    "measured_seconds": 599.8782574160001,
+    "wall_clock_seconds": 600.0355749130249,
+    "sample_interval_seconds": 15,
+    "sample_count": 41,
+    "kernel_task_cpu_energy_joules": 0.594657611,
+    "kernel_task_cpu_energy_average_watts": 0.0009912971567956335,
+    "task_gpu_nanoseconds": 0,
+    "whole_computer_battery_discharge": {
+      "sampled_wh": null,
+      "covered_seconds": 0.0
+    },
+    "battery_measurement_complete": false,
+    "units_sources": [
+      "https://github.com/apple-oss-distributions/xnu/blob/main/iokit/IOKit/pwr_mgt/IOPMPowerSource.h",
+      "https://github.com/apple-oss-distributions/xnu/blob/main/osfmk/kern/task.c"
+    ],
+    "limits": [
+      "Kernel CPU-energy attribution is not battery drain. OS helpers and WindowServer are excluded.",
+      "Battery current/voltage samples cover the whole computer, including other apps and this measurement tool.",
+      "No per-app battery-life estimate or extrapolation is made. Sleep and AC gaps are excluded."
+    ],
+    "samples": [
+      {
+        "seconds": 0.15524079200000002,
+        "epoch_seconds": 1792729604.1542988,
+        "battery": {
+          "external_power": true,
+          "charging": false,
+          "capacity": 85,
+          "capacity_max": 100,
+          "voltage_mv": 12511,
+          "current_ma": 0,
+          "battery_discharge_w": null
+        },
+        "gpu_nanoseconds": 0,
+        "task_cpu_energy_nanojoules": 4068063285
+      },
+      {
+        "seconds": 15.200849000000002,
+        "epoch_seconds": 1792729619.199935,
+        "battery": {
+          "external_power": true,
+          "charging": false,
+          "capacity": 85,
+          "capacity_max": 100,
+          "voltage_mv": 12511,
+          "current_ma": 0,
+          "battery_discharge_w": null
+        },
+        "gpu_nanoseconds": 0,
+        "task_cpu_energy_nanojoules": 4068114325
+      },
+      {
+        "seconds": 30.243716125000002,
+        "epoch_seconds": 1792729634.24283,
+        "battery": {
+          "external_power": true,
+          "charging": false,
+          "capacity": 85,
+          "capacity_max": 100,
+          "voltage_mv": 12511,
+          "current_ma": 0,
+          "battery_discharge_w": null
+        },
+        "gpu_nanoseconds": 0,
+        "task_cpu_energy_nanojoules": 4100395559
+      },
+      {
+        "seconds": 45.288454042,
+        "epoch_seconds": 1792729649.287595,
+        "battery": {
+          "external_power": true,
+          "charging": false,
+          "capacity": 85,
+          "capacity_max": 100,
+          "voltage_mv": 12511,
+          "current_ma": 0,
+          "battery_discharge_w": null
+        },
+        "gpu_nanoseconds": 0,
+        "task_cpu_energy_nanojoules": 4121389789
+      },
+      {
+        "seconds": 60.330707458,
+        "epoch_seconds": 1792729664.329877,
+        "battery": {
+          "external_power": true,
+          "charging": false,
+          "capacity": 85,
+          "capacity_max": 100,
+          "voltage_mv": 12511,
+          "current_ma": 0,
+          "battery_discharge_w": null
+        },
+        "gpu_nanoseconds": 0,
+        "task_cpu_energy_nanojoules": 4121447441
+      },
+      {
+        "seconds": 75.370904583,
+        "epoch_seconds": 1792729679.370101,
+        "battery": {
+          "external_power": true,
+          "charging": false,
+          "capacity": 85,
+          "capacity_max": 100,
+          "voltage_mv": 12511,
+          "current_ma": 0,
+          "battery_discharge_w": null
+        },
+        "gpu_nanoseconds": 0,
+        "task_cpu_energy_nanojoules": 4121490255
+      },
+      {
+        "seconds": 90.40273670799999,
+        "epoch_seconds": 1792729694.4019608,
+        "battery": {
+          "external_power": true,
+          "charging": false,
+          "capacity": 85,
+          "capacity_max": 100,
+          "voltage_mv": 12509,
+          "current_ma": 0,
+          "battery_discharge_w": null
+        },
+        "gpu_nanoseconds": 0,
+        "task_cpu_energy_nanojoules": 4121584697
+      },
+      {
+        "seconds": 105.444964167,
+        "epoch_seconds": 1792729709.444216,
+        "battery": {
+          "external_power": true,
+          "charging": false,
+          "capacity": 85,
+          "capacity_max": 100,
+          "voltage_mv": 12509,
+          "current_ma": 0,
+          "battery_discharge_w": null
+        },
+        "gpu_nanoseconds": 0,
+        "task_cpu_energy_nanojoules": 4122074763
+      },
+      {
+        "seconds": 120.483768292,
+        "epoch_seconds": 1792729724.483048,
+        "battery": {
+          "external_power": true,
+          "charging": false,
+          "capacity": 85,
+          "capacity_max": 100,
+          "voltage_mv": 12509,
+          "current_ma": 0,
+          "battery_discharge_w": null
+        },
+        "gpu_nanoseconds": 0,
+        "task_cpu_energy_nanojoules": 4122244129
+      },
+      {
+        "seconds": 135.526753292,
+        "epoch_seconds": 1792729739.526061,
+        "battery": {
+          "external_power": true,
+          "charging": false,
+          "capacity": 85,
+          "capacity_max": 100,
+          "voltage_mv": 12509,
+          "current_ma": 0,
+          "battery_discharge_w": null
+        },
+        "gpu_nanoseconds": 0,
+        "task_cpu_energy_nanojoules": 4122276834
+      },
+      {
+        "seconds": 150.564085958,
+        "epoch_seconds": 1792729754.563422,
+        "battery": {
+          "external_power": true,
+          "charging": false,
+          "capacity": 85,
+          "capacity_max": 100,
+          "voltage_mv": 12509,
+          "current_ma": 0,
+          "battery_discharge_w": null
+        },
+        "gpu_nanoseconds": 0,
+        "task_cpu_energy_nanojoules": 4122403765
+      },
+      {
+        "seconds": 165.607948042,
+        "epoch_seconds": 1792729769.607311,
+        "battery": {
+          "external_power": true,
+          "charging": false,
+          "capacity": 85,
+          "capacity_max": 100,
+          "voltage_mv": 12509,
+          "current_ma": 0,
+          "battery_discharge_w": null
+        },
+        "gpu_nanoseconds": 0,
+        "task_cpu_energy_nanojoules": 4122447991
+      },
+      {
+        "seconds": 180.641933917,
+        "epoch_seconds": 1792729784.641325,
+        "battery": {
+          "external_power": true,
+          "charging": false,
+          "capacity": 85,
+          "capacity_max": 100,
+          "voltage_mv": 12509,
+          "current_ma": 0,
+          "battery_discharge_w": null
+        },
+        "gpu_nanoseconds": 0,
+        "task_cpu_energy_nanojoules": 4124033945
+      },
+      {
+        "seconds": 195.681493958,
+        "epoch_seconds": 1792729799.680913,
+        "battery": {
+          "external_power": true,
+          "charging": false,
+          "capacity": 85,
+          "capacity_max": 100,
+          "voltage_mv": 12509,
+          "current_ma": 0,
+          "battery_discharge_w": null
+        },
+        "gpu_nanoseconds": 0,
+        "task_cpu_energy_nanojoules": 4231047440
+      },
+      {
+        "seconds": 210.71619825,
+        "epoch_seconds": 1792729814.7156448,
+        "battery": {
+          "external_power": true,
+          "charging": false,
+          "capacity": 85,
+          "capacity_max": 100,
+          "voltage_mv": 12510,
+          "current_ma": 0,
+          "battery_discharge_w": null
+        },
+        "gpu_nanoseconds": 0,
+        "task_cpu_energy_nanojoules": 4431629821
+      },
+      {
+        "seconds": 225.750452042,
+        "epoch_seconds": 1792729829.7499259,
+        "battery": {
+          "external_power": true,
+          "charging": false,
+          "capacity": 85,
+          "capacity_max": 100,
+          "voltage_mv": 12510,
+          "current_ma": 0,
+          "battery_discharge_w": null
+        },
+        "gpu_nanoseconds": 0,
+        "task_cpu_energy_nanojoules": 4547876905
+      },
+      {
+        "seconds": 240.78561875,
+        "epoch_seconds": 1792729844.78512,
+        "battery": {
+          "external_power": true,
+          "charging": false,
+          "capacity": 85,
+          "capacity_max": 100,
+          "voltage_mv": 12510,
+          "current_ma": 0,
+          "battery_discharge_w": null
+        },
+        "gpu_nanoseconds": 0,
+        "task_cpu_energy_nanojoules": 4547946465
+      },
+      {
+        "seconds": 255.824479125,
+        "epoch_seconds": 1792729859.824009,
+        "battery": {
+          "external_power": true,
+          "charging": false,
+          "capacity": 85,
+          "capacity_max": 100,
+          "voltage_mv": 12510,
+          "current_ma": 0,
+          "battery_discharge_w": null
+        },
+        "gpu_nanoseconds": 0,
+        "task_cpu_energy_nanojoules": 4557275241
+      },
+      {
+        "seconds": 270.870161125,
+        "epoch_seconds": 1792729874.869718,
+        "battery": {
+          "external_power": true,
+          "charging": false,
+          "capacity": 85,
+          "capacity_max": 100,
+          "voltage_mv": 12509,
+          "current_ma": 0,
+          "battery_discharge_w": null
+        },
+        "gpu_nanoseconds": 0,
+        "task_cpu_energy_nanojoules": 4573503452
+      },
+      {
+        "seconds": 285.896946125,
+        "epoch_seconds": 1792729889.8965309,
+        "battery": {
+          "external_power": true,
+          "charging": false,
+          "capacity": 85,
+          "capacity_max": 100,
+          "voltage_mv": 12509,
+          "current_ma": 0,
+          "battery_discharge_w": null
+        },
+        "gpu_nanoseconds": 0,
+        "task_cpu_energy_nanojoules": 4587213746
+      },
+      {
+        "seconds": 300.932501125,
+        "epoch_seconds": 1792729904.932114,
+        "battery": {
+          "external_power": true,
+          "charging": false,
+          "capacity": 85,
+          "capacity_max": 100,
+          "voltage_mv": 12509,
+          "current_ma": 0,
+          "battery_discharge_w": null
+        },
+        "gpu_nanoseconds": 0,
+        "task_cpu_energy_nanojoules": 4587525177
+      },
+      {
+        "seconds": 315.969583292,
+        "epoch_seconds": 1792729919.969224,
+        "battery": {
+          "external_power": true,
+          "charging": false,
+          "capacity": 85,
+          "capacity_max": 100,
+          "voltage_mv": 12509,
+          "current_ma": 0,
+          "battery_discharge_w": null
+        },
+        "gpu_nanoseconds": 0,
+        "task_cpu_energy_nanojoules": 4606254216
+      },
+      {
+        "seconds": 330.999264667,
+        "epoch_seconds": 1792729934.998933,
+        "battery": {
+          "external_power": true,
+          "charging": false,
+          "capacity": 85,
+          "capacity_max": 100,
+          "voltage_mv": 12509,
+          "current_ma": 0,
+          "battery_discharge_w": null
+        },
+        "gpu_nanoseconds": 0,
+        "task_cpu_energy_nanojoules": 4606616390
+      },
+      {
+        "seconds": 346.029137583,
+        "epoch_seconds": 1792729950.028834,
+        "battery": {
+          "external_power": true,
+          "charging": false,
+          "capacity": 85,
+          "capacity_max": 100,
+          "voltage_mv": 12509,
+          "current_ma": 0,
+          "battery_discharge_w": null
+        },
+        "gpu_nanoseconds": 0,
+        "task_cpu_energy_nanojoules": 4636207456
+      },
+      {
+        "seconds": 361.06333225,
+        "epoch_seconds": 1792729965.0630558,
+        "battery": {
+          "external_power": true,
+          "charging": false,
+          "capacity": 85,
+          "capacity_max": 100,
+          "voltage_mv": 12509,
+          "current_ma": 0,
+          "battery_discharge_w": null
+        },
+        "gpu_nanoseconds": 0,
+        "task_cpu_energy_nanojoules": 4636387301
+      },
+      {
+        "seconds": 376.095029417,
+        "epoch_seconds": 1792729980.094781,
+        "battery": {
+          "external_power": true,
+          "charging": false,
+          "capacity": 85,
+          "capacity_max": 100,
+          "voltage_mv": 12509,
+          "current_ma": 0,
+          "battery_discharge_w": null
+        },
+        "gpu_nanoseconds": 0,
+        "task_cpu_energy_nanojoules": 4636425867
+      },
+      {
+        "seconds": 391.12742325,
+        "epoch_seconds": 1792729995.127202,
+        "battery": {
+          "external_power": true,
+          "charging": false,
+          "capacity": 85,
+          "capacity_max": 100,
+          "voltage_mv": 12509,
+          "current_ma": 0,
+          "battery_discharge_w": null
+        },
+        "gpu_nanoseconds": 0,
+        "task_cpu_energy_nanojoules": 4636480278
+      },
+      {
+        "seconds": 406.158655625,
+        "epoch_seconds": 1792730010.158462,
+        "battery": {
+          "external_power": true,
+          "charging": false,
+          "capacity": 85,
+          "capacity_max": 100,
+          "voltage_mv": 12509,
+          "current_ma": 0,
+          "battery_discharge_w": null
+        },
+        "gpu_nanoseconds": 0,
+        "task_cpu_energy_nanojoules": 4640001980
+      },
+      {
+        "seconds": 421.201319667,
+        "epoch_seconds": 1792730025.201154,
+        "battery": {
+          "external_power": true,
+          "charging": false,
+          "capacity": 85,
+          "capacity_max": 100,
+          "voltage_mv": 12509,
+          "current_ma": 0,
+          "battery_discharge_w": null
+        },
+        "gpu_nanoseconds": 0,
+        "task_cpu_energy_nanojoules": 4640068300
+      },
+      {
+        "seconds": 436.247949417,
+        "epoch_seconds": 1792730040.247811,
+        "battery": {
+          "external_power": true,
+          "charging": false,
+          "capacity": 85,
+          "capacity_max": 100,
+          "voltage_mv": 12509,
+          "current_ma": 0,
+          "battery_discharge_w": null
+        },
+        "gpu_nanoseconds": 0,
+        "task_cpu_energy_nanojoules": 4641101104
+      },
+      {
+        "seconds": 451.290192208,
+        "epoch_seconds": 1792730055.290082,
+        "battery": {
+          "external_power": true,
+          "charging": false,
+          "capacity": 85,
+          "capacity_max": 100,
+          "voltage_mv": 12509,
+          "current_ma": 0,
+          "battery_discharge_w": null
+        },
+        "gpu_nanoseconds": 0,
+        "task_cpu_energy_nanojoules": 4642216949
+      },
+      {
+        "seconds": 466.326207083,
+        "epoch_seconds": 1792730070.3261251,
+        "battery": {
+          "external_power": true,
+          "charging": false,
+          "capacity": 85,
+          "capacity_max": 100,
+          "voltage_mv": 12509,
+          "current_ma": 0,
+          "battery_discharge_w": null
+        },
+        "gpu_nanoseconds": 0,
+        "task_cpu_energy_nanojoules": 4642305855
+      },
+      {
+        "seconds": 481.371513958,
+        "epoch_seconds": 1792730085.371459,
+        "battery": {
+          "external_power": true,
+          "charging": false,
+          "capacity": 85,
+          "capacity_max": 100,
+          "voltage_mv": 12509,
+          "current_ma": 0,
+          "battery_discharge_w": null
+        },
+        "gpu_nanoseconds": 0,
+        "task_cpu_energy_nanojoules": 4642398529
+      },
+      {
+        "seconds": 496.408225542,
+        "epoch_seconds": 1792730100.4081979,
+        "battery": {
+          "external_power": true,
+          "charging": false,
+          "capacity": 85,
+          "capacity_max": 100,
+          "voltage_mv": 12509,
+          "current_ma": 0,
+          "battery_discharge_w": null
+        },
+        "gpu_nanoseconds": 0,
+        "task_cpu_energy_nanojoules": 4642447894
+      },
+      {
+        "seconds": 511.44678325,
+        "epoch_seconds": 1792730115.446784,
+        "battery": {
+          "external_power": true,
+          "charging": false,
+          "capacity": 85,
+          "capacity_max": 100,
+          "voltage_mv": 12511,
+          "current_ma": 0,
+          "battery_discharge_w": null
+        },
+        "gpu_nanoseconds": 0,
+        "task_cpu_energy_nanojoules": 4642508682
+      },
+      {
+        "seconds": 526.4865366250001,
+        "epoch_seconds": 1792730130.486565,
+        "battery": {
+          "external_power": true,
+          "charging": false,
+          "capacity": 85,
+          "capacity_max": 100,
+          "voltage_mv": 12511,
+          "current_ma": 0,
+          "battery_discharge_w": null
+        },
+        "gpu_nanoseconds": 0,
+        "task_cpu_energy_nanojoules": 4642557769
+      },
+      {
+        "seconds": 541.522791458,
+        "epoch_seconds": 1792730145.522848,
+        "battery": {
+          "external_power": true,
+          "charging": false,
+          "capacity": 85,
+          "capacity_max": 100,
+          "voltage_mv": 12511,
+          "current_ma": 0,
+          "battery_discharge_w": null
+        },
+        "gpu_nanoseconds": 0,
+        "task_cpu_energy_nanojoules": 4642613861
+      },
+      {
+        "seconds": 556.555552583,
+        "epoch_seconds": 1792730160.555636,
+        "battery": {
+          "external_power": true,
+          "charging": false,
+          "capacity": 85,
+          "capacity_max": 100,
+          "voltage_mv": 12511,
+          "current_ma": 0,
+          "battery_discharge_w": null
+        },
+        "gpu_nanoseconds": 0,
+        "task_cpu_energy_nanojoules": 4642664531
+      },
+      {
+        "seconds": 571.59070425,
+        "epoch_seconds": 1792730175.590816,
+        "battery": {
+          "external_power": true,
+          "charging": false,
+          "capacity": 85,
+          "capacity_max": 100,
+          "voltage_mv": 12511,
+          "current_ma": 0,
+          "battery_discharge_w": null
+        },
+        "gpu_nanoseconds": 0,
+        "task_cpu_energy_nanojoules": 4642729422
+      },
+      {
+        "seconds": 586.694780375,
+        "epoch_seconds": 1792730190.6949198,
+        "battery": {
+          "external_power": true,
+          "charging": false,
+          "capacity": 85,
+          "capacity_max": 100,
+          "voltage_mv": 12511,
+          "current_ma": 0,
+          "battery_discharge_w": null
+        },
+        "gpu_nanoseconds": 0,
+        "task_cpu_energy_nanojoules": 4658302939
+      },
+      {
+        "seconds": 600.0334982080001,
+        "epoch_seconds": 1792730204.0336618,
+        "battery": {
+          "external_power": true,
+          "charging": false,
+          "capacity": 85,
+          "capacity_max": 100,
+          "voltage_mv": 12511,
+          "current_ma": 0,
+          "battery_discharge_w": null
+        },
+        "gpu_nanoseconds": 0,
+        "task_cpu_energy_nanojoules": 4662720896
+      }
+    ]
+  },
+  "energy_interval_note": "The initial collector timed the first sample from launch; the actual counter interval is 599.878 seconds. The published helper now times from its first sample.",
+  "resource_measurement": {
+    "pid": 91886,
+    "requested_seconds": 900.0,
+    "seconds": 900.001,
+    "elapsed_clock": "mach_absolute_time()",
+    "wall_clock_seconds": 900.004,
+    "completed": true,
+    "error": null,
+    "started_at_utc": "2026-10-23T04:22:44.494750+00:00",
+    "reported_at_utc": "2026-10-23T04:37:44.498610+00:00",
+    "sample_interval_seconds": 15.0,
+    "sample_count": 61,
+    "cpu_counter_unit": "mach_absolute_time ticks",
+    "mach_timebase": {
+      "numer": 125,
+      "denom": 3
+    },
+    "cpu_seconds": 0.8838152499999999,
+    "child_cpu_seconds": 0.04951783333333333,
+    "cpu_percent_one_core": 0.09820163614627936,
+    "idle_wakeups": 89,
+    "interrupt_wakeups": 1573,
+    "disk_read_bytes": 32768,
+    "disk_write_bytes": 0,
+    "logical_write_bytes": 0,
+    "resident_mib_start": 115.015625,
+    "resident_mib_end": 111.71875,
+    "resident_mib_max": 119.875,
+    "physical_footprint_mib_start": 46.11040496826172,
+    "physical_footprint_mib_end": 46.626075744628906,
+    "physical_footprint_mib_max": 53.90727996826172,
+    "timeline": [
+      {
+        "seconds": 15.006,
+        "cpu_percent_one_core": 0.0011723389810666558,
+        "resident_mib": 115.015625,
+        "physical_footprint_mib": 46.11040496826172,
+        "disk_write_bytes": 0
+      },
+      {
+        "seconds": 30.006,
+        "cpu_percent_one_core": 0.5475500911966388,
+        "resident_mib": 119.78125,
+        "physical_footprint_mib": 46.40727996826172,
+        "disk_write_bytes": 0
+      },
+      {
+        "seconds": 45.01,
+        "cpu_percent_one_core": 0.16236782844688308,
+        "resident_mib": 119.875,
+        "physical_footprint_mib": 46.46977996826172,
+        "disk_write_bytes": 0
+      },
+      {
+        "seconds": 60.015,
+        "cpu_percent_one_core": 0.239649972292762,
+        "resident_mib": 117.3125,
+        "physical_footprint_mib": 46.37602996826172,
+        "disk_write_bytes": 0
+      },
+      {
+        "seconds": 75.021,
+        "cpu_percent_one_core": 0.0009596010831461773,
+        "resident_mib": 117.3125,
+        "physical_footprint_mib": 46.37602996826172,
+        "disk_write_bytes": 0
+      },
+      {
+        "seconds": 90.023,
+        "cpu_percent_one_core": 0.0019463603419881757,
+        "resident_mib": 117.3125,
+        "physical_footprint_mib": 46.37602996826172,
+        "disk_write_bytes": 0
+      },
+      {
+        "seconds": 105.024,
+        "cpu_percent_one_core": 0.0008885613442711542,
+        "resident_mib": 117.3125,
+        "physical_footprint_mib": 46.37602996826172,
+        "disk_write_bytes": 0
+      },
+      {
+        "seconds": 120.027,
+        "cpu_percent_one_core": 0.0019557350829697666,
+        "resident_mib": 115.484375,
+        "physical_footprint_mib": 46.37602996826172,
+        "disk_write_bytes": 0
+      },
+      {
+        "seconds": 135.032,
+        "cpu_percent_one_core": 0.0007936042230540793,
+        "resident_mib": 115.484375,
+        "physical_footprint_mib": 46.37602996826172,
+        "disk_write_bytes": 0
+      },
+      {
+        "seconds": 150.034,
+        "cpu_percent_one_core": 0.0011545670003104214,
+        "resident_mib": 115.34375,
+        "physical_footprint_mib": 46.37602996826172,
+        "disk_write_bytes": 0
+      },
+      {
+        "seconds": 165.038,
+        "cpu_percent_one_core": 0.0010669950264021865,
+        "resident_mib": 115.34375,
+        "physical_footprint_mib": 46.37602996826172,
+        "disk_write_bytes": 0
+      },
+      {
+        "seconds": 180.042,
+        "cpu_percent_one_core": 0.0010810428830967734,
+        "resident_mib": 115.34375,
+        "physical_footprint_mib": 46.37602996826172,
+        "disk_write_bytes": 0
+      },
+      {
+        "seconds": 195.049,
+        "cpu_percent_one_core": 0.0008421616007728208,
+        "resident_mib": 115.34375,
+        "physical_footprint_mib": 46.37602996826172,
+        "disk_write_bytes": 0
+      },
+      {
+        "seconds": 210.053,
+        "cpu_percent_one_core": 0.16925381494681693,
+        "resident_mib": 115.03125,
+        "physical_footprint_mib": 46.32915496826172,
+        "disk_write_bytes": 0
+      },
+      {
+        "seconds": 225.058,
+        "cpu_percent_one_core": 0.1481458534242617,
+        "resident_mib": 115.265625,
+        "physical_footprint_mib": 46.50102996826172,
+        "disk_write_bytes": 0
+      },
+      {
+        "seconds": 240.063,
+        "cpu_percent_one_core": 0.0022334180807614436,
+        "resident_mib": 115.125,
+        "physical_footprint_mib": 46.36040496826172,
+        "disk_write_bytes": 0
+      },
+      {
+        "seconds": 255.07,
+        "cpu_percent_one_core": 0.0009112886185832486,
+        "resident_mib": 115.125,
+        "physical_footprint_mib": 46.36040496826172,
+        "disk_write_bytes": 0
+      },
+      {
+        "seconds": 270.071,
+        "cpu_percent_one_core": 0.12450274050350514,
+        "resident_mib": 114.765625,
+        "physical_footprint_mib": 46.37602996826172,
+        "disk_write_bytes": 0
+      },
+      {
+        "seconds": 285.071,
+        "cpu_percent_one_core": 0.3224951680156152,
+        "resident_mib": 112.640625,
+        "physical_footprint_mib": 46.36040496826172,
+        "disk_write_bytes": 0
+      },
+      {
+        "seconds": 300.076,
+        "cpu_percent_one_core": 0.0013445420228132743,
+        "resident_mib": 112.640625,
+        "physical_footprint_mib": 46.36040496826172,
+        "disk_write_bytes": 0
+      },
+      {
+        "seconds": 315.08,
+        "cpu_percent_one_core": 0.001028641863425587,
+        "resident_mib": 112.640625,
+        "physical_footprint_mib": 46.36040496826172,
+        "disk_write_bytes": 0
+      },
+      {
+        "seconds": 330.085,
+        "cpu_percent_one_core": 0.0014478431016705013,
+        "resident_mib": 112.640625,
+        "physical_footprint_mib": 46.36040496826172,
+        "disk_write_bytes": 0
+      },
+      {
+        "seconds": 345.089,
+        "cpu_percent_one_core": 0.009845596804180588,
+        "resident_mib": 112.640625,
+        "physical_footprint_mib": 46.36040496826172,
+        "disk_write_bytes": 0
+      },
+      {
+        "seconds": 360.089,
+        "cpu_percent_one_core": 0.004713538182305642,
+        "resident_mib": 112.640625,
+        "physical_footprint_mib": 46.36040496826172,
+        "disk_write_bytes": 0
+      },
+      {
+        "seconds": 375.096,
+        "cpu_percent_one_core": 0.0013746940025138304,
+        "resident_mib": 112.640625,
+        "physical_footprint_mib": 46.36040496826172,
+        "disk_write_bytes": 0
+      },
+      {
+        "seconds": 390.097,
+        "cpu_percent_one_core": 0.003157148398906644,
+        "resident_mib": 112.640625,
+        "physical_footprint_mib": 46.36040496826172,
+        "disk_write_bytes": 0
+      },
+      {
+        "seconds": 405.103,
+        "cpu_percent_one_core": 0.0009929987203699327,
+        "resident_mib": 112.640625,
+        "physical_footprint_mib": 46.36040496826172,
+        "disk_write_bytes": 0
+      },
+      {
+        "seconds": 420.108,
+        "cpu_percent_one_core": 0.008566552542497208,
+        "resident_mib": 112.625,
+        "physical_footprint_mib": 46.36040496826172,
+        "disk_write_bytes": 0
+      },
+      {
+        "seconds": 435.114,
+        "cpu_percent_one_core": 0.48800769529616916,
+        "resident_mib": 116.765625,
+        "physical_footprint_mib": 52.57915496826172,
+        "disk_write_bytes": 0
+      },
+      {
+        "seconds": 450.115,
+        "cpu_percent_one_core": 0.8859662859993376,
+        "resident_mib": 117.703125,
+        "physical_footprint_mib": 49.36040496826172,
+        "disk_write_bytes": 0
+      },
+      {
+        "seconds": 465.12,
+        "cpu_percent_one_core": 0.7136645664075785,
+        "resident_mib": 118.0,
+        "physical_footprint_mib": 49.56352996826172,
+        "disk_write_bytes": 0
+      },
+      {
+        "seconds": 480.121,
+        "cpu_percent_one_core": 0.0017129516983805059,
+        "resident_mib": 117.84375,
+        "physical_footprint_mib": 49.56352996826172,
+        "disk_write_bytes": 0
+      },
+      {
+        "seconds": 495.128,
+        "cpu_percent_one_core": 0.1461870665502559,
+        "resident_mib": 116.921875,
+        "physical_footprint_mib": 52.87602996826172,
+        "disk_write_bytes": 0
+      },
+      {
+        "seconds": 510.133,
+        "cpu_percent_one_core": 0.15653788475515298,
+        "resident_mib": 116.859375,
+        "physical_footprint_mib": 49.67290496826172,
+        "disk_write_bytes": 0
+      },
+      {
+        "seconds": 525.134,
+        "cpu_percent_one_core": 0.1845122268589188,
+        "resident_mib": 117.25,
+        "physical_footprint_mib": 53.90727996826172,
+        "disk_write_bytes": 0
+      },
+      {
+        "seconds": 540.135,
+        "cpu_percent_one_core": 0.004496089362113213,
+        "resident_mib": 116.546875,
+        "physical_footprint_mib": 50.48540496826172,
+        "disk_write_bytes": 0
+      },
+      {
+        "seconds": 555.141,
+        "cpu_percent_one_core": 0.05774845670339213,
+        "resident_mib": 116.578125,
+        "physical_footprint_mib": 49.64165496826172,
+        "disk_write_bytes": 0
+      },
+      {
+        "seconds": 570.145,
+        "cpu_percent_one_core": 0.12192072909905587,
+        "resident_mib": 116.59375,
+        "physical_footprint_mib": 51.20415496826172,
+        "disk_write_bytes": 0
+      },
+      {
+        "seconds": 585.15,
+        "cpu_percent_one_core": 0.15451738631817905,
+        "resident_mib": 116.46875,
+        "physical_footprint_mib": 47.094825744628906,
+        "disk_write_bytes": 0
+      },
+      {
+        "seconds": 600.154,
+        "cpu_percent_one_core": 0.0033845450332547966,
+        "resident_mib": 114.40625,
+        "physical_footprint_mib": 46.64165496826172,
+        "disk_write_bytes": 0
+      },
+      {
+        "seconds": 615.16,
+        "cpu_percent_one_core": 0.0011173024338965764,
+        "resident_mib": 114.265625,
+        "physical_footprint_mib": 46.64165496826172,
+        "disk_write_bytes": 0
+      },
+      {
+        "seconds": 630.162,
+        "cpu_percent_one_core": 0.0016016726939773725,
+        "resident_mib": 114.265625,
+        "physical_footprint_mib": 46.64165496826172,
+        "disk_write_bytes": 0
+      },
+      {
+        "seconds": 645.164,
+        "cpu_percent_one_core": 0.019133402115704398,
+        "resident_mib": 111.3125,
+        "physical_footprint_mib": 46.64165496826172,
+        "disk_write_bytes": 0
+      },
+      {
+        "seconds": 660.167,
+        "cpu_percent_one_core": 0.0015663523170909243,
+        "resident_mib": 111.078125,
+        "physical_footprint_mib": 46.64165496826172,
+        "disk_write_bytes": 0
+      },
+      {
+        "seconds": 675.173,
+        "cpu_percent_one_core": 0.012941184572540641,
+        "resident_mib": 111.1875,
+        "physical_footprint_mib": 46.64165496826172,
+        "disk_write_bytes": 0
+      },
+      {
+        "seconds": 690.178,
+        "cpu_percent_one_core": 0.010229296463816671,
+        "resident_mib": 111.171875,
+        "physical_footprint_mib": 46.64165496826172,
+        "disk_write_bytes": 0
+      },
+      {
+        "seconds": 705.183,
+        "cpu_percent_one_core": 0.0016636012640503938,
+        "resident_mib": 111.140625,
+        "physical_footprint_mib": 46.64165496826172,
+        "disk_write_bytes": 0
+      },
+      {
+        "seconds": 720.183,
+        "cpu_percent_one_core": 0.0021579858586546867,
+        "resident_mib": 108.265625,
+        "physical_footprint_mib": 46.64165496826172,
+        "disk_write_bytes": 0
+      },
+      {
+        "seconds": 735.189,
+        "cpu_percent_one_core": 0.0007416548344120632,
+        "resident_mib": 108.265625,
+        "physical_footprint_mib": 46.64165496826172,
+        "disk_write_bytes": 0
+      },
+      {
+        "seconds": 750.192,
+        "cpu_percent_one_core": 0.0010736673883004148,
+        "resident_mib": 108.265625,
+        "physical_footprint_mib": 46.64165496826172,
+        "disk_write_bytes": 0
+      },
+      {
+        "seconds": 765.195,
+        "cpu_percent_one_core": 0.0009178905672961722,
+        "resident_mib": 108.265625,
+        "physical_footprint_mib": 46.64165496826172,
+        "disk_write_bytes": 0
+      },
+      {
+        "seconds": 780.196,
+        "cpu_percent_one_core": 0.0011163387435479146,
+        "resident_mib": 108.265625,
+        "physical_footprint_mib": 46.64165496826172,
+        "disk_write_bytes": 0
+      },
+      {
+        "seconds": 795.203,
+        "cpu_percent_one_core": 0.0008182443899040478,
+        "resident_mib": 108.265625,
+        "physical_footprint_mib": 46.64165496826172,
+        "disk_write_bytes": 0
+      },
+      {
+        "seconds": 810.208,
+        "cpu_percent_one_core": 0.0014520069509053202,
+        "resident_mib": 108.265625,
+        "physical_footprint_mib": 46.64165496826172,
+        "disk_write_bytes": 0
+      },
+      {
+        "seconds": 825.212,
+        "cpu_percent_one_core": 0.12701237133310253,
+        "resident_mib": 108.234375,
+        "physical_footprint_mib": 46.78227996826172,
+        "disk_write_bytes": 0
+      },
+      {
+        "seconds": 840.215,
+        "cpu_percent_one_core": 0.041007416912166604,
+        "resident_mib": 107.953125,
+        "physical_footprint_mib": 46.64165496826172,
+        "disk_write_bytes": 0
+      },
+      {
+        "seconds": 855.222,
+        "cpu_percent_one_core": 0.4536356635956311,
+        "resident_mib": 114.546875,
+        "physical_footprint_mib": 49.469825744628906,
+        "disk_write_bytes": 0
+      },
+      {
+        "seconds": 870.227,
+        "cpu_percent_one_core": 0.5303980015060941,
+        "resident_mib": 111.71875,
+        "physical_footprint_mib": 46.626075744628906,
+        "disk_write_bytes": 0
+      },
+      {
+        "seconds": 885.23,
+        "cpu_percent_one_core": 0.0006023690650442278,
+        "resident_mib": 111.71875,
+        "physical_footprint_mib": 46.626075744628906,
+        "disk_write_bytes": 0
+      },
+      {
+        "seconds": 900.001,
+        "cpu_percent_one_core": 0.00135493864772874,
+        "resident_mib": 111.71875,
+        "physical_footprint_mib": 46.626075744628906,
+        "disk_write_bytes": 0
+      }
+    ],
+    "gpu": "not measured",
+    "battery_life": "not measured"
+  },
+  "tests": {
+    "swift_assertions_passed": 228,
+    "swift_assertions_failed": 0,
+    "e2e_scenarios_passed": 5,
+    "process_restart_scoping": "passed",
+    "resource_accounting_tests_passed": 2,
+    "energy_tests_passed": 6,
+    "minimal_appkit_compile": "passed with warnings as errors",
+    "battery_ac_refusal": {
+      "pid": 91886,
+      "process_start_identity": 836635454319,
+      "started_at_utc": "2026-10-23T04:27:34.711256+00:00",
+      "completed": false,
+      "error": "Actual battery measurement requires unplugged power; AC is connected",
+      "requested_seconds": 1.0,
+      "measured_seconds": 0,
+      "wall_clock_seconds": 0.019894123077392578,
+      "sample_interval_seconds": 15,
+      "sample_count": 0,
+      "kernel_task_cpu_energy_joules": null,
+      "kernel_task_cpu_energy_average_watts": null,
+      "task_gpu_nanoseconds": null,
+      "whole_computer_battery_discharge": {
+        "sampled_wh": null,
+        "covered_seconds": 0.0
+      },
+      "battery_measurement_complete": false,
+      "units_sources": [
+        "https://github.com/apple-oss-distributions/xnu/blob/main/iokit/IOKit/pwr_mgt/IOPMPowerSource.h",
+        "https://github.com/apple-oss-distributions/xnu/blob/main/osfmk/kern/task.c"
+      ],
+      "limits": [
+        "Kernel CPU-energy attribution is not battery drain. OS helpers and WindowServer are excluded.",
+        "Battery current/voltage samples cover the whole computer, including other apps and this measurement tool.",
+        "No per-app battery-life estimate or extrapolation is made. Sleep and AC gaps are excluded."
+      ],
+      "samples": []
+    }
+  },
+  "limits": [
+    "No unplugged battery discharge was measured: AC stayed connected and the user could not disconnect it.",
+    "Kernel task CPU energy is not whole-computer energy or battery drain. WindowServer and other helpers are excluded.",
+    "The measured task GPU counter increased by zero; this does not establish zero GPU work performed on behalf of the app by the compositor.",
+    "Screen capture and Settings inspection occurred during the measurement. These data are not an idle-only benchmark.",
+    "The independent AppKit reproduction narrows the sharing-indicator issue to an OS path. The diagnostics were not suppressed or claimed fixed.",
+    "Private accessibility messages, historical layout recursion, and wake-time scene invalidation are not fully explained or repaired.",
+    "The battery integration arithmetic is covered by deterministic tests; a physical unplugged run remains pending."
+  ]
+}

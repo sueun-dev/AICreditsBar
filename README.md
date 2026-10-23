@@ -167,6 +167,17 @@ The [one-hour follow-up](docs/validation-2026-10-23.json) and
 measurement, 13 automatic refreshes per provider, observed sleep recovery, and
 the remaining OS diagnostics and measurement limits.
 
+For kernel-attributed task CPU energy and task GPU time, run
+`python3 Tests/measure_energy.py <PID> --seconds 900 --output energy.json`.
+This compiles a temporary, SDK-typed reader and requires no administrator access.
+Add `--require-battery` for an unplugged measurement: it rejects AC power and
+reports incomplete coverage if sleep, clock or power-source changes leave gaps.
+Battery Wh integrates sampled battery current/voltage for the **whole computer**;
+task CPU energy excludes WindowServer and other helpers. Neither is a per-app
+battery-life estimate. No measurement tool is bundled into the running app.
+See the [diagnostic investigation](docs/diagnostics-2026-10-22.md) for the minimal
+AppKit reproduction, measured energy, and issues that remain unresolved.
+
 ### License
 
 MIT — see [LICENSE](LICENSE).
@@ -289,6 +300,14 @@ CPU 카운터는 Mac의 Mach 시계 단위를 적용해 초로 환산합니다. 
 [자원 사용 그래프](docs/validation-2026-10-23.svg)에는 잠자기를 제외한 60분 측정,
 서비스별 13회 자동 갱신, 잠자기 이후 조회 재개, 남아 있는 OS 진단 메시지와 측정 한계를
 기록했습니다.
+
+`python3 Tests/measure_energy.py <PID> --seconds 900 --output energy.json`은
+커널이 앱에 배분한 CPU 에너지와 앱의 GPU 시간을 읽습니다. `--require-battery`를 추가하면
+AC 전원에서는 측정을 거부하고, 잠자기·시계 변경·전원 전환으로 빠진 구간도 미완료로 표시합니다.
+배터리 Wh는 배터리 전류·전압 표본을 적분한 **Mac 전체**의 값이며, 앱별 배터리 지속 시간은
+추정하지 않습니다. 측정 도구는 실행 앱에 포함되지 않습니다.
+[진단 조사 기록](docs/diagnostics-2026-10-22.md)에 최소 AppKit 재현, 실제 에너지 계측 결과,
+아직 해결되지 않은 범위를 구분해 남겼습니다.
 
 ### 라이선스
 

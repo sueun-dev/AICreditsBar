@@ -24,5 +24,6 @@ echo "── e2e ──"
 bash Tests/e2e.sh "$OUT/aicreditsbar"
 bash Tests/processes.sh
 python3 Tests/test_resources.py
+python3 Tests/test_energy.py
 
 echo "── ✓ all tests passed ──"
