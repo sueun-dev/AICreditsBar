@@ -23,5 +23,6 @@ echo "── e2e ──"
 "${SWIFTC[@]}" -O Sources/*.swift -o "$OUT/aicreditsbar"
 bash Tests/e2e.sh "$OUT/aicreditsbar"
 bash Tests/processes.sh
+python3 Tests/test_resources.py
 
 echo "── ✓ all tests passed ──"

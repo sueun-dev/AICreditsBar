@@ -152,9 +152,14 @@ To sample a running app's CPU time, memory footprint, wakeups and disk counters:
 For a one-hour run, use `--seconds 3600 --interval 15`. The report records memory
 growth and a sample timeline, updates every minute, and reports an interrupted
 process as an incomplete measurement.
+CPU counters are converted with the host's Mach timebase (important on Apple
+Silicon). `Tests/test_resources.py` checks this against an independent process CPU
+clock and is included in `Tests/run.sh`.
 This does not measure battery life or GPU work performed by WindowServer.
 See the [2026-10-22 validation record](docs/validation-2026-10-22.json) for the tested
 environment, live-app checks, resource samples and remaining limits.
+Its CPU values were corrected on 2026-10-23 to apply the Apple Silicon Mach timebase;
+the record preserves the previous values and the calibration evidence.
 
 ### License
 
@@ -266,8 +271,12 @@ e2e(키체인 접근 없는 임시 `HOME`)를 실행합니다. 설치된 앱과 
 지속 시간이나 WindowServer가 수행한 GPU 작업을 측정할 수는 없습니다.
 1시간 측정에는 `--seconds 3600 --interval 15`를 사용합니다. 보고서는 메모리 변화와
 시점별 표본을 포함하고 매분 저장되며, 프로세스가 종료되면 미완료로 기록합니다.
+CPU 카운터는 Mac의 Mach 시계 단위를 적용해 초로 환산합니다. Apple Silicon에서 이 환산이
+누락되지 않도록 별도의 프로세스 CPU 시계와 비교하는 검증도 `Tests/run.sh`에 포함했습니다.
 [2026-10-22 검증 기록](docs/validation-2026-10-22.json)에 환경·실제 앱 확인·성능 표본과
 검증하지 못한 범위를 남겼습니다.
+해당 기록의 CPU 수치는 2026-10-23에 Apple Silicon의 Mach 시계 환산을 적용해 정정했으며,
+이전 값과 환산 검증 근거도 함께 보관했습니다.
 
 ### 라이선스
 

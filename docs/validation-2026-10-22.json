@@ -91,8 +91,8 @@
     "baseline_idle_60s": {
       "pid": 1556,
       "seconds": 60.003,
-      "cpu_seconds": 0.000928746,
-      "cpu_percent_one_core": 0.0015478444380563267,
+      "cpu_seconds": 0.03869775,
+      "cpu_percent_one_core": 0.06449351825234695,
       "idle_wakeups": 0,
       "interrupt_wakeups": 37,
       "disk_read_bytes": 0,
@@ -101,13 +101,17 @@
       "resident_mib_max": 59.09375,
       "physical_footprint_mib_max": 34.094642639160156,
       "gpu": "not measured",
-      "battery_life": "not measured"
+      "battery_life": "not measured",
+      "mach_timebase": {
+        "numer": 125,
+        "denom": 3
+      }
     },
     "updated_idle_60s": {
       "pid": 82919,
       "seconds": 60.005,
-      "cpu_seconds": 0.002326565,
-      "cpu_percent_one_core": 0.0038772823534689417,
+      "cpu_seconds": 0.09694020833333333,
+      "cpu_percent_one_core": 0.16155343139453923,
       "idle_wakeups": 1,
       "interrupt_wakeups": 51,
       "disk_read_bytes": 0,
@@ -116,13 +120,17 @@
       "resident_mib_max": 113.0625,
       "physical_footprint_mib_max": 43.32917785644531,
       "gpu": "not measured",
-      "battery_life": "not measured"
+      "battery_life": "not measured",
+      "mach_timebase": {
+        "numer": 125,
+        "denom": 3
+      }
     },
     "updated_75s_including_refresh_and_settings": {
       "pid": 82919,
       "seconds": 75.005,
-      "cpu_seconds": 0.005983224,
-      "cpu_percent_one_core": 0.007977093076419738,
+      "cpu_seconds": 0.24930099999999997,
+      "cpu_percent_one_core": 0.33237887818415573,
       "idle_wakeups": 4,
       "interrupt_wakeups": 353,
       "disk_read_bytes": 49152,
@@ -131,7 +139,11 @@
       "resident_mib_max": 125.78125,
       "physical_footprint_mib_max": 47.422950744628906,
       "gpu": "not measured",
-      "battery_life": "not measured"
+      "battery_life": "not measured",
+      "mach_timebase": {
+        "numer": 125,
+        "denom": 3
+      }
     },
     "app_bundle_allocated_kib": 524,
     "activity_monitor_gpu_snapshot": {
@@ -152,5 +164,33 @@
     "No full battery discharge, multi-hour endurance, or physical sleep/wake cycle was performed.",
     "No real paid-account quota was deliberately exhausted. Alert transitions use labeled samples and deterministic fixtures; live fetches use the actual providers.",
     "Runtime testing was on this Apple Silicon macOS system. macOS 11 API availability was compiler checked; older macOS and Intel runtime behavior were not tested."
-  ]
+  ],
+  "cpu_time_correction": {
+    "date_utc": "2026-10-23",
+    "reason": "The original measurement assumed proc_pid_rusage CPU counters were nanoseconds. These counters are Mach ticks; the measured Apple Silicon timebase is 125/3. All CPU seconds and percentages in this record have been corrected. Memory, disk, wakeup and duration measurements are unchanged.",
+    "supersedes_cpu_values_in_commit": "3a7bdcb821862b7f9e9fea51578cdcf7460abc72",
+    "independent_calibration": {
+      "process_time_seconds": 1.000001,
+      "raw_counter_delta": 24000462,
+      "converted_seconds": 1.00001925
+    },
+    "previous_values": {
+      "baseline_idle_60s": {
+        "previous_cpu_seconds": 0.000928746,
+        "previous_cpu_percent_one_core": 0.0015478444380563267
+      },
+      "updated_idle_60s": {
+        "previous_cpu_seconds": 0.002326565,
+        "previous_cpu_percent_one_core": 0.0038772823534689417
+      },
+      "updated_75s_including_refresh_and_settings": {
+        "previous_cpu_seconds": 0.005983224,
+        "previous_cpu_percent_one_core": 0.007977093076419738
+      }
+    },
+    "primary_sources": [
+      "https://github.com/apple-oss-distributions/xnu/blob/main/osfmk/kern/bsd_kern.c",
+      "https://github.com/apple-oss-distributions/xnu/blob/main/osfmk/kern/task.c#L6387-L6392"
+    ]
+  }
 }

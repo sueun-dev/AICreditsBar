@@ -27,7 +27,24 @@ class RUsage(ctypes.Structure):
     _fields_ = [("uuid", ctypes.c_ubyte * 16)] + [(name, ctypes.c_uint64) for name in FIELDS]
 
 
+class MachTimebase(ctypes.Structure):
+    _fields_ = [("numer", ctypes.c_uint32), ("denom", ctypes.c_uint32)]
+
+
+def mach_timebase():
+    """rusage CPU counters use Mach ticks, not nanoseconds on Apple Silicon."""
+    system = ctypes.CDLL("/usr/lib/libSystem.B.dylib")
+    system.mach_timebase_info.argtypes = [ctypes.POINTER(MachTimebase)]
+    system.mach_timebase_info.restype = ctypes.c_int
+    result = MachTimebase()
+    if system.mach_timebase_info(ctypes.byref(result)) != 0 or not result.denom:
+        raise RuntimeError("mach_timebase_info failed")
+    return result
+
+
 def measure(pid, seconds, interval=5, output=None):
+    timebase = mach_timebase()
+    seconds_per_tick = timebase.numer / timebase.denom / 1e9
     libproc = ctypes.CDLL("/usr/lib/libproc.dylib", use_errno=True)
     libproc.proc_pid_rusage.argtypes = [ctypes.c_int, ctypes.c_int, ctypes.c_void_p]
     libproc.proc_pid_rusage.restype = ctypes.c_int
@@ -49,13 +66,16 @@ def measure(pid, seconds, interval=5, output=None):
     def report(completed=False):
         elapsed, after = samples[-1]
         delta = lambda name: getattr(after, name) - getattr(before, name)
-        cpu_seconds = (delta("user_time") + delta("system_time")) / 1e9
+        cpu_seconds = (delta("user_time") + delta("system_time")) * seconds_per_tick
         return {
             "pid": pid, "requested_seconds": seconds, "seconds": round(elapsed, 3),
             "completed": completed, "error": error, "started_at_utc": started_at,
             "reported_at_utc": datetime.now(timezone.utc).isoformat(),
             "sample_interval_seconds": interval, "sample_count": len(samples),
+            "cpu_counter_unit": "mach_absolute_time ticks",
+            "mach_timebase": {"numer": timebase.numer, "denom": timebase.denom},
             "cpu_seconds": cpu_seconds,
+            "child_cpu_seconds": (delta("child_user_time") + delta("child_system_time")) * seconds_per_tick,
             "cpu_percent_one_core": cpu_seconds / elapsed * 100 if elapsed else 0,
             "idle_wakeups": delta("pkg_idle_wkups"), "interrupt_wakeups": delta("interrupt_wkups"),
             "disk_read_bytes": delta("diskio_bytesread"), "disk_write_bytes": delta("diskio_byteswritten"),
@@ -92,7 +112,7 @@ def measure(pid, seconds, interval=5, output=None):
         cpu = current.user_time + current.system_time - previous.user_time - previous.system_time
         timeline.append({
             "seconds": round(elapsed, 3),
-            "cpu_percent_one_core": cpu / 1e9 / (elapsed - previous_elapsed) * 100,
+            "cpu_percent_one_core": cpu * seconds_per_tick / (elapsed - previous_elapsed) * 100,
             "resident_mib": current.resident_size / 2**20,
             "physical_footprint_mib": current.phys_footprint / 2**20,
             "disk_write_bytes": current.diskio_byteswritten - before.diskio_byteswritten,
