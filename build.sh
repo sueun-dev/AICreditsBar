@@ -18,6 +18,7 @@ if ! command -v swiftc >/dev/null 2>&1; then
 fi
 
 mkdir -p "$CONTENTS/MacOS" "$CONTENTS/Resources"
+cp "$HERE/Resources/AppIcon.icns" "$CONTENTS/Resources/AppIcon.icns"
 
 echo "compiling…"
 # Build native arch for this machine, but pin a low min-OS floor (macOS 11, 2020)
@@ -36,7 +37,8 @@ cat > "$CONTENTS/Info.plist" <<'PLIST'
     <key>CFBundleDisplayName</key>        <string>AICreditsBar</string>
     <key>CFBundleIdentifier</key>         <string>com.sueun.aicreditsbar</string>
     <key>CFBundleExecutable</key>         <string>aicreditsbar</string>
-    <key>CFBundleVersion</key>            <string>2</string>
+    <key>CFBundleIconFile</key>           <string>AppIcon</string>
+    <key>CFBundleVersion</key>            <string>3</string>
     <key>CFBundleShortVersionString</key> <string>2.0</string>
     <key>CFBundlePackageType</key>        <string>APPL</string>
     <key>LSMinimumSystemVersion</key>     <string>11.0</string>

@@ -2,6 +2,8 @@
 
 # AICreditsBar
 
+<img src="docs/images/app-icon.png" width="96" alt="AICreditsBar: two white quota bars inside an open gauge on a blue tile">
+
 **How much of your Codex and Claude plan limits is left — in the macOS menu bar.**
 
 ![macOS 11+](https://img.shields.io/badge/macOS-11%2B-111?logo=apple&logoColor=white)
@@ -93,6 +95,11 @@ limits retain their history until reset (24 hours without a reset time), with up
 bash build.sh          # compile Sources/*.swift → AICreditsBar.app
 open AICreditsBar.app  # menu-bar only, no Dock icon
 ```
+
+The app bundle includes an icon for Finder and macOS notifications. To edit its
+original vector geometry, change `scripts/render-app-icon.swift` and run
+`bash scripts/build-app-icon.sh` before rebuilding. The generated ICNS contains
+16–1024 pixel representations and is checked in, so normal builds need no extra tools.
 
 The build uses your Apple Development or Developer ID Application signing identity
 when exactly one is available. Choose a specific identity with `AICB_SIGN_IDENTITY`
