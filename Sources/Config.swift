@@ -22,6 +22,19 @@ enum Cfg {
     static func isShown(_ provider: Provider) -> Bool { d.object(forKey: "show\(provider.rawValue)") as? Bool ?? true }
     static func setShown(_ provider: Provider, _ shown: Bool) { d.set(shown, forKey: "show\(provider.rawValue)") }
 
+    static var lowAlerts: Bool {
+        get { d.object(forKey: "lowAlerts") as? Bool ?? true }
+        set { d.set(newValue, forKey: "lowAlerts") }
+    }
+    static var recoveryAlerts: Bool {
+        get { d.object(forKey: "recoveryAlerts") as? Bool ?? true }
+        set { d.set(newValue, forKey: "recoveryAlerts") }
+    }
+    static var alertHistory: Data? {
+        get { d.data(forKey: "alertHistory") }
+        set { if newValue != alertHistory { d.set(newValue, forKey: "alertHistory") } }
+    }
+
     /// Seconds between automatic checks. The usage endpoints rate-limit hard, so
     /// the default is 5 minutes (the menu also checks when it opens).
     static var refreshInterval: Double {
@@ -58,7 +71,7 @@ enum Cfg {
     }
 
     static func resetAll() {
-        for key in ["displayMode", "showCodex", "showClaude", "refreshInterval", "warnBelow", "criticalBelow"] {
+        for key in ["displayMode", "showCodex", "showClaude", "refreshInterval", "warnBelow", "criticalBelow", "lowAlerts", "recoveryAlerts"] {
             d.removeObject(forKey: key)
         }
     }

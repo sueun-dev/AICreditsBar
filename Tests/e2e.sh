@@ -7,7 +7,7 @@ BIN="${1:?usage: e2e.sh <binary>}"
 FAKE="$(mktemp -d)"; SUITE="aicb-e2e-$$"; fail=0
 cleanup() { defaults delete "$SUITE" >/dev/null 2>&1 || true; rm -rf "$FAKE"; }
 trap cleanup EXIT
-run() { HOME="$FAKE" AICB_DEFAULTS_SUITE="$SUITE" AICB_SKIP_KEYCHAIN=1 "$BIN" "$@" 2>&1; }
+run() { env -u CODEX_HOME -u CLAUDE_CONFIG_DIR HOME="$FAKE" AICB_DEFAULTS_SUITE="$SUITE" AICB_SKIP_KEYCHAIN=1 "$BIN" "$@" 2>&1; }
 check() {   # check <output> <expected substring> <description>
   if printf '%s' "$1" | grep -qF -- "$2"; then echo "  ok: $3"
   else echo "  FAIL: $3"; echo "      want: $2"; echo "      got:  $1"; fail=1; fi

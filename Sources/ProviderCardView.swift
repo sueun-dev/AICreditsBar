@@ -38,6 +38,7 @@ final class ProviderCardView: NSView {
         describe()
         needsDisplay = true
     }
+    func updateTime() { describe(); needsDisplay = true }
 
     // MARK: Drawing
 

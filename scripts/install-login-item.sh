@@ -5,11 +5,12 @@ HERE="$(cd "$(dirname "$0")/.." && pwd)"   # project root (this script lives in 
 LABEL="com.sueun.aicreditsbar"
 PLIST="$HOME/Library/LaunchAgents/$LABEL.plist"
 BIN="$HERE/AICreditsBar.app/Contents/MacOS/aicreditsbar"
+source "$HERE/scripts/app-process.sh"
 
 if [[ "${1:-}" == "-u" || "${1:-}" == "--uninstall" ]]; then
     launchctl bootout "gui/$(id -u)/$LABEL" 2>/dev/null || true
     rm -f "$PLIST"
-    pkill -x aicreditsbar 2>/dev/null || true
+    stop_app "$BIN" || true
     echo "Removed login item."
     exit 0
 fi

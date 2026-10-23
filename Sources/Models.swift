@@ -57,12 +57,14 @@ struct UsageError: Error, CustomStringConvertible {
 struct ProviderState {
     var reading: Reading?
     var error: UsageError?
+    var restored = false
 
     /// True when the reading is what the provider says now: the last refresh
     /// worked and it isn't old (a reading restored from the previous run is).
     func isCurrent(now: Double) -> Bool {
-        guard error == nil, let reading = reading else { return false }
-        return now - reading.fetchedAt < 2 * Cfg.refreshInterval + 60
+        guard !restored, error == nil, let reading = reading, reading.fetchedAt.isFinite else { return false }
+        let age = now - reading.fetchedAt
+        return age >= -5 && age < 2 * Cfg.refreshInterval + 60
     }
 
     /// The provider says the limit is hit — and that's still what it says now.
@@ -73,6 +75,7 @@ struct ProviderState {
         case .success(let reading):
             self.reading = reading
             error = nil
+            restored = false
         case .failure(let failure):
             error = failure as? UsageError ?? UsageError(failure.localizedDescription)
         }

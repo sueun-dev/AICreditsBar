@@ -30,7 +30,10 @@ func jsonObject(_ data: Data?) -> [String: Any]? {
 
 /// A JSON number, or a number sent as a string ("58600.48").
 func number(_ value: Any?) -> Double? {
-    if let n = value as? NSNumber { return n.doubleValue.isFinite ? n.doubleValue : nil }
+    if let n = value as? NSNumber {
+        guard CFGetTypeID(n) != CFBooleanGetTypeID() else { return nil }
+        return n.doubleValue.isFinite ? n.doubleValue : nil
+    }
     if let s = value as? String, let d = Double(s), d.isFinite { return d }
     return nil
 }
@@ -99,29 +102,44 @@ private let session: URLSession = {
     let config = URLSessionConfiguration.ephemeral   // no cookies or cache written to disk
     config.timeoutIntervalForRequest = 20
     config.timeoutIntervalForResource = 30
+    config.httpShouldSetCookies = false
+    config.urlCache = nil
     return URLSession(configuration: config)
 }()
 
-func httpGet(_ url: String, headers: [String: String]) throws -> (status: Int, body: Data) {
+final class LockedValue<Value> {
+    private let lock = NSLock()
+    private var value: Value?
+    func store(_ value: Value) { lock.lock(); defer { lock.unlock() }; self.value = value }
+    func load() -> Value? { lock.lock(); defer { lock.unlock() }; return value }
+}
+
+func httpGet(_ url: String, headers: [String: String], using client: URLSession? = nil,
+             timeout: TimeInterval = 32) throws -> (status: Int, body: Data) {
     guard let target = URL(string: url) else { throw UsageError("Bad URL \(url)") }
     var request = URLRequest(url: target)
     request.cachePolicy = .reloadIgnoringLocalCacheData
     for (name, value) in headers { request.setValue(value, forHTTPHeaderField: name) }
-    var response: (Int, Data)?
+    let response = LockedValue<(Int, Data)>()
     let done = DispatchSemaphore(value: 0)
-    session.dataTask(with: request) { data, reply, _ in
-        if let http = reply as? HTTPURLResponse { response = (http.statusCode, data ?? Data()) }
+    let task = (client ?? session).dataTask(with: request) { data, reply, error in
+        if error == nil, let http = reply as? HTTPURLResponse { response.store((http.statusCode, data ?? Data())) }
         done.signal()
-    }.resume()
-    done.wait()
-    guard let (status, body) = response else {
+    }
+    task.resume()
+    let wait = timeout.isFinite && timeout > 0 ? timeout : 32
+    guard done.wait(timeout: .now() + wait) == .success else {
+        task.cancel()
+        throw UsageError("Usage check timed out", hint: "The next automatic check will retry.")
+    }
+    guard let (status, body) = response.load() else {
         throw UsageError("Can't reach \(target.host ?? url)", hint: "Check the internet connection.")
     }
     return (status, body)
 }
 
-/// A generic-password secret, read with /usr/bin/security. Claude Code saves
-/// its login with that same tool, so macOS hands it over without a prompt.
+/// A generic-password secret, read with /usr/bin/security. Keychain access
+/// remains subject to the user's macOS permissions; a blocked read is bounded.
 func keychainSecret(service: String) -> Data? {
     let process = Process()
     process.executableURL = URL(fileURLWithPath: "/usr/bin/security")
@@ -129,8 +147,20 @@ func keychainSecret(service: String) -> Data? {
     let output = Pipe()
     process.standardOutput = output
     process.standardError = FileHandle.nullDevice
+    let finished = DispatchSemaphore(value: 0)
+    process.terminationHandler = { _ in finished.signal() }
     do { try process.run() } catch { return nil }
-    let data = output.fileHandleForReading.readDataToEndOfFile()
-    process.waitUntilExit()
+    // The credential record is small, but pipe capacity must not be assumed.
+    let bytes = LockedValue<Data>()
+    let drained = DispatchSemaphore(value: 0)
+    DispatchQueue.global(qos: .utility).async {
+        bytes.store(output.fileHandleForReading.readDataToEndOfFile())
+        drained.signal()
+    }
+    guard finished.wait(timeout: .now() + 10) == .success else {
+        process.terminate()
+        return nil
+    }
+    guard drained.wait(timeout: .now() + 1) == .success, let data = bytes.load() else { return nil }
     return process.terminationStatus == 0 && !data.isEmpty ? data : nil
 }

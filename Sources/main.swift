@@ -5,10 +5,16 @@ import AppKit
 
 handleCLIFlags()   // --once / --dump-config / --render-preview / --render-settings exit here
 
-// Single instance: if another copy is already in the menu bar, hand it --settings and bow out.
-let myPid = ProcessInfo.processInfo.processIdentifier
-if NSRunningApplication.runningApplications(withBundleIdentifier: Bundle.main.bundleIdentifier ?? "com.sueun.aicreditsbar")
-    .contains(where: { $0.processIdentifier != myPid }) {
+// Single instance, including simultaneous launches before AppKit registers a process.
+let instance: AppInstance?
+do {
+    let cache = try FileManager.default.url(for: .cachesDirectory, in: .userDomainMask, appropriateFor: nil, create: true)
+    instance = try AppInstance.acquire(at: cache.appendingPathComponent("com.sueun.aicreditsbar/instance.lock").path)
+} catch {
+    fputs("Cannot acquire AICreditsBar instance lock: \(error.localizedDescription)\n", stderr)
+    exit(1)
+}
+if instance == nil {
     if CommandLine.arguments.contains("--settings") {
         DistributedNotificationCenter.default().postNotificationName(showSettingsNotification, object: nil, userInfo: nil,
                                                                      deliverImmediately: true)
@@ -21,3 +27,4 @@ app.setActivationPolicy(.accessory)
 let delegate = AppDelegate()
 app.delegate = delegate
 app.run()
+withExtendedLifetime(instance) {}

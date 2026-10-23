@@ -5,6 +5,9 @@ import AppKit
 final class SettingsWindow: NSObject, NSWindowDelegate, NSTextFieldDelegate {
     private(set) var window: NSWindow?
     var onChange: () -> Void = {}
+    var onEnableNotifications: () -> Void = {}
+    var onTestAlerts: () -> Void = {}
+    var onShow: () -> Void = {}
 
     private let modes = [("min", "Lowest remaining"), ("5h", "5-hour window"), ("week", "Weekly window")]
     private let modePopup = NSPopUpButton()
@@ -13,6 +16,9 @@ final class SettingsWindow: NSObject, NSWindowDelegate, NSTextFieldDelegate {
     private let refreshField = NSTextField()
     let warnField = NSTextField()   // internal for tests
     private let criticalField = NSTextField()
+    private let lowAlertBox = NSButton(checkboxWithTitle: "At or below 20% remaining · once per window", target: nil, action: nil)
+    private let recoveryBox = NSButton(checkboxWithTitle: "When the provider confirms quota recovery", target: nil, action: nil)
+    private let notificationStatus = NSTextField(wrappingLabelWithString: "Enable notifications to receive alerts.")
     private let cardWidth: CGFloat = 420
 
     func show() {
@@ -22,6 +28,7 @@ final class SettingsWindow: NSObject, NSWindowDelegate, NSTextFieldDelegate {
         window?.center()
         window?.makeKeyAndOrderFront(nil)
         window?.makeFirstResponder(nil)   // open without a text field already selected
+        onShow()
     }
 
     private func build() {
@@ -34,7 +41,7 @@ final class SettingsWindow: NSObject, NSWindowDelegate, NSTextFieldDelegate {
         win.delegate = self
 
         modePopup.addItems(withTitles: modes.map { $0.1 })
-        for control in [modePopup, codexBox, claudeBox] as [NSControl] {
+        for control in [modePopup, codexBox, claudeBox, lowAlertBox, recoveryBox] as [NSControl] {
             control.target = self
             control.action = #selector(changed)
         }
@@ -54,6 +61,12 @@ final class SettingsWindow: NSObject, NSWindowDelegate, NSTextFieldDelegate {
             form([("Show", modePopup), ("Providers", providers), ("Check every", refresh)]),
             note("Also checks when the menu opens (at most every 2 minutes) and after the Mac wakes. The usage services rate-limit frequent checks.")])
         let warningCard = card("exclamationmark.triangle.fill", "Warnings", [warnings])
+        let enable = NSButton(title: "Enable Notifications", target: self, action: #selector(enableNotifications))
+        let test = NSButton(title: "Test Alerts", target: self, action: #selector(testAlerts))
+        notificationStatus.font = .systemFont(ofSize: 11)
+        notificationStatus.textColor = .secondaryLabelColor
+        notificationStatus.preferredMaxLayoutWidth = cardWidth - 32
+        let alertsCard = card("bell", "Notifications", [lowAlertBox, recoveryBox, row([enable, test]), notificationStatus])
         let sourcesCard = card("checkmark.shield.fill", "Data", [
             note("Codex — the official usage API, using your Codex CLI login (~/.codex/auth.json)."),
             note("Claude — the official usage API, using your Claude Code login (macOS Keychain)."),
@@ -66,7 +79,7 @@ final class SettingsWindow: NSObject, NSWindowDelegate, NSTextFieldDelegate {
         footer.distribution = .fill
         footer.widthAnchor.constraint(equalToConstant: cardWidth).isActive = true
 
-        let column = NSStackView(views: [menuBarCard, warningCard, sourcesCard, footer])
+        let column = NSStackView(views: [menuBarCard, warningCard, alertsCard, sourcesCard, footer])
         column.orientation = .vertical
         column.alignment = .centerX
         column.spacing = 14
@@ -95,12 +108,16 @@ final class SettingsWindow: NSObject, NSWindowDelegate, NSTextFieldDelegate {
         refreshField.stringValue = String(Int(Cfg.refreshInterval / 60))
         warnField.stringValue = String(Cfg.warnBelow)
         criticalField.stringValue = String(Cfg.criticalBelow)
+        lowAlertBox.state = Cfg.lowAlerts ? .on : .off
+        recoveryBox.state = Cfg.recoveryAlerts ? .on : .off
     }
 
     @objc private func changed() {
         Cfg.displayMode = modes[max(0, modePopup.indexOfSelectedItem)].0
         Cfg.setShown(.codex, codexBox.state == .on)
         Cfg.setShown(.claude, claudeBox.state == .on)
+        Cfg.lowAlerts = lowAlertBox.state == .on
+        Cfg.recoveryAlerts = recoveryBox.state == .on
         if let minutes = Double(refreshField.stringValue) { Cfg.refreshInterval = minutes * 60 }
         if let percent = Int(warnField.stringValue) { Cfg.warnBelow = min(100, max(0, percent)) }
         if let percent = Int(criticalField.stringValue) { Cfg.criticalBelow = min(100, max(0, percent)) }
@@ -113,6 +130,9 @@ final class SettingsWindow: NSObject, NSWindowDelegate, NSTextFieldDelegate {
     }
 
     @objc private func resetDefaults() { Cfg.resetAll(); load(); onChange() }
+    @objc private func enableNotifications() { onEnableNotifications() }
+    @objc private func testAlerts() { onTestAlerts() }
+    func setNotificationStatus(_ text: String) { notificationStatus.stringValue = text }
     @objc func closeWindow() {
         window?.makeFirstResponder(nil)   // commits a number typed without pressing Return
         window?.orderOut(nil)

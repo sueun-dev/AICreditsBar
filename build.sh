@@ -3,6 +3,7 @@
 set -euo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
 APP="$HERE/AICreditsBar.app"
+source "$HERE/scripts/app-process.sh"
 STAGING="$(mktemp -d "$HERE/.build-XXXXXX")"
 STAGED_APP="$STAGING/AICreditsBar.app"
 CONTENTS="$STAGED_APP/Contents"
@@ -22,7 +23,7 @@ echo "compiling…"
 # so the binary is portable and the compiler flags any too-new API at build time.
 ARCH="$(uname -m)"
 /usr/bin/swiftc -swift-version 5 -O -target "${ARCH}-apple-macos11" \
-  -framework AppKit \
+  -framework AppKit -framework UserNotifications \
   -o "$CONTENTS/MacOS/aicreditsbar" "$HERE"/Sources/*.swift
 
 cat > "$CONTENTS/Info.plist" <<'PLIST'
@@ -60,12 +61,12 @@ echo "Built $APP"
 # the exact (ad-hoc signed) binary it was registered with and refuses to launch a
 # rebuilt one, so the login item is re-registered rather than just relaunched.
 PLIST="$HOME/Library/LaunchAgents/com.sueun.aicreditsbar.plist"
-if [ -f "$PLIST" ] && grep -q "$APP/" "$PLIST"; then
+if [ -f "$PLIST" ] && [ "$(/usr/libexec/PlistBuddy -c 'Print :ProgramArguments:0' "$PLIST" 2>/dev/null)" = "$APP/Contents/MacOS/aicreditsbar" ]; then
   launchctl bootout "gui/$(id -u)/com.sueun.aicreditsbar" 2>/dev/null || true
-  pkill -x aicreditsbar 2>/dev/null || true   # a copy started with `open` would keep the new one out
+  stop_app "$APP/Contents/MacOS/aicreditsbar" || true
   launchctl bootstrap "gui/$(id -u)" "$PLIST" 2>/dev/null || { sleep 1; launchctl bootstrap "gui/$(id -u)" "$PLIST"; }
   echo "Restarted the login item on the new build"
-elif pkill -x aicreditsbar 2>/dev/null; then
+elif stop_app "$APP/Contents/MacOS/aicreditsbar"; then
   sleep 1
   open "$APP"
   echo "Restarted AICreditsBar on the new build"

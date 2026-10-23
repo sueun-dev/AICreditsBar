@@ -1,0 +1,156 @@
+{
+  "date_local": "2026-10-22",
+  "environment": {
+    "os": "27.0",
+    "architecture": "arm64",
+    "compiler": "Apple Swift version 6.4 (swiftlang-6.4.0.34.1 clang-2100.3.34.1)\nTarget: arm64-apple-macosx27.0.0"
+  },
+  "base_commit": "9bf0d143ce95f2a49c5ad15eff24cd684fd43cfe",
+  "source_sha256": {
+    "Sources/AppDelegate.swift": "20b02412095bde880da1cb63f3efbd9bada2f5b5e0d6a214e3d2a24fa125d5cb",
+    "Sources/AppInstance.swift": "55672b84f0a4f30d98d169bfeb3d48f738269a9152cafb5267e073ddc5b3665a",
+    "Sources/CLI.swift": "83a2e9da3e81b983f9086c175b686f41fca73a849c973dd87ae77c91f2f375b3",
+    "Sources/Claude.swift": "4700dd6a3c5d461d743bb7d8ec04c1dc77c2da6e7f4142e03d77dc42eea3eb25",
+    "Sources/Codex.swift": "622a39e6df640ac2685db51be72435f2f7e80e60faa50f55d6c06d7c49ffaa2d",
+    "Sources/Config.swift": "bbc1ca35ec17d9121ca53160c193981627b2c2a6c803644bf4a29d4b1d7bf87e",
+    "Sources/DisplaySchedule.swift": "bead41207f6a5508dff0931b0d6aa34cd4cf90b8569560a95f584bc0e3db86ff",
+    "Sources/Models.swift": "e0833767241c7cdd7712d464ab8fbb4a968df16eb774ccbc06fdd08cdda8a3f7",
+    "Sources/NotificationController.swift": "53597c52fbb853c3b9a95715b791a71322db16bfadfdcf96c6a06d7268f7dc29",
+    "Sources/Preview.swift": "a34bd1db7c7436a1677b9e925bf52bd84874bed10131e6e3ad85a283e68e3b58",
+    "Sources/ProviderCardView.swift": "2971d370cc3d0724555b3eb61c2e15e50b6f9a405a599d9bf71dd312478c5e97",
+    "Sources/QuotaAlerts.swift": "dc6efd603f3dc96a64b3c20a0e207e401b105047d230055034ed74f93c3de998",
+    "Sources/RefreshController.swift": "104ae3a6b618188a15f5e03bebe133820a987d40bd414210ac1bb9497f312859",
+    "Sources/Rendering.swift": "e14725de078c0bbd5ea23164b48ca2f1017e9537ddbc4c649459f55911965c4a",
+    "Sources/Settings.swift": "c4599de85aa4fd8e65467d46d6e50f0ce62682749801c0d4562fee5311115589",
+    "Sources/Support.swift": "185a26495f1526697967843dc976ea6fdbf6f9278ea0a4f70ae3b86282171525",
+    "Sources/main.swift": "d813877d0f449e5a1631f430579515b887ce7385ade327394728181dd8ee8f73"
+  },
+  "binary_sha256": "40f57c9c2b4c29365859169227d8b092782754de6343d084e1c69a1ed1acb8a6",
+  "tests": {
+    "unit_assertions_passed": 207,
+    "unit_assertions_failed": 0,
+    "e2e_scenarios_passed": 5,
+    "thread_sanitizer": "207 assertions passed, no sanitizer report",
+    "address_sanitizer": "207 assertions passed, no sanitizer report",
+    "warnings_as_errors_typecheck": "passed",
+    "shell_syntax": "passed",
+    "codesign_strict": "passed",
+    "quota_sequence": {
+      "readings": 10100,
+      "low_alerts": 100,
+      "recovery_alerts": 99,
+      "checkpoints": 1
+    },
+    "restart_scoping": "absolute and relative paths, spaces, separate checkout preserved",
+    "simultaneous_launch": {
+      "simultaneous_launches": 8,
+      "remaining_instances": 1,
+      "other_exit_codes": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "restart_after_forced_exit": true
+    }
+  },
+  "live_app": {
+    "notification_permission": "Allowed by macOS, confirmed in actual Settings window",
+    "notification_delivery": "Both distinct sample low/recovery alerts confirmed in UNUserNotificationCenter.getDeliveredNotifications, using this test run identifier",
+    "notification_labels": "Test and Sample data; no real quota consumed or alert history modified",
+    "banner_visibility": "not visually confirmed; delivery to Notification Center was confirmed",
+    "automatic_refresh": {
+      "manual_refresh_pressed": false,
+      "interval_seconds_during_check": 60,
+      "before": {
+        "utc": "2026-10-23T01:50:55.882709+00:00",
+        "interval": 60.0,
+        "fetchedAt": {
+          "lastReadingClaude": 1792720122.2854052,
+          "lastReadingCodex": 1792720122.373668
+        }
+      },
+      "after": {
+        "utc": "2026-10-23T01:52:25.318613+00:00",
+        "interval": 60.0,
+        "fetchedAt": {
+          "lastReadingClaude": 1792720306.7059221,
+          "lastReadingCodex": 1792720306.7103171
+        }
+      },
+      "both_provider_timestamps_advanced": true,
+      "restored_interval_seconds": 300
+    },
+    "settings_visual_review": "Native macOS Settings screenshot inspected; controls and status fit without clipping",
+    "menu_event_tracking": "refresh timer/result delivery exercised in AppKit eventTracking run-loop mode by automated tests"
+  },
+  "resources": {
+    "baseline_idle_60s": {
+      "pid": 1556,
+      "seconds": 60.003,
+      "cpu_seconds": 0.000928746,
+      "cpu_percent_one_core": 0.0015478444380563267,
+      "idle_wakeups": 0,
+      "interrupt_wakeups": 37,
+      "disk_read_bytes": 0,
+      "disk_write_bytes": 0,
+      "logical_write_bytes": 0,
+      "resident_mib_max": 59.09375,
+      "physical_footprint_mib_max": 34.094642639160156,
+      "gpu": "not measured",
+      "battery_life": "not measured"
+    },
+    "updated_idle_60s": {
+      "pid": 82919,
+      "seconds": 60.005,
+      "cpu_seconds": 0.002326565,
+      "cpu_percent_one_core": 0.0038772823534689417,
+      "idle_wakeups": 1,
+      "interrupt_wakeups": 51,
+      "disk_read_bytes": 0,
+      "disk_write_bytes": 0,
+      "logical_write_bytes": 0,
+      "resident_mib_max": 113.0625,
+      "physical_footprint_mib_max": 43.32917785644531,
+      "gpu": "not measured",
+      "battery_life": "not measured"
+    },
+    "updated_75s_including_refresh_and_settings": {
+      "pid": 82919,
+      "seconds": 75.005,
+      "cpu_seconds": 0.005983224,
+      "cpu_percent_one_core": 0.007977093076419738,
+      "idle_wakeups": 4,
+      "interrupt_wakeups": 353,
+      "disk_read_bytes": 49152,
+      "disk_write_bytes": 0,
+      "logical_write_bytes": 0,
+      "resident_mib_max": 125.78125,
+      "physical_footprint_mib_max": 47.422950744628906,
+      "gpu": "not measured",
+      "battery_life": "not measured"
+    },
+    "app_bundle_allocated_kib": 524,
+    "activity_monitor_gpu_snapshot": {
+      "gpu_percent": 0.0,
+      "gpu_time_display": "0.00",
+      "scope": "main app only; excludes WindowServer rendering"
+    },
+    "activity_monitor_energy_snapshot": {
+      "energy_impact": 0.1,
+      "on_ac_power": true,
+      "scope": "macOS relative metric, not watts or battery duration"
+    }
+  },
+  "limits": [
+    "These finite checks cannot establish zero bugs or universally minimal resource usage.",
+    "CPU/disk/memory counters are for the app process; OS helpers, networking daemons and WindowServer are not attributed.",
+    "Idle/resource samples are short and include normal OS variance. Baseline was a long-running old process; updated process had Settings and notification UI exercised, so this is not a controlled memory improvement comparison.",
+    "No full battery discharge, multi-hour endurance, or physical sleep/wake cycle was performed.",
+    "No real paid-account quota was deliberately exhausted. Alert transitions use labeled samples and deterministic fixtures; live fetches use the actual providers.",
+    "Runtime testing was on this Apple Silicon macOS system. macOS 11 API availability was compiler checked; older macOS and Intel runtime behavior were not tested."
+  ]
+}

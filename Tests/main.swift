@@ -247,29 +247,34 @@ pump(until: { arrivals.contains(.claude) })
 check(arrivals.contains(.claude), "the slow provider still reports")
 
 var fetched = 0
-let gated = RefreshController(sources: [.init(provider: .codex, fetch: { fetched += 1; return reading(left: 3) })])
+let gated = RefreshController(sources: [.init(provider: .codex, fetch: { reading(left: 3) })])
+gated.onResult = { _, _ in fetched += 1 }
 gated.isEnabled = { _ in false }
 gated.refresh()
 gated.isEnabled = { _ in true }
 gated.refresh(minimumGap: 20)
 pump(until: { fetched == 1 }, timeout: 0.3)
-eq(fetched, 0, "a disabled provider isn't fetched, and minimumGap skips a just-run refresh")
-gated.refresh()
-pump(until: { fetched == 1 })
-eq(fetched, 1, "a normal refresh fetches")
+eq(fetched, 1, "a skipped disabled provider does not throttle its first enabled refresh")
+gated.refresh(minimumGap: 20)
+pump(until: { false }, timeout: 0.05)
+eq(fetched, 1, "minimumGap is tracked per provider's actual request")
 
 // After an HTTP 429 the provider is left alone (no matter how often refresh is asked for);
 // other providers carry on, and other errors don't pause anything.
 var limitedCalls = 0, otherCalls = 0
 let limited = RefreshController(sources: [
-    .init(provider: .claude, fetch: { limitedCalls += 1; throw UsageError("429", rateLimited: true) }),
-    .init(provider: .codex, fetch: { otherCalls += 1; throw UsageError("offline") })])
+    .init(provider: .claude, fetch: { throw UsageError("429", rateLimited: true) }),
+    .init(provider: .codex, fetch: { throw UsageError("offline") })])
 var limitedResults = 0
-limited.onResult = { _, _ in limitedResults += 1 }
+limited.onResult = { provider, _ in
+    limitedResults += 1
+    if provider == .claude { limitedCalls += 1 } else { otherCalls += 1 }
+}
 for _ in 0..<5 {
     let before = limitedResults
+    let expected = limitedCalls == 0 ? 2 : 1
     limited.refresh()
-    pump(until: { limitedResults >= before + (limitedCalls == 0 ? 2 : 1) }, timeout: 1)
+    pump(until: { limitedResults >= before + expected }, timeout: 1)
 }
 eq(limitedCalls, 1, "a rate-limited provider isn't asked again during its pause")
 eq(otherCalls, 5, "a plain failure doesn't pause the other provider")
@@ -328,6 +333,8 @@ Cfg.d.set("secret", forKey: "claudeSessionKey")
 Cfg.d.set("org", forKey: "claudeOrgUuid")
 Cfg.removeLegacyKeys()
 check(Cfg.d.object(forKey: "claudeSessionKey") == nil && Cfg.d.object(forKey: "claudeOrgUuid") == nil, "version-1 session cookie is removed")
+
+runRegressionTests(now: now)
 
 let summary = "\(passed) passed, \(failures) failed"
 print(failures == 0 ? "✓ unit: \(summary)" : "✗ unit: \(summary)")
