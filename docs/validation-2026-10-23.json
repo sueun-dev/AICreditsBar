@@ -1,0 +1,2053 @@
+{
+  "date_utc": "2026-10-23",
+  "tested_commit": "cd257615f68c5a7885a587e57b691735bb305d32",
+  "collection_tool": "Tests/measure_resources.py at cd25761; CPU values corrected after collection with the measured Mach timebase 125/3. Raw collection files were retained locally.",
+  "calibrated_tool_commit": "a46559ae8fdd85491199837e86364e32d12546f5",
+  "environment": {
+    "os": "27.0",
+    "architecture": "arm64",
+    "processor": "Apple M5 Max"
+  },
+  "source_sha256": {
+    "Sources/AppDelegate.swift": "20b02412095bde880da1cb63f3efbd9bada2f5b5e0d6a214e3d2a24fa125d5cb",
+    "Sources/AppInstance.swift": "55672b84f0a4f30d98d169bfeb3d48f738269a9152cafb5267e073ddc5b3665a",
+    "Sources/CLI.swift": "83a2e9da3e81b983f9086c175b686f41fca73a849c973dd87ae77c91f2f375b3",
+    "Sources/Claude.swift": "4700dd6a3c5d461d743bb7d8ec04c1dc77c2da6e7f4142e03d77dc42eea3eb25",
+    "Sources/Codex.swift": "622a39e6df640ac2685db51be72435f2f7e80e60faa50f55d6c06d7c49ffaa2d",
+    "Sources/Config.swift": "bbc1ca35ec17d9121ca53160c193981627b2c2a6c803644bf4a29d4b1d7bf87e",
+    "Sources/DisplaySchedule.swift": "bead41207f6a5508dff0931b0d6aa34cd4cf90b8569560a95f584bc0e3db86ff",
+    "Sources/Models.swift": "e0833767241c7cdd7712d464ab8fbb4a968df16eb774ccbc06fdd08cdda8a3f7",
+    "Sources/NotificationController.swift": "97cc423ae7ed1a61f544bd9c8be034eb075d09d16e79199b353cba3a493b1051",
+    "Sources/Preview.swift": "a34bd1db7c7436a1677b9e925bf52bd84874bed10131e6e3ad85a283e68e3b58",
+    "Sources/ProviderCardView.swift": "2971d370cc3d0724555b3eb61c2e15e50b6f9a405a599d9bf71dd312478c5e97",
+    "Sources/QuotaAlerts.swift": "3d51402387e9bccc737096129bf10e8cea1b68498b0d9f97e888a11ee7e836df",
+    "Sources/RefreshController.swift": "104ae3a6b618188a15f5e03bebe133820a987d40bd414210ac1bb9497f312859",
+    "Sources/Rendering.swift": "e14725de078c0bbd5ea23164b48ca2f1017e9537ddbc4c649459f55911965c4a",
+    "Sources/Settings.swift": "c4599de85aa4fd8e65467d46d6e50f0ce62682749801c0d4562fee5311115589",
+    "Sources/Support.swift": "185a26495f1526697967843dc976ea6fdbf6f9278ea0a4f70ae3b86282171525",
+    "Sources/main.swift": "d813877d0f449e5a1631f430579515b887ce7385ade327394728181dd8ee8f73"
+  },
+  "binary_sha256": "1fead906c9754deae9d61be6fc838236f7c02ea73885c510423192a68e183747",
+  "fixed_regressions": [
+    "A late partial response could discard newer window history and re-arm warnings.",
+    "A temporarily omitted quota window could warn again when it returned.",
+    "A delayed notification permission callback could schedule an obsolete low-quota alert."
+  ],
+  "tests": {
+    "before_fix_regression_run": {
+      "passed": 207,
+      "failed": 3
+    },
+    "unit_assertions_passed": 228,
+    "unit_assertions_failed": 0,
+    "e2e_scenarios_passed": 5,
+    "process_restart_scoping": "passed",
+    "thread_sanitizer": "228 assertions passed; no sanitizer report; warnings treated as errors",
+    "address_sanitizer": "228 assertions passed; no sanitizer report; warnings treated as errors",
+    "intel_macos11_cross_compile": "passed with warnings as errors; Mach-O x86_64 executable produced",
+    "intel_runtime": "not tested: arch -x86_64 /usr/bin/true failed with Bad CPU type in executable",
+    "codesign_strict": "passed for the installed build",
+    "measurement_helper": "2-second live-process smoke check and reaped-child exit check passed; interrupted run reports completed=false",
+    "cpu_measurement_calibration": {
+      "reference_process_cpu_seconds": 1.000001,
+      "raw_mach_tick_delta": 24000462,
+      "mach_timebase": {
+        "numer": 125,
+        "denom": 3
+      },
+      "converted_cpu_seconds": 1.00001925,
+      "automated_regression": "Independent process CPU-clock comparison and process-exit tests both passed.",
+      "before_fix": "The independent CPU-clock comparison fails against cd25761 with measured/reference ratio 0.023985413704673195; the process-exit test passes.",
+      "primary_source": "https://github.com/apple-oss-distributions/xnu/blob/main/osfmk/kern/task.c#L6387-L6392"
+    }
+  },
+  "live_app": {
+    "notification_delivery": "Both labeled sample low/recovery notifications confirmed in Notification Center for the same test run, observed in actual Settings.",
+    "notification_banner_visibility": "not visually confirmed",
+    "settings_visual_review": "Controls and delivery status fit without clipping in the native Settings window.",
+    "settings_interactions_during_measurement": [
+      {
+        "at_utc": "2026-10-23T02:41:51.350Z",
+        "action": "settings_open",
+        "observation": "Actual Settings controls responded; providers enabled, 5-minute interval, notification permission allowed."
+      },
+      {
+        "at_utc": "2026-10-23T02:43:50.231Z",
+        "action": "settings_close"
+      },
+      {
+        "at_utc": "2026-10-23T03:34:06.446424+00:00",
+        "action": "settings_requested_while_locked",
+        "observation": "The CLI show-settings request returned successfully, but CUA reported that the Mac was locked and automatic unlock failed. Window visibility and interaction were not verified."
+      }
+    ],
+    "post_run_ui_check": {
+      "utc": "2026-10-23T03:56:39.264Z",
+      "settings_responsive": true,
+      "sample_low_and_recovery_delivery": "Both test alerts reached Notification Center; observed in actual Settings after the endurance run."
+    },
+    "one_hour_process_continuity": "The same PID and kernel process start identity were retained throughout the measurement.",
+    "manual_refresh_by_test": false,
+    "settings_changes_by_test": false,
+    "observed_refresh_intervals_seconds": [
+      300.0
+    ],
+    "providers_enabled_in_every_sample": true,
+    "automatic_refresh": {
+      "Codex": {
+        "distinct_successful_readings": 14,
+        "automatic_refreshes_after_initial_sample": 13,
+        "minimum_seconds_between_readings": 76.36973595619202,
+        "maximum_seconds_between_readings": 2131.2116799354553,
+        "fetched_at": [
+          1792722052.458856,
+          1792722382.5049958,
+          1792722682.4077702,
+          1792722982.449391,
+          1792723282.4458609,
+          1792723554.689351,
+          1792725685.901031,
+          1792725985.9741821,
+          1792726285.851233,
+          1792726362.220969,
+          1792726585.894275,
+          1792726885.893996,
+          1792727185.865608,
+          1792727486.009686
+        ]
+      },
+      "Claude": {
+        "distinct_successful_readings": 14,
+        "automatic_refreshes_after_initial_sample": 13,
+        "minimum_seconds_between_readings": 76.32301187515259,
+        "maximum_seconds_between_readings": 2131.2470293045044,
+        "fetched_at": [
+          1792722052.174231,
+          1792722382.2581081,
+          1792722682.287088,
+          1792722983.526367,
+          1792723282.286354,
+          1792723554.5818539,
+          1792725685.8288832,
+          1792725985.7885718,
+          1792726285.79845,
+          1792726362.1214619,
+          1792726586.004919,
+          1792726885.821744,
+          1792727185.8381581,
+          1792727485.827962
+        ]
+      }
+    },
+    "observed_system_sleep_events": [
+      {
+        "timestamp": "2026-10-22 21:46:21 -0500",
+        "state": "Sleep",
+        "sleep_reason": "Software Sleep",
+        "source": "pmset -g log"
+      },
+      {
+        "timestamp": "2026-10-22 21:46:59 -0500",
+        "state": "DarkWake",
+        "sleep_reason": null,
+        "source": "pmset -g log"
+      },
+      {
+        "timestamp": "2026-10-22 21:47:10 -0500",
+        "state": "Sleep",
+        "sleep_reason": "Maintenance Sleep",
+        "source": "pmset -g log"
+      },
+      {
+        "timestamp": "2026-10-22 21:53:41 -0500",
+        "state": "DarkWake",
+        "sleep_reason": null,
+        "source": "pmset -g log"
+      },
+      {
+        "timestamp": "2026-10-22 21:56:41 -0500",
+        "state": "Sleep",
+        "sleep_reason": "Maintenance Sleep",
+        "source": "pmset -g log"
+      },
+      {
+        "timestamp": "2026-10-22 22:05:12 -0500",
+        "state": "DarkWake",
+        "sleep_reason": null,
+        "source": "pmset -g log"
+      },
+      {
+        "timestamp": "2026-10-22 22:05:42 -0500",
+        "state": "Sleep",
+        "sleep_reason": "Maintenance Sleep",
+        "source": "pmset -g log"
+      },
+      {
+        "timestamp": "2026-10-22 22:20:42 -0500",
+        "state": "DarkWake",
+        "sleep_reason": null,
+        "source": "pmset -g log"
+      },
+      {
+        "timestamp": "2026-10-22 22:32:36 -0500",
+        "state": "DarkWake",
+        "sleep_reason": null,
+        "source": "pmset -g log"
+      }
+    ],
+    "runtime_diagnostics": {
+      "error_or_fault_log_entry_count": 22,
+      "messages": [
+        {
+          "subsystem": "com.apple.BaseBoard",
+          "message": "Unable to obtain a task name port right for pid 418: (os/kern) failure (0x5)",
+          "count": 1
+        },
+        {
+          "subsystem": "com.apple.runtime-issues",
+          "message": "Invalid view geometry: width is negative.",
+          "count": 6
+        },
+        {
+          "subsystem": "com.apple.runtime-issues",
+          "message": "Invalid view geometry: height is negative.",
+          "count": 6
+        },
+        {
+          "subsystem": "com.apple.AppKit",
+          "message": "<private>",
+          "count": 3
+        },
+        {
+          "subsystem": "com.apple.FrontBoard",
+          "message": "[com.apple.appkit.status-items:<scene-id>-Variant[2]] No matching scene to invalidate for this identity.",
+          "count": 1
+        },
+        {
+          "subsystem": "com.apple.BaseBoard",
+          "message": "[BSBlockSentinel:FBSWorkspaceScenesClient] failed!",
+          "count": 3
+        },
+        {
+          "subsystem": "com.apple.FrontBoard",
+          "message": "[com.apple.appkit.status-items:<scene-id>-Variant[1]] No matching scene to invalidate for this identity.",
+          "count": 1
+        },
+        {
+          "subsystem": "com.apple.FrontBoard",
+          "message": "[com.apple.appkit.status-items:<scene-id>-Variant[3]] No matching scene to invalidate for this identity.",
+          "count": 1
+        }
+      ],
+      "geometry_symbolicated_stack": [
+        "_NSViewValidateGeometry (in AppKit) + 656",
+        "NSViewValidateSize (in AppKit) + 32",
+        "-[NSView setFrameSize:] (in AppKit) + 64",
+        "-[NSThemeFrame _positionSharingIndicator] (in AppKit) + 64",
+        "-[NSWindowSharingSessionRecipientIndicator invalidateIntrinsicContentSize] (in AppKit) + 80",
+        "-[NSView _viewDidChangeAppearance:] (in AppKit) + 248",
+        "-[NSView _setSuperview:] (in AppKit) + 1412",
+        "-[NSView addSubview:] (in AppKit) + 180",
+        "-[NSThemeFrame addTitlebarSubview:] (in AppKit) + 80",
+        "-[NSThemeFrame _updateButtons] (in AppKit) + 2096",
+        "-[NSWindow _updateButtonsForWindowSharingSession] (in AppKit) + 28",
+        "-[NSWindow _setIsSelectivelyShared:] (in AppKit) + 420",
+        "___windowSelectiveSharingStateChangedNotification_block_invoke (in AppKit) + 292",
+        "_withUncaughtExceptionHandler (in AppKit) + 28",
+        "_windowSelectiveSharingStateChangedNotification (in AppKit) + 112",
+        "_DPSBlockUntilNextEventMatchingListInMode (in AppKit) + 292",
+        "_DPSNextEvent (in AppKit) + 580",
+        "-[NSApplication(NSEventRouting) _nextEventMatchingEventMask:untilDate:inMode:dequeue:] (in AppKit) + 780",
+        "-[NSApplication(NSEventRouting) nextEventMatchingMask:untilDate:inMode:dequeue:] (in AppKit) + 292",
+        "-[NSApplication run] (in AppKit) + 396"
+      ],
+      "independent_settings_probe": {
+        "exit_code": 0,
+        "matching_runtime_issue_count": 0
+      },
+      "interpretation": "The geometry stack enters AppKit window-sharing indicator code. This does not establish a defect in the custom settings layout. The OS-path diagnostics were not suppressed or claimed to be fixed."
+    }
+  },
+  "resources": {
+    "one_hour_final_build": {
+      "pid": 91886,
+      "requested_seconds": 3600,
+      "seconds": 3600.008,
+      "completed": true,
+      "error": null,
+      "started_at_utc": "2026-10-23T02:21:03.971239+00:00",
+      "reported_at_utc": "2026-10-23T03:51:35.221106+00:00",
+      "sample_interval_seconds": 15,
+      "sample_count": 241,
+      "cpu_seconds": 1.7781687499999999,
+      "cpu_percent_one_core": 0.04939347321540414,
+      "idle_wakeups": 184,
+      "interrupt_wakeups": 1897,
+      "disk_read_bytes": 372736,
+      "disk_write_bytes": 0,
+      "logical_write_bytes": 69640,
+      "resident_mib_start": 64.125,
+      "resident_mib_end": 104.390625,
+      "resident_mib_max": 119.890625,
+      "physical_footprint_mib_start": 19.891448974609375,
+      "physical_footprint_mib_end": 42.48535919189453,
+      "physical_footprint_mib_max": 45.40723419189453,
+      "timeline": [
+        {
+          "seconds": 15.002,
+          "cpu_percent_one_core": 0.16637138730130974,
+          "resident_mib": 64.03125,
+          "physical_footprint_mib": 19.828948974609375,
+          "disk_write_bytes": 0
+        },
+        {
+          "seconds": 30.002,
+          "cpu_percent_one_core": 0.32342892162553494,
+          "resident_mib": 57.65625,
+          "physical_footprint_mib": 19.969573974609375,
+          "disk_write_bytes": 0
+        },
+        {
+          "seconds": 45.007,
+          "cpu_percent_one_core": 0.007099543063287427,
+          "resident_mib": 57.609375,
+          "physical_footprint_mib": 19.969573974609375,
+          "disk_write_bytes": 0
+        },
+        {
+          "seconds": 60.009,
+          "cpu_percent_one_core": 0.15294980912957928,
+          "resident_mib": 57.71875,
+          "physical_footprint_mib": 20.094573974609375,
+          "disk_write_bytes": 0
+        },
+        {
+          "seconds": 75.011,
+          "cpu_percent_one_core": 0.40152722157622245,
+          "resident_mib": 58.09375,
+          "physical_footprint_mib": 20.141448974609375,
+          "disk_write_bytes": 0
+        },
+        {
+          "seconds": 90.016,
+          "cpu_percent_one_core": 0.5817110609938133,
+          "resident_mib": 58.078125,
+          "physical_footprint_mib": 20.282073974609375,
+          "disk_write_bytes": 0
+        },
+        {
+          "seconds": 105.018,
+          "cpu_percent_one_core": 0.005979571175041128,
+          "resident_mib": 57.6875,
+          "physical_footprint_mib": 20.110198974609375,
+          "disk_write_bytes": 0
+        },
+        {
+          "seconds": 120.023,
+          "cpu_percent_one_core": 0.021628932253933336,
+          "resident_mib": 57.609375,
+          "physical_footprint_mib": 20.125823974609375,
+          "disk_write_bytes": 0
+        },
+        {
+          "seconds": 135.027,
+          "cpu_percent_one_core": 0.00046209247820665336,
+          "resident_mib": 57.59375,
+          "physical_footprint_mib": 20.110198974609375,
+          "disk_write_bytes": 0
+        },
+        {
+          "seconds": 150.028,
+          "cpu_percent_one_core": 0.0016371087251850853,
+          "resident_mib": 57.578125,
+          "physical_footprint_mib": 20.157073974609375,
+          "disk_write_bytes": 0
+        },
+        {
+          "seconds": 165.03,
+          "cpu_percent_one_core": 0.002337994363117255,
+          "resident_mib": 50.5625,
+          "physical_footprint_mib": 20.063323974609375,
+          "disk_write_bytes": 0
+        },
+        {
+          "seconds": 180.035,
+          "cpu_percent_one_core": 0.0010280093333016023,
+          "resident_mib": 50.578125,
+          "physical_footprint_mib": 20.063323974609375,
+          "disk_write_bytes": 0
+        },
+        {
+          "seconds": 195.038,
+          "cpu_percent_one_core": 0.00025244136838851365,
+          "resident_mib": 50.625,
+          "physical_footprint_mib": 20.110198974609375,
+          "disk_write_bytes": 0
+        },
+        {
+          "seconds": 210.039,
+          "cpu_percent_one_core": 0.1626683700096912,
+          "resident_mib": 54.984375,
+          "physical_footprint_mib": 20.188323974609375,
+          "disk_write_bytes": 0
+        },
+        {
+          "seconds": 225.042,
+          "cpu_percent_one_core": 0.004548901385704094,
+          "resident_mib": 54.9375,
+          "physical_footprint_mib": 20.141448974609375,
+          "disk_write_bytes": 0
+        },
+        {
+          "seconds": 240.047,
+          "cpu_percent_one_core": 0.0,
+          "resident_mib": 54.921875,
+          "physical_footprint_mib": 20.141448974609375,
+          "disk_write_bytes": 0
+        },
+        {
+          "seconds": 255.052,
+          "cpu_percent_one_core": 0.19524919415531322,
+          "resident_mib": 55.015625,
+          "physical_footprint_mib": 20.172698974609375,
+          "disk_write_bytes": 0
+        },
+        {
+          "seconds": 270.057,
+          "cpu_percent_one_core": 0.2062966264977474,
+          "resident_mib": 54.78125,
+          "physical_footprint_mib": 20.203948974609375,
+          "disk_write_bytes": 0
+        },
+        {
+          "seconds": 285.062,
+          "cpu_percent_one_core": 0.0033716361790803234,
+          "resident_mib": 54.640625,
+          "physical_footprint_mib": 20.157073974609375,
+          "disk_write_bytes": 0
+        },
+        {
+          "seconds": 300.064,
+          "cpu_percent_one_core": 0.0009373828661993444,
+          "resident_mib": 54.015625,
+          "physical_footprint_mib": 20.141448974609375,
+          "disk_write_bytes": 0
+        },
+        {
+          "seconds": 315.069,
+          "cpu_percent_one_core": 0.0003257066596946679,
+          "resident_mib": 53.984375,
+          "physical_footprint_mib": 20.141448974609375,
+          "disk_write_bytes": 0
+        },
+        {
+          "seconds": 330.072,
+          "cpu_percent_one_core": 0.24314284239340614,
+          "resident_mib": 55.78125,
+          "physical_footprint_mib": 20.235198974609375,
+          "disk_write_bytes": 0
+        },
+        {
+          "seconds": 345.072,
+          "cpu_percent_one_core": 0.0,
+          "resident_mib": 55.78125,
+          "physical_footprint_mib": 20.235198974609375,
+          "disk_write_bytes": 0
+        },
+        {
+          "seconds": 360.077,
+          "cpu_percent_one_core": 0.0018629757174094212,
+          "resident_mib": 55.828125,
+          "physical_footprint_mib": 20.282073974609375,
+          "disk_write_bytes": 0
+        },
+        {
+          "seconds": 375.084,
+          "cpu_percent_one_core": 0.20801441588347913,
+          "resident_mib": 55.296875,
+          "physical_footprint_mib": 20.157073974609375,
+          "disk_write_bytes": 0
+        },
+        {
+          "seconds": 390.086,
+          "cpu_percent_one_core": 0.006629297128771932,
+          "resident_mib": 55.296875,
+          "physical_footprint_mib": 20.157073974609375,
+          "disk_write_bytes": 0
+        },
+        {
+          "seconds": 405.091,
+          "cpu_percent_one_core": 0.16015038482860106,
+          "resident_mib": 55.390625,
+          "physical_footprint_mib": 20.188323974609375,
+          "disk_write_bytes": 0
+        },
+        {
+          "seconds": 420.096,
+          "cpu_percent_one_core": 0.0,
+          "resident_mib": 54.84375,
+          "physical_footprint_mib": 20.172698974609375,
+          "disk_write_bytes": 0
+        },
+        {
+          "seconds": 435.101,
+          "cpu_percent_one_core": 0.01694951475961457,
+          "resident_mib": 54.484375,
+          "physical_footprint_mib": 20.188323974609375,
+          "disk_write_bytes": 0
+        },
+        {
+          "seconds": 450.106,
+          "cpu_percent_one_core": 0.04062292893365536,
+          "resident_mib": 53.796875,
+          "physical_footprint_mib": 20.235198974609375,
+          "disk_write_bytes": 0
+        },
+        {
+          "seconds": 465.109,
+          "cpu_percent_one_core": 0.28642670139961857,
+          "resident_mib": 55.390625,
+          "physical_footprint_mib": 20.235198974609375,
+          "disk_write_bytes": 0
+        },
+        {
+          "seconds": 480.113,
+          "cpu_percent_one_core": 0.00631164267190144,
+          "resident_mib": 53.671875,
+          "physical_footprint_mib": 20.188323974609375,
+          "disk_write_bytes": 0
+        },
+        {
+          "seconds": 495.119,
+          "cpu_percent_one_core": 0.0031753707098163796,
+          "resident_mib": 53.625,
+          "physical_footprint_mib": 20.141448974609375,
+          "disk_write_bytes": 0
+        },
+        {
+          "seconds": 510.121,
+          "cpu_percent_one_core": 0.0,
+          "resident_mib": 53.625,
+          "physical_footprint_mib": 20.141448974609375,
+          "disk_write_bytes": 0
+        },
+        {
+          "seconds": 525.122,
+          "cpu_percent_one_core": 0.00039138351498449074,
+          "resident_mib": 53.34375,
+          "physical_footprint_mib": 20.188323974609375,
+          "disk_write_bytes": 0
+        },
+        {
+          "seconds": 540.127,
+          "cpu_percent_one_core": 0.0,
+          "resident_mib": 53.34375,
+          "physical_footprint_mib": 20.188323974609375,
+          "disk_write_bytes": 0
+        },
+        {
+          "seconds": 555.133,
+          "cpu_percent_one_core": 0.00047563948512937794,
+          "resident_mib": 53.34375,
+          "physical_footprint_mib": 20.188323974609375,
+          "disk_write_bytes": 0
+        },
+        {
+          "seconds": 570.134,
+          "cpu_percent_one_core": 0.0,
+          "resident_mib": 53.34375,
+          "physical_footprint_mib": 20.188323974609375,
+          "disk_write_bytes": 0
+        },
+        {
+          "seconds": 585.139,
+          "cpu_percent_one_core": 0.0007297432661998417,
+          "resident_mib": 53.34375,
+          "physical_footprint_mib": 20.188323974609375,
+          "disk_write_bytes": 0
+        },
+        {
+          "seconds": 600.142,
+          "cpu_percent_one_core": 0.0,
+          "resident_mib": 53.34375,
+          "physical_footprint_mib": 20.188323974609375,
+          "disk_write_bytes": 0
+        },
+        {
+          "seconds": 615.149,
+          "cpu_percent_one_core": 0.00035149786471467246,
+          "resident_mib": 53.34375,
+          "physical_footprint_mib": 20.188323974609375,
+          "disk_write_bytes": 0
+        },
+        {
+          "seconds": 630.15,
+          "cpu_percent_one_core": 0.15957070264202428,
+          "resident_mib": 54.671875,
+          "physical_footprint_mib": 20.157073974609375,
+          "disk_write_bytes": 0
+        },
+        {
+          "seconds": 645.155,
+          "cpu_percent_one_core": 0.0,
+          "resident_mib": 54.671875,
+          "physical_footprint_mib": 20.157073974609375,
+          "disk_write_bytes": 0
+        },
+        {
+          "seconds": 660.16,
+          "cpu_percent_one_core": 0.0,
+          "resident_mib": 54.671875,
+          "physical_footprint_mib": 20.157073974609375,
+          "disk_write_bytes": 0
+        },
+        {
+          "seconds": 675.168,
+          "cpu_percent_one_core": 0.002717230161847435,
+          "resident_mib": 54.640625,
+          "physical_footprint_mib": 20.141448974609375,
+          "disk_write_bytes": 0
+        },
+        {
+          "seconds": 690.171,
+          "cpu_percent_one_core": 0.0,
+          "resident_mib": 54.640625,
+          "physical_footprint_mib": 20.141448974609375,
+          "disk_write_bytes": 0
+        },
+        {
+          "seconds": 705.172,
+          "cpu_percent_one_core": 0.000868846035433037,
+          "resident_mib": 54.6875,
+          "physical_footprint_mib": 20.188323974609375,
+          "disk_write_bytes": 0
+        },
+        {
+          "seconds": 720.177,
+          "cpu_percent_one_core": 0.026540313481597088,
+          "resident_mib": 54.703125,
+          "physical_footprint_mib": 20.188323974609375,
+          "disk_write_bytes": 0
+        },
+        {
+          "seconds": 735.182,
+          "cpu_percent_one_core": 0.0006795134625039767,
+          "resident_mib": 54.703125,
+          "physical_footprint_mib": 20.188323974609375,
+          "disk_write_bytes": 0
+        },
+        {
+          "seconds": 750.185,
+          "cpu_percent_one_core": 0.014156225948681144,
+          "resident_mib": 54.71875,
+          "physical_footprint_mib": 20.203948974609375,
+          "disk_write_bytes": 0
+        },
+        {
+          "seconds": 765.188,
+          "cpu_percent_one_core": 0.000345773388721675,
+          "resident_mib": 54.703125,
+          "physical_footprint_mib": 20.188323974609375,
+          "disk_write_bytes": 0
+        },
+        {
+          "seconds": 780.193,
+          "cpu_percent_one_core": 0.0,
+          "resident_mib": 54.703125,
+          "physical_footprint_mib": 20.188323974609375,
+          "disk_write_bytes": 0
+        },
+        {
+          "seconds": 795.2,
+          "cpu_percent_one_core": 0.003864495565078594,
+          "resident_mib": 54.703125,
+          "physical_footprint_mib": 20.188323974609375,
+          "disk_write_bytes": 0
+        },
+        {
+          "seconds": 810.205,
+          "cpu_percent_one_core": 0.0011396662614236244,
+          "resident_mib": 54.703125,
+          "physical_footprint_mib": 20.188323974609375,
+          "disk_write_bytes": 0
+        },
+        {
+          "seconds": 825.206,
+          "cpu_percent_one_core": 0.0017590176192403993,
+          "resident_mib": 54.703125,
+          "physical_footprint_mib": 20.188323974609375,
+          "disk_write_bytes": 0
+        },
+        {
+          "seconds": 840.207,
+          "cpu_percent_one_core": 0.0,
+          "resident_mib": 54.703125,
+          "physical_footprint_mib": 20.188323974609375,
+          "disk_write_bytes": 0
+        },
+        {
+          "seconds": 855.212,
+          "cpu_percent_one_core": 0.00020160122298518079,
+          "resident_mib": 54.703125,
+          "physical_footprint_mib": 20.188323974609375,
+          "disk_write_bytes": 0
+        },
+        {
+          "seconds": 870.217,
+          "cpu_percent_one_core": 0.014495297676672656,
+          "resident_mib": 54.734375,
+          "physical_footprint_mib": 20.203948974609375,
+          "disk_write_bytes": 0
+        },
+        {
+          "seconds": 885.218,
+          "cpu_percent_one_core": 0.016234696048500412,
+          "resident_mib": 54.765625,
+          "physical_footprint_mib": 20.235198974609375,
+          "disk_write_bytes": 0
+        },
+        {
+          "seconds": 900.22,
+          "cpu_percent_one_core": 0.00430568053100208,
+          "resident_mib": 54.71875,
+          "physical_footprint_mib": 20.188323974609375,
+          "disk_write_bytes": 0
+        },
+        {
+          "seconds": 915.226,
+          "cpu_percent_one_core": 0.002076313287289174,
+          "resident_mib": 54.71875,
+          "physical_footprint_mib": 20.188323974609375,
+          "disk_write_bytes": 0
+        },
+        {
+          "seconds": 930.231,
+          "cpu_percent_one_core": 0.16506975363569837,
+          "resident_mib": 55.671875,
+          "physical_footprint_mib": 20.250823974609375,
+          "disk_write_bytes": 0
+        },
+        {
+          "seconds": 945.236,
+          "cpu_percent_one_core": 0.03781517786387507,
+          "resident_mib": 56.03125,
+          "physical_footprint_mib": 20.235198974609375,
+          "disk_write_bytes": 0
+        },
+        {
+          "seconds": 960.241,
+          "cpu_percent_one_core": 0.010277820952456532,
+          "resident_mib": 56.03125,
+          "physical_footprint_mib": 20.235198974609375,
+          "disk_write_bytes": 0
+        },
+        {
+          "seconds": 975.247,
+          "cpu_percent_one_core": 1.0790797880205032,
+          "resident_mib": 74.015625,
+          "physical_footprint_mib": 28.547744750976562,
+          "disk_write_bytes": 0
+        },
+        {
+          "seconds": 990.252,
+          "cpu_percent_one_core": 0.020128922966776406,
+          "resident_mib": 73.796875,
+          "physical_footprint_mib": 28.360244750976562,
+          "disk_write_bytes": 0
+        },
+        {
+          "seconds": 1005.257,
+          "cpu_percent_one_core": 0.011955348176325565,
+          "resident_mib": 73.765625,
+          "physical_footprint_mib": 28.328994750976562,
+          "disk_write_bytes": 0
+        },
+        {
+          "seconds": 1020.26,
+          "cpu_percent_one_core": 0.00992193790516547,
+          "resident_mib": 73.765625,
+          "physical_footprint_mib": 27.922744750976562,
+          "disk_write_bytes": 0
+        },
+        {
+          "seconds": 1035.262,
+          "cpu_percent_one_core": 0.006976610474568567,
+          "resident_mib": 73.765625,
+          "physical_footprint_mib": 27.922744750976562,
+          "disk_write_bytes": 0
+        },
+        {
+          "seconds": 1050.268,
+          "cpu_percent_one_core": 0.028230370229253555,
+          "resident_mib": 73.78125,
+          "physical_footprint_mib": 27.453994750976562,
+          "disk_write_bytes": 0
+        },
+        {
+          "seconds": 1065.271,
+          "cpu_percent_one_core": 0.004343219555255704,
+          "resident_mib": 73.765625,
+          "physical_footprint_mib": 27.438369750976562,
+          "disk_write_bytes": 0
+        },
+        {
+          "seconds": 1080.273,
+          "cpu_percent_one_core": 0.0,
+          "resident_mib": 73.765625,
+          "physical_footprint_mib": 27.438369750976562,
+          "disk_write_bytes": 0
+        },
+        {
+          "seconds": 1095.279,
+          "cpu_percent_one_core": 0.0009740391169622707,
+          "resident_mib": 73.765625,
+          "physical_footprint_mib": 27.438369750976562,
+          "disk_write_bytes": 0
+        },
+        {
+          "seconds": 1110.284,
+          "cpu_percent_one_core": 0.004147752329300717,
+          "resident_mib": 73.765625,
+          "physical_footprint_mib": 27.438369750976562,
+          "disk_write_bytes": 0
+        },
+        {
+          "seconds": 1125.285,
+          "cpu_percent_one_core": 0.017208303137752765,
+          "resident_mib": 73.765625,
+          "physical_footprint_mib": 27.453994750976562,
+          "disk_write_bytes": 0
+        },
+        {
+          "seconds": 1140.289,
+          "cpu_percent_one_core": 0.013461967828946066,
+          "resident_mib": 73.765625,
+          "physical_footprint_mib": 27.453994750976562,
+          "disk_write_bytes": 0
+        },
+        {
+          "seconds": 1155.295,
+          "cpu_percent_one_core": 0.00034595773939629336,
+          "resident_mib": 73.15625,
+          "physical_footprint_mib": 27.453994750976562,
+          "disk_write_bytes": 0
+        },
+        {
+          "seconds": 1170.3,
+          "cpu_percent_one_core": 0.017021909520997133,
+          "resident_mib": 73.171875,
+          "physical_footprint_mib": 27.469619750976562,
+          "disk_write_bytes": 0
+        },
+        {
+          "seconds": 1185.304,
+          "cpu_percent_one_core": 0.00026159436634371305,
+          "resident_mib": 73.15625,
+          "physical_footprint_mib": 27.453994750976562,
+          "disk_write_bytes": 0
+        },
+        {
+          "seconds": 1200.31,
+          "cpu_percent_one_core": 0.0,
+          "resident_mib": 73.15625,
+          "physical_footprint_mib": 27.453994750976562,
+          "disk_write_bytes": 0
+        },
+        {
+          "seconds": 1215.318,
+          "cpu_percent_one_core": 0.0013140309215046676,
+          "resident_mib": 73.15625,
+          "physical_footprint_mib": 27.453994750976562,
+          "disk_write_bytes": 0
+        },
+        {
+          "seconds": 1230.318,
+          "cpu_percent_one_core": 0.27894818994160336,
+          "resident_mib": 73.21875,
+          "physical_footprint_mib": 27.578994750976562,
+          "disk_write_bytes": 0
+        },
+        {
+          "seconds": 1245.324,
+          "cpu_percent_one_core": 1.6147851241154707,
+          "resident_mib": 114.859375,
+          "physical_footprint_mib": 41.62598419189453,
+          "disk_write_bytes": 0
+        },
+        {
+          "seconds": 1260.326,
+          "cpu_percent_one_core": 0.36335851857030815,
+          "resident_mib": 114.375,
+          "physical_footprint_mib": 38.12598419189453,
+          "disk_write_bytes": 0
+        },
+        {
+          "seconds": 1275.328,
+          "cpu_percent_one_core": 0.0013845361174924292,
+          "resident_mib": 114.375,
+          "physical_footprint_mib": 38.12598419189453,
+          "disk_write_bytes": 0
+        },
+        {
+          "seconds": 1290.33,
+          "cpu_percent_one_core": 0.0013661655474165736,
+          "resident_mib": 114.375,
+          "physical_footprint_mib": 38.12598419189453,
+          "disk_write_bytes": 0
+        },
+        {
+          "seconds": 1305.332,
+          "cpu_percent_one_core": 0.0019522790833527198,
+          "resident_mib": 114.375,
+          "physical_footprint_mib": 38.12598419189453,
+          "disk_write_bytes": 0
+        },
+        {
+          "seconds": 1320.335,
+          "cpu_percent_one_core": 0.0013000446761272145,
+          "resident_mib": 114.375,
+          "physical_footprint_mib": 38.12598419189453,
+          "disk_write_bytes": 0
+        },
+        {
+          "seconds": 1335.34,
+          "cpu_percent_one_core": 0.0019251513003564235,
+          "resident_mib": 114.375,
+          "physical_footprint_mib": 38.12598419189453,
+          "disk_write_bytes": 0
+        },
+        {
+          "seconds": 1350.341,
+          "cpu_percent_one_core": 0.014789506751492395,
+          "resident_mib": 114.375,
+          "physical_footprint_mib": 38.12598419189453,
+          "disk_write_bytes": 0
+        },
+        {
+          "seconds": 1365.345,
+          "cpu_percent_one_core": 0.0011787925964827134,
+          "resident_mib": 114.375,
+          "physical_footprint_mib": 38.12598419189453,
+          "disk_write_bytes": 0
+        },
+        {
+          "seconds": 1380.351,
+          "cpu_percent_one_core": 0.4508655342833332,
+          "resident_mib": 114.765625,
+          "physical_footprint_mib": 38.45410919189453,
+          "disk_write_bytes": 0
+        },
+        {
+          "seconds": 1395.357,
+          "cpu_percent_one_core": 0.080360804128122,
+          "resident_mib": 119.890625,
+          "physical_footprint_mib": 38.95410919189453,
+          "disk_write_bytes": 0
+        },
+        {
+          "seconds": 1410.358,
+          "cpu_percent_one_core": 0.005556826807687948,
+          "resident_mib": 119.890625,
+          "physical_footprint_mib": 38.95410919189453,
+          "disk_write_bytes": 0
+        },
+        {
+          "seconds": 1425.363,
+          "cpu_percent_one_core": 0.0020388135732731095,
+          "resident_mib": 119.890625,
+          "physical_footprint_mib": 38.95410919189453,
+          "disk_write_bytes": 0
+        },
+        {
+          "seconds": 1440.363,
+          "cpu_percent_one_core": 0.009349756776673846,
+          "resident_mib": 119.734375,
+          "physical_footprint_mib": 38.95410919189453,
+          "disk_write_bytes": 0
+        },
+        {
+          "seconds": 1455.368,
+          "cpu_percent_one_core": 0.0015941882930656168,
+          "resident_mib": 117.703125,
+          "physical_footprint_mib": 39.42285919189453,
+          "disk_write_bytes": 0
+        },
+        {
+          "seconds": 1470.372,
+          "cpu_percent_one_core": 0.0013249326586122227,
+          "resident_mib": 117.703125,
+          "physical_footprint_mib": 39.42285919189453,
+          "disk_write_bytes": 0
+        },
+        {
+          "seconds": 1485.374,
+          "cpu_percent_one_core": 0.004227871684977622,
+          "resident_mib": 117.703125,
+          "physical_footprint_mib": 39.42285919189453,
+          "disk_write_bytes": 0
+        },
+        {
+          "seconds": 1500.378,
+          "cpu_percent_one_core": 0.18358850311116276,
+          "resident_mib": 114.28125,
+          "physical_footprint_mib": 39.48535919189453,
+          "disk_write_bytes": 0
+        },
+        {
+          "seconds": 1515.382,
+          "cpu_percent_one_core": 0.2128419256048508,
+          "resident_mib": 112.203125,
+          "physical_footprint_mib": 39.76660919189453,
+          "disk_write_bytes": 0
+        },
+        {
+          "seconds": 1530.39,
+          "cpu_percent_one_core": 0.21200252898951616,
+          "resident_mib": 111.703125,
+          "physical_footprint_mib": 39.76660919189453,
+          "disk_write_bytes": 0
+        },
+        {
+          "seconds": 1545.4,
+          "cpu_percent_one_core": 0.028348839297155877,
+          "resident_mib": 111.65625,
+          "physical_footprint_mib": 39.71973419189453,
+          "disk_write_bytes": 0
+        },
+        {
+          "seconds": 1560.404,
+          "cpu_percent_one_core": 0.004725825334099998,
+          "resident_mib": 111.65625,
+          "physical_footprint_mib": 39.71973419189453,
+          "disk_write_bytes": 0
+        },
+        {
+          "seconds": 1575.417,
+          "cpu_percent_one_core": 0.001317773580237806,
+          "resident_mib": 111.640625,
+          "physical_footprint_mib": 39.71973419189453,
+          "disk_write_bytes": 0
+        },
+        {
+          "seconds": 1590.423,
+          "cpu_percent_one_core": 0.0021825391618957787,
+          "resident_mib": 111.640625,
+          "physical_footprint_mib": 39.71973419189453,
+          "disk_write_bytes": 0
+        },
+        {
+          "seconds": 1605.431,
+          "cpu_percent_one_core": 0.0015230320521757248,
+          "resident_mib": 111.640625,
+          "physical_footprint_mib": 39.71973419189453,
+          "disk_write_bytes": 0
+        },
+        {
+          "seconds": 1620.434,
+          "cpu_percent_one_core": 0.0018659781612207092,
+          "resident_mib": 111.671875,
+          "physical_footprint_mib": 39.75098419189453,
+          "disk_write_bytes": 0
+        },
+        {
+          "seconds": 1635.448,
+          "cpu_percent_one_core": 0.0014736755790695278,
+          "resident_mib": 111.671875,
+          "physical_footprint_mib": 39.75098419189453,
+          "disk_write_bytes": 0
+        },
+        {
+          "seconds": 1650.455,
+          "cpu_percent_one_core": 0.0018119097320495642,
+          "resident_mib": 111.671875,
+          "physical_footprint_mib": 39.75098419189453,
+          "disk_write_bytes": 0
+        },
+        {
+          "seconds": 1665.455,
+          "cpu_percent_one_core": 0.0016774390577443876,
+          "resident_mib": 111.640625,
+          "physical_footprint_mib": 39.71973419189453,
+          "disk_write_bytes": 0
+        },
+        {
+          "seconds": 1680.458,
+          "cpu_percent_one_core": 0.002247344327533151,
+          "resident_mib": 111.640625,
+          "physical_footprint_mib": 39.71973419189453,
+          "disk_write_bytes": 0
+        },
+        {
+          "seconds": 1695.464,
+          "cpu_percent_one_core": 0.0013839090100484608,
+          "resident_mib": 111.640625,
+          "physical_footprint_mib": 39.71973419189453,
+          "disk_write_bytes": 0
+        },
+        {
+          "seconds": 1710.47,
+          "cpu_percent_one_core": 0.0021749930126029656,
+          "resident_mib": 111.640625,
+          "physical_footprint_mib": 39.71973419189453,
+          "disk_write_bytes": 0
+        },
+        {
+          "seconds": 1725.472,
+          "cpu_percent_one_core": 0.0064699006613528325,
+          "resident_mib": 111.65625,
+          "physical_footprint_mib": 39.73535919189453,
+          "disk_write_bytes": 0
+        },
+        {
+          "seconds": 1740.482,
+          "cpu_percent_one_core": 0.0023042652359839067,
+          "resident_mib": 111.65625,
+          "physical_footprint_mib": 39.73535919189453,
+          "disk_write_bytes": 0
+        },
+        {
+          "seconds": 1755.485,
+          "cpu_percent_one_core": 0.0018126861351967095,
+          "resident_mib": 109.59375,
+          "physical_footprint_mib": 39.73535919189453,
+          "disk_write_bytes": 0
+        },
+        {
+          "seconds": 1770.489,
+          "cpu_percent_one_core": 0.0008620266331490502,
+          "resident_mib": 109.578125,
+          "physical_footprint_mib": 39.73535919189453,
+          "disk_write_bytes": 0
+        },
+        {
+          "seconds": 1785.492,
+          "cpu_percent_one_core": 0.0013836179457787786,
+          "resident_mib": 109.546875,
+          "physical_footprint_mib": 39.73535919189453,
+          "disk_write_bytes": 0
+        },
+        {
+          "seconds": 1800.496,
+          "cpu_percent_one_core": 0.2658322397779513,
+          "resident_mib": 111.25,
+          "physical_footprint_mib": 39.81348419189453,
+          "disk_write_bytes": 0
+        },
+        {
+          "seconds": 1815.508,
+          "cpu_percent_one_core": 0.0034457750560059524,
+          "resident_mib": 111.125,
+          "physical_footprint_mib": 39.81348419189453,
+          "disk_write_bytes": 0
+        },
+        {
+          "seconds": 1830.515,
+          "cpu_percent_one_core": 0.0008970626271288475,
+          "resident_mib": 111.125,
+          "physical_footprint_mib": 39.81348419189453,
+          "disk_write_bytes": 0
+        },
+        {
+          "seconds": 1845.516,
+          "cpu_percent_one_core": 0.011115316785462025,
+          "resident_mib": 111.125,
+          "physical_footprint_mib": 39.81348419189453,
+          "disk_write_bytes": 0
+        },
+        {
+          "seconds": 1860.524,
+          "cpu_percent_one_core": 0.0013345495993835992,
+          "resident_mib": 111.125,
+          "physical_footprint_mib": 39.81348419189453,
+          "disk_write_bytes": 0
+        },
+        {
+          "seconds": 1875.527,
+          "cpu_percent_one_core": 0.0018074305000094293,
+          "resident_mib": 111.125,
+          "physical_footprint_mib": 39.81348419189453,
+          "disk_write_bytes": 0
+        },
+        {
+          "seconds": 1890.535,
+          "cpu_percent_one_core": 0.0014733857108488533,
+          "resident_mib": 111.125,
+          "physical_footprint_mib": 39.81348419189453,
+          "disk_write_bytes": 0
+        },
+        {
+          "seconds": 1905.542,
+          "cpu_percent_one_core": 0.0017522271123892855,
+          "resident_mib": 111.125,
+          "physical_footprint_mib": 39.81348419189453,
+          "disk_write_bytes": 0
+        },
+        {
+          "seconds": 1920.551,
+          "cpu_percent_one_core": 0.001491097463807566,
+          "resident_mib": 111.125,
+          "physical_footprint_mib": 39.81348419189453,
+          "disk_write_bytes": 0
+        },
+        {
+          "seconds": 1935.565,
+          "cpu_percent_one_core": 0.001806660090032297,
+          "resident_mib": 111.125,
+          "physical_footprint_mib": 39.81348419189453,
+          "disk_write_bytes": 0
+        },
+        {
+          "seconds": 1950.572,
+          "cpu_percent_one_core": 0.0011628071049779756,
+          "resident_mib": 111.125,
+          "physical_footprint_mib": 39.81348419189453,
+          "disk_write_bytes": 0
+        },
+        {
+          "seconds": 1965.581,
+          "cpu_percent_one_core": 0.0015023936862421658,
+          "resident_mib": 111.125,
+          "physical_footprint_mib": 39.81348419189453,
+          "disk_write_bytes": 0
+        },
+        {
+          "seconds": 1980.587,
+          "cpu_percent_one_core": 0.0011062224783701011,
+          "resident_mib": 111.125,
+          "physical_footprint_mib": 39.81348419189453,
+          "disk_write_bytes": 0
+        },
+        {
+          "seconds": 1995.597,
+          "cpu_percent_one_core": 0.0016125228821988057,
+          "resident_mib": 111.109375,
+          "physical_footprint_mib": 39.81348419189453,
+          "disk_write_bytes": 0
+        },
+        {
+          "seconds": 2010.602,
+          "cpu_percent_one_core": 0.0013506909073878889,
+          "resident_mib": 111.109375,
+          "physical_footprint_mib": 39.81348419189453,
+          "disk_write_bytes": 0
+        },
+        {
+          "seconds": 2025.612,
+          "cpu_percent_one_core": 0.0017357710391526257,
+          "resident_mib": 111.109375,
+          "physical_footprint_mib": 39.81348419189453,
+          "disk_write_bytes": 0
+        },
+        {
+          "seconds": 2040.618,
+          "cpu_percent_one_core": 0.011231680774629485,
+          "resident_mib": 111.109375,
+          "physical_footprint_mib": 39.81348419189453,
+          "disk_write_bytes": 0
+        },
+        {
+          "seconds": 2055.623,
+          "cpu_percent_one_core": 0.004068294284830709,
+          "resident_mib": 111.109375,
+          "physical_footprint_mib": 39.81348419189453,
+          "disk_write_bytes": 0
+        },
+        {
+          "seconds": 2070.633,
+          "cpu_percent_one_core": 0.0011669898035450233,
+          "resident_mib": 111.109375,
+          "physical_footprint_mib": 39.81348419189453,
+          "disk_write_bytes": 0
+        },
+        {
+          "seconds": 2085.636,
+          "cpu_percent_one_core": 0.0027083543124702294,
+          "resident_mib": 111.109375,
+          "physical_footprint_mib": 39.81348419189453,
+          "disk_write_bytes": 0
+        },
+        {
+          "seconds": 2100.637,
+          "cpu_percent_one_core": 0.14833839094329943,
+          "resident_mib": 111.078125,
+          "physical_footprint_mib": 39.79785919189453,
+          "disk_write_bytes": 0
+        },
+        {
+          "seconds": 2115.648,
+          "cpu_percent_one_core": 0.001189698457130428,
+          "resident_mib": 111.078125,
+          "physical_footprint_mib": 39.79785919189453,
+          "disk_write_bytes": 0
+        },
+        {
+          "seconds": 2130.654,
+          "cpu_percent_one_core": 0.0011150866399164232,
+          "resident_mib": 111.078125,
+          "physical_footprint_mib": 39.79785919189453,
+          "disk_write_bytes": 0
+        },
+        {
+          "seconds": 2145.657,
+          "cpu_percent_one_core": 0.001633865263946925,
+          "resident_mib": 111.078125,
+          "physical_footprint_mib": 39.79785919189453,
+          "disk_write_bytes": 0
+        },
+        {
+          "seconds": 2160.661,
+          "cpu_percent_one_core": 0.0010341787179453483,
+          "resident_mib": 111.078125,
+          "physical_footprint_mib": 39.79785919189453,
+          "disk_write_bytes": 0
+        },
+        {
+          "seconds": 2175.67,
+          "cpu_percent_one_core": 0.0014538069780391974,
+          "resident_mib": 111.078125,
+          "physical_footprint_mib": 39.79785919189453,
+          "disk_write_bytes": 0
+        },
+        {
+          "seconds": 2190.671,
+          "cpu_percent_one_core": 0.0015620682977824855,
+          "resident_mib": 111.078125,
+          "physical_footprint_mib": 39.79785919189453,
+          "disk_write_bytes": 0
+        },
+        {
+          "seconds": 2205.679,
+          "cpu_percent_one_core": 0.001557016677715809,
+          "resident_mib": 111.078125,
+          "physical_footprint_mib": 39.79785919189453,
+          "disk_write_bytes": 0
+        },
+        {
+          "seconds": 2220.685,
+          "cpu_percent_one_core": 0.00797072968802517,
+          "resident_mib": 111.078125,
+          "physical_footprint_mib": 39.79785919189453,
+          "disk_write_bytes": 0
+        },
+        {
+          "seconds": 2235.697,
+          "cpu_percent_one_core": 0.0032016365912795287,
+          "resident_mib": 111.078125,
+          "physical_footprint_mib": 39.79785919189453,
+          "disk_write_bytes": 0
+        },
+        {
+          "seconds": 2250.698,
+          "cpu_percent_one_core": 0.001070469733570609,
+          "resident_mib": 111.078125,
+          "physical_footprint_mib": 39.79785919189453,
+          "disk_write_bytes": 0
+        },
+        {
+          "seconds": 2265.705,
+          "cpu_percent_one_core": 0.0018111635412401135,
+          "resident_mib": 111.078125,
+          "physical_footprint_mib": 39.79785919189453,
+          "disk_write_bytes": 0
+        },
+        {
+          "seconds": 2280.715,
+          "cpu_percent_one_core": 0.001026530252413613,
+          "resident_mib": 111.078125,
+          "physical_footprint_mib": 39.79785919189453,
+          "disk_write_bytes": 0
+        },
+        {
+          "seconds": 2295.724,
+          "cpu_percent_one_core": 0.0015812852492527664,
+          "resident_mib": 111.078125,
+          "physical_footprint_mib": 39.79785919189453,
+          "disk_write_bytes": 0
+        },
+        {
+          "seconds": 2310.726,
+          "cpu_percent_one_core": 0.0011045615913528024,
+          "resident_mib": 111.078125,
+          "physical_footprint_mib": 39.79785919189453,
+          "disk_write_bytes": 0
+        },
+        {
+          "seconds": 2325.727,
+          "cpu_percent_one_core": 0.001611319839322053,
+          "resident_mib": 111.078125,
+          "physical_footprint_mib": 39.79785919189453,
+          "disk_write_bytes": 0
+        },
+        {
+          "seconds": 2340.734,
+          "cpu_percent_one_core": 0.0009295371447249446,
+          "resident_mib": 111.078125,
+          "physical_footprint_mib": 39.79785919189453,
+          "disk_write_bytes": 0
+        },
+        {
+          "seconds": 2355.737,
+          "cpu_percent_one_core": 0.0013453101261448682,
+          "resident_mib": 111.0625,
+          "physical_footprint_mib": 39.78223419189453,
+          "disk_write_bytes": 0
+        },
+        {
+          "seconds": 2370.741,
+          "cpu_percent_one_core": 0.0010627344119528337,
+          "resident_mib": 111.0625,
+          "physical_footprint_mib": 39.78223419189453,
+          "disk_write_bytes": 0
+        },
+        {
+          "seconds": 2385.751,
+          "cpu_percent_one_core": 0.0024617703076066913,
+          "resident_mib": 111.0625,
+          "physical_footprint_mib": 39.78223419189453,
+          "disk_write_bytes": 0
+        },
+        {
+          "seconds": 2400.753,
+          "cpu_percent_one_core": 0.16140264510287258,
+          "resident_mib": 111.109375,
+          "physical_footprint_mib": 39.79785919189453,
+          "disk_write_bytes": 0
+        },
+        {
+          "seconds": 2415.756,
+          "cpu_percent_one_core": 0.0015099026634989977,
+          "resident_mib": 111.109375,
+          "physical_footprint_mib": 39.79785919189453,
+          "disk_write_bytes": 0
+        },
+        {
+          "seconds": 2430.766,
+          "cpu_percent_one_core": 0.001235827553434374,
+          "resident_mib": 111.109375,
+          "physical_footprint_mib": 39.79785919189453,
+          "disk_write_bytes": 0
+        },
+        {
+          "seconds": 2445.773,
+          "cpu_percent_one_core": 0.001732808406908551,
+          "resident_mib": 111.109375,
+          "physical_footprint_mib": 39.79785919189453,
+          "disk_write_bytes": 0
+        },
+        {
+          "seconds": 2460.779,
+          "cpu_percent_one_core": 0.4234517116660502,
+          "resident_mib": 115.953125,
+          "physical_footprint_mib": 45.40723419189453,
+          "disk_write_bytes": 0
+        },
+        {
+          "seconds": 2475.789,
+          "cpu_percent_one_core": 0.6789618837869877,
+          "resident_mib": 111.5,
+          "physical_footprint_mib": 42.70410919189453,
+          "disk_write_bytes": 0
+        },
+        {
+          "seconds": 2490.794,
+          "cpu_percent_one_core": 0.00200460865063604,
+          "resident_mib": 111.625,
+          "physical_footprint_mib": 42.70410919189453,
+          "disk_write_bytes": 0
+        },
+        {
+          "seconds": 2505.796,
+          "cpu_percent_one_core": 0.01479670650628414,
+          "resident_mib": 111.625,
+          "physical_footprint_mib": 42.70410919189453,
+          "disk_write_bytes": 0
+        },
+        {
+          "seconds": 2520.806,
+          "cpu_percent_one_core": 0.17242230026839872,
+          "resident_mib": 111.640625,
+          "physical_footprint_mib": 42.71973419189453,
+          "disk_write_bytes": 0
+        },
+        {
+          "seconds": 2535.819,
+          "cpu_percent_one_core": 0.0022835540965084177,
+          "resident_mib": 111.640625,
+          "physical_footprint_mib": 42.71973419189453,
+          "disk_write_bytes": 0
+        },
+        {
+          "seconds": 2550.827,
+          "cpu_percent_one_core": 0.0013118207938521563,
+          "resident_mib": 111.640625,
+          "physical_footprint_mib": 42.71973419189453,
+          "disk_write_bytes": 0
+        },
+        {
+          "seconds": 2565.837,
+          "cpu_percent_one_core": 0.0014540168947814482,
+          "resident_mib": 111.640625,
+          "physical_footprint_mib": 42.71973419189453,
+          "disk_write_bytes": 0
+        },
+        {
+          "seconds": 2580.839,
+          "cpu_percent_one_core": 0.004926073186300225,
+          "resident_mib": 111.640625,
+          "physical_footprint_mib": 42.71973419189453,
+          "disk_write_bytes": 0
+        },
+        {
+          "seconds": 2595.844,
+          "cpu_percent_one_core": 0.0015359570332703488,
+          "resident_mib": 111.640625,
+          "physical_footprint_mib": 42.71973419189453,
+          "disk_write_bytes": 0
+        },
+        {
+          "seconds": 2610.85,
+          "cpu_percent_one_core": 0.0009307296980808623,
+          "resident_mib": 111.640625,
+          "physical_footprint_mib": 42.71973419189453,
+          "disk_write_bytes": 0
+        },
+        {
+          "seconds": 2625.858,
+          "cpu_percent_one_core": 0.0013012148568308682,
+          "resident_mib": 111.609375,
+          "physical_footprint_mib": 42.68848419189453,
+          "disk_write_bytes": 0
+        },
+        {
+          "seconds": 2640.868,
+          "cpu_percent_one_core": 0.23511390180043684,
+          "resident_mib": 110.1875,
+          "physical_footprint_mib": 42.40723419189453,
+          "disk_write_bytes": 0
+        },
+        {
+          "seconds": 2655.875,
+          "cpu_percent_one_core": 0.0029238521480145128,
+          "resident_mib": 109.453125,
+          "physical_footprint_mib": 42.40723419189453,
+          "disk_write_bytes": 0
+        },
+        {
+          "seconds": 2670.881,
+          "cpu_percent_one_core": 0.0012726226765154695,
+          "resident_mib": 104.5625,
+          "physical_footprint_mib": 42.40723419189453,
+          "disk_write_bytes": 0
+        },
+        {
+          "seconds": 2685.886,
+          "cpu_percent_one_core": 0.0023858646250299277,
+          "resident_mib": 98.453125,
+          "physical_footprint_mib": 42.40723419189453,
+          "disk_write_bytes": 0
+        },
+        {
+          "seconds": 2700.891,
+          "cpu_percent_one_core": 0.16086538365144454,
+          "resident_mib": 100.296875,
+          "physical_footprint_mib": 42.42285919189453,
+          "disk_write_bytes": 0
+        },
+        {
+          "seconds": 2715.895,
+          "cpu_percent_one_core": 0.0013262840410596113,
+          "resident_mib": 100.296875,
+          "physical_footprint_mib": 42.42285919189453,
+          "disk_write_bytes": 0
+        },
+        {
+          "seconds": 2730.9,
+          "cpu_percent_one_core": 0.0015339240095933579,
+          "resident_mib": 100.296875,
+          "physical_footprint_mib": 42.42285919189453,
+          "disk_write_bytes": 0
+        },
+        {
+          "seconds": 2745.9,
+          "cpu_percent_one_core": 0.00966437241780992,
+          "resident_mib": 100.296875,
+          "physical_footprint_mib": 42.42285919189453,
+          "disk_write_bytes": 0
+        },
+        {
+          "seconds": 2760.905,
+          "cpu_percent_one_core": 0.0010135798765620325,
+          "resident_mib": 100.296875,
+          "physical_footprint_mib": 42.42285919189453,
+          "disk_write_bytes": 0
+        },
+        {
+          "seconds": 2775.91,
+          "cpu_percent_one_core": 0.016779700698489157,
+          "resident_mib": 100.296875,
+          "physical_footprint_mib": 42.42285919189453,
+          "disk_write_bytes": 0
+        },
+        {
+          "seconds": 2790.915,
+          "cpu_percent_one_core": 0.0012190528000015674,
+          "resident_mib": 100.296875,
+          "physical_footprint_mib": 42.42285919189453,
+          "disk_write_bytes": 0
+        },
+        {
+          "seconds": 2805.92,
+          "cpu_percent_one_core": 0.00194848878209351,
+          "resident_mib": 100.296875,
+          "physical_footprint_mib": 42.42285919189453,
+          "disk_write_bytes": 0
+        },
+        {
+          "seconds": 2820.925,
+          "cpu_percent_one_core": 0.013930645976599945,
+          "resident_mib": 100.28125,
+          "physical_footprint_mib": 42.42285919189453,
+          "disk_write_bytes": 0
+        },
+        {
+          "seconds": 2835.932,
+          "cpu_percent_one_core": 0.012316250641772613,
+          "resident_mib": 100.328125,
+          "physical_footprint_mib": 42.42285919189453,
+          "disk_write_bytes": 0
+        },
+        {
+          "seconds": 2850.933,
+          "cpu_percent_one_core": 0.001491240278444205,
+          "resident_mib": 100.328125,
+          "physical_footprint_mib": 42.42285919189453,
+          "disk_write_bytes": 0
+        },
+        {
+          "seconds": 2865.936,
+          "cpu_percent_one_core": 0.002922868167048564,
+          "resident_mib": 100.328125,
+          "physical_footprint_mib": 42.42285919189453,
+          "disk_write_bytes": 0
+        },
+        {
+          "seconds": 2880.939,
+          "cpu_percent_one_core": 0.0016951429436368795,
+          "resident_mib": 100.328125,
+          "physical_footprint_mib": 42.42285919189453,
+          "disk_write_bytes": 0
+        },
+        {
+          "seconds": 2895.944,
+          "cpu_percent_one_core": 0.0020956880849254157,
+          "resident_mib": 100.328125,
+          "physical_footprint_mib": 42.42285919189453,
+          "disk_write_bytes": 0
+        },
+        {
+          "seconds": 2910.949,
+          "cpu_percent_one_core": 0.001460920400155767,
+          "resident_mib": 100.328125,
+          "physical_footprint_mib": 42.42285919189453,
+          "disk_write_bytes": 0
+        },
+        {
+          "seconds": 2925.951,
+          "cpu_percent_one_core": 0.0017447250555247852,
+          "resident_mib": 100.328125,
+          "physical_footprint_mib": 42.42285919189453,
+          "disk_write_bytes": 0
+        },
+        {
+          "seconds": 2940.954,
+          "cpu_percent_one_core": 0.0014956212252285586,
+          "resident_mib": 100.328125,
+          "physical_footprint_mib": 42.42285919189453,
+          "disk_write_bytes": 0
+        },
+        {
+          "seconds": 2955.963,
+          "cpu_percent_one_core": 0.0018035991210495162,
+          "resident_mib": 100.328125,
+          "physical_footprint_mib": 42.42285919189453,
+          "disk_write_bytes": 0
+        },
+        {
+          "seconds": 2970.963,
+          "cpu_percent_one_core": 0.0015585567131178768,
+          "resident_mib": 100.328125,
+          "physical_footprint_mib": 42.42285919189453,
+          "disk_write_bytes": 0
+        },
+        {
+          "seconds": 2985.969,
+          "cpu_percent_one_core": 0.0020131921119592843,
+          "resident_mib": 100.328125,
+          "physical_footprint_mib": 42.42285919189453,
+          "disk_write_bytes": 0
+        },
+        {
+          "seconds": 3000.973,
+          "cpu_percent_one_core": 0.28514941958113743,
+          "resident_mib": 101.734375,
+          "physical_footprint_mib": 42.50098419189453,
+          "disk_write_bytes": 0
+        },
+        {
+          "seconds": 3015.982,
+          "cpu_percent_one_core": 0.0014622087742726065,
+          "resident_mib": 101.734375,
+          "physical_footprint_mib": 42.50098419189453,
+          "disk_write_bytes": 0
+        },
+        {
+          "seconds": 3030.983,
+          "cpu_percent_one_core": 0.0015437492439051947,
+          "resident_mib": 101.734375,
+          "physical_footprint_mib": 42.50098419189453,
+          "disk_write_bytes": 0
+        },
+        {
+          "seconds": 3045.989,
+          "cpu_percent_one_core": 0.0022717030676329894,
+          "resident_mib": 101.734375,
+          "physical_footprint_mib": 42.50098419189453,
+          "disk_write_bytes": 0
+        },
+        {
+          "seconds": 3060.991,
+          "cpu_percent_one_core": 0.018772115776110883,
+          "resident_mib": 101.625,
+          "physical_footprint_mib": 42.46973419189453,
+          "disk_write_bytes": 0
+        },
+        {
+          "seconds": 3075.998,
+          "cpu_percent_one_core": 0.001668178870257244,
+          "resident_mib": 101.625,
+          "physical_footprint_mib": 42.46973419189453,
+          "disk_write_bytes": 0
+        },
+        {
+          "seconds": 3091.0,
+          "cpu_percent_one_core": 0.0015603778241522835,
+          "resident_mib": 101.515625,
+          "physical_footprint_mib": 42.46973419189453,
+          "disk_write_bytes": 0
+        },
+        {
+          "seconds": 3106.005,
+          "cpu_percent_one_core": 0.01938446767797974,
+          "resident_mib": 101.515625,
+          "physical_footprint_mib": 42.46973419189453,
+          "disk_write_bytes": 0
+        },
+        {
+          "seconds": 3121.007,
+          "cpu_percent_one_core": 0.016685275046793756,
+          "resident_mib": 100.328125,
+          "physical_footprint_mib": 42.46973419189453,
+          "disk_write_bytes": 0
+        },
+        {
+          "seconds": 3136.012,
+          "cpu_percent_one_core": 0.03946491627206742,
+          "resident_mib": 104.28125,
+          "physical_footprint_mib": 42.48535919189453,
+          "disk_write_bytes": 0
+        },
+        {
+          "seconds": 3151.017,
+          "cpu_percent_one_core": 0.03230124029998559,
+          "resident_mib": 104.28125,
+          "physical_footprint_mib": 42.48535919189453,
+          "disk_write_bytes": 0
+        },
+        {
+          "seconds": 3166.019,
+          "cpu_percent_one_core": 0.003051992326509709,
+          "resident_mib": 104.28125,
+          "physical_footprint_mib": 42.48535919189453,
+          "disk_write_bytes": 0
+        },
+        {
+          "seconds": 3181.024,
+          "cpu_percent_one_core": 0.0010452305701671722,
+          "resident_mib": 104.28125,
+          "physical_footprint_mib": 42.48535919189453,
+          "disk_write_bytes": 0
+        },
+        {
+          "seconds": 3196.031,
+          "cpu_percent_one_core": 0.0015615260461281874,
+          "resident_mib": 104.28125,
+          "physical_footprint_mib": 42.48535919189453,
+          "disk_write_bytes": 0
+        },
+        {
+          "seconds": 3211.035,
+          "cpu_percent_one_core": 0.001142134796079154,
+          "resident_mib": 104.28125,
+          "physical_footprint_mib": 42.48535919189453,
+          "disk_write_bytes": 0
+        },
+        {
+          "seconds": 3226.037,
+          "cpu_percent_one_core": 0.0016962414148331702,
+          "resident_mib": 104.28125,
+          "physical_footprint_mib": 42.48535919189453,
+          "disk_write_bytes": 0
+        },
+        {
+          "seconds": 3241.037,
+          "cpu_percent_one_core": 0.001195217419298106,
+          "resident_mib": 104.28125,
+          "physical_footprint_mib": 42.48535919189453,
+          "disk_write_bytes": 0
+        },
+        {
+          "seconds": 3256.043,
+          "cpu_percent_one_core": 0.0015682790069299164,
+          "resident_mib": 104.28125,
+          "physical_footprint_mib": 42.48535919189453,
+          "disk_write_bytes": 0
+        },
+        {
+          "seconds": 3271.048,
+          "cpu_percent_one_core": 0.0008627619313273171,
+          "resident_mib": 104.28125,
+          "physical_footprint_mib": 42.48535919189453,
+          "disk_write_bytes": 0
+        },
+        {
+          "seconds": 3286.05,
+          "cpu_percent_one_core": 0.028671993436612767,
+          "resident_mib": 104.3125,
+          "physical_footprint_mib": 42.48535919189453,
+          "disk_write_bytes": 0
+        },
+        {
+          "seconds": 3301.054,
+          "cpu_percent_one_core": 0.15496204336037195,
+          "resident_mib": 104.375,
+          "physical_footprint_mib": 42.48535919189453,
+          "disk_write_bytes": 0
+        },
+        {
+          "seconds": 3316.061,
+          "cpu_percent_one_core": 0.0010614661890353083,
+          "resident_mib": 104.375,
+          "physical_footprint_mib": 42.48535919189453,
+          "disk_write_bytes": 0
+        },
+        {
+          "seconds": 3331.063,
+          "cpu_percent_one_core": 0.0012997810230315594,
+          "resident_mib": 104.375,
+          "physical_footprint_mib": 42.48535919189453,
+          "disk_write_bytes": 0
+        },
+        {
+          "seconds": 3346.067,
+          "cpu_percent_one_core": 0.025146264266675752,
+          "resident_mib": 104.375,
+          "physical_footprint_mib": 42.48535919189453,
+          "disk_write_bytes": 0
+        },
+        {
+          "seconds": 3361.068,
+          "cpu_percent_one_core": 0.001212113741355468,
+          "resident_mib": 104.375,
+          "physical_footprint_mib": 42.48535919189453,
+          "disk_write_bytes": 0
+        },
+        {
+          "seconds": 3376.079,
+          "cpu_percent_one_core": 0.029014549381364937,
+          "resident_mib": 104.375,
+          "physical_footprint_mib": 42.48535919189453,
+          "disk_write_bytes": 0
+        },
+        {
+          "seconds": 3391.084,
+          "cpu_percent_one_core": 0.0017996639474387778,
+          "resident_mib": 104.375,
+          "physical_footprint_mib": 42.48535919189453,
+          "disk_write_bytes": 0
+        },
+        {
+          "seconds": 3406.092,
+          "cpu_percent_one_core": 0.032290007437880824,
+          "resident_mib": 104.375,
+          "physical_footprint_mib": 42.48535919189453,
+          "disk_write_bytes": 0
+        },
+        {
+          "seconds": 3421.095,
+          "cpu_percent_one_core": 0.001866920885633584,
+          "resident_mib": 104.375,
+          "physical_footprint_mib": 42.48535919189453,
+          "disk_write_bytes": 0
+        },
+        {
+          "seconds": 3436.098,
+          "cpu_percent_one_core": 0.0012344211503600457,
+          "resident_mib": 104.375,
+          "physical_footprint_mib": 42.48535919189453,
+          "disk_write_bytes": 0
+        },
+        {
+          "seconds": 3451.103,
+          "cpu_percent_one_core": 0.0010891136896928242,
+          "resident_mib": 104.375,
+          "physical_footprint_mib": 42.48535919189453,
+          "disk_write_bytes": 0
+        },
+        {
+          "seconds": 3466.109,
+          "cpu_percent_one_core": 0.019840246213758142,
+          "resident_mib": 104.375,
+          "physical_footprint_mib": 42.48535919189453,
+          "disk_write_bytes": 0
+        },
+        {
+          "seconds": 3481.119,
+          "cpu_percent_one_core": 0.001054288217833207,
+          "resident_mib": 104.375,
+          "physical_footprint_mib": 42.48535919189453,
+          "disk_write_bytes": 0
+        },
+        {
+          "seconds": 3496.125,
+          "cpu_percent_one_core": 0.009579710405056384,
+          "resident_mib": 104.375,
+          "physical_footprint_mib": 42.48535919189453,
+          "disk_write_bytes": 0
+        },
+        {
+          "seconds": 3511.128,
+          "cpu_percent_one_core": 0.0010031826385813252,
+          "resident_mib": 104.375,
+          "physical_footprint_mib": 42.48535919189453,
+          "disk_write_bytes": 0
+        },
+        {
+          "seconds": 3526.134,
+          "cpu_percent_one_core": 0.08118717712807413,
+          "resident_mib": 104.375,
+          "physical_footprint_mib": 42.48535919189453,
+          "disk_write_bytes": 0
+        },
+        {
+          "seconds": 3541.141,
+          "cpu_percent_one_core": 0.01300697229605674,
+          "resident_mib": 104.375,
+          "physical_footprint_mib": 42.48535919189453,
+          "disk_write_bytes": 0
+        },
+        {
+          "seconds": 3556.149,
+          "cpu_percent_one_core": 0.0009594674050165045,
+          "resident_mib": 104.375,
+          "physical_footprint_mib": 42.48535919189453,
+          "disk_write_bytes": 0
+        },
+        {
+          "seconds": 3571.15,
+          "cpu_percent_one_core": 0.0009707645896743758,
+          "resident_mib": 104.375,
+          "physical_footprint_mib": 42.48535919189453,
+          "disk_write_bytes": 0
+        },
+        {
+          "seconds": 3586.159,
+          "cpu_percent_one_core": 0.001898623631123701,
+          "resident_mib": 104.375,
+          "physical_footprint_mib": 42.48535919189453,
+          "disk_write_bytes": 0
+        },
+        {
+          "seconds": 3600.008,
+          "cpu_percent_one_core": 0.16769505965196566,
+          "resident_mib": 104.390625,
+          "physical_footprint_mib": 42.48535919189453,
+          "disk_write_bytes": 0
+        }
+      ],
+      "gpu": "not measured",
+      "battery_life": "not measured",
+      "wall_clock_seconds": 5431.249867,
+      "elapsed_clock": "mach_absolute_time() via Python time.monotonic; deep sleep excluded",
+      "cpu_counter_unit": "mach_absolute_time ticks",
+      "mach_timebase": {
+        "numer": 125,
+        "denom": 3
+      },
+      "cpu_conversion_note": "Corrected after collection. The collector initially assumed Mach ticks were nanoseconds; timebase 125/3 was verified on this host with an independent 1-second CPU-clock calibration."
+    },
+    "prior_build_15_minutes": {
+      "tested_commit": "3a7bdcb821862b7f9e9fea51578cdcf7460abc72",
+      "pid": 84794,
+      "seconds": 900.001,
+      "cpu_seconds": 0.7159987499999999,
+      "cpu_percent_one_core": 0.07955529411102892,
+      "idle_wakeups": 12,
+      "interrupt_wakeups": 494,
+      "disk_read_bytes": 192512,
+      "disk_write_bytes": 0,
+      "logical_write_bytes": 32772,
+      "resident_mib_max": 82.0625,
+      "physical_footprint_mib_max": 35.18846130371094,
+      "gpu": "not measured",
+      "battery_life": "not measured",
+      "cpu_counter_unit": "mach_absolute_time ticks",
+      "mach_timebase": {
+        "numer": 125,
+        "denom": 3
+      },
+      "cpu_conversion_note": "Corrected after collection. The collector initially assumed Mach ticks were nanoseconds; timebase 125/3 was verified on this host with an independent 1-second CPU-clock calibration."
+    },
+    "app_bundle_allocated_kib": 548,
+    "power_start": "Now drawing from 'AC Power'\n -InternalBattery-0 85%; AC attached; not charging present: true",
+    "power_end": "Now drawing from 'AC Power'\n -InternalBattery-0 85%; AC attached; not charging present: true",
+    "additional_task_power_counters": {
+      "start": {
+        "available": true,
+        "gpu_utilisation_raw": 0,
+        "task_energy_raw": 2494968543,
+        "utc": "2026-10-23T03:39:41.119762+00:00",
+        "epoch_seconds": 1792726781.1199281,
+        "scope": "task_name_for_pid and TASK_POWER_INFO_V2 for app PID 91886 only"
+      },
+      "end": {
+        "available": true,
+        "gpu_utilisation_raw": 0,
+        "task_energy_raw": 2578760708,
+        "utc": "2026-10-23T03:52:24.108414+00:00",
+        "epoch_seconds": 1792727544.108596
+      },
+      "wall_clock_seconds_between_samples": 762.9886679649353,
+      "gpu_nanoseconds_delta": 0,
+      "kernel_attributed_task_energy_joules_delta": 0.083792165,
+      "scope": "TASK_POWER_INFO_V2 counters for the app process. GPU time excludes WindowServer. Task CPU-energy accounting is not whole-device energy or battery consumption; helpers are excluded.",
+      "unit_source": "https://github.com/apple-oss-distributions/xnu/blob/main/osfmk/kern/task.c#L6387-L6403"
+    },
+    "child_cpu_observation": {
+      "start_utc": "2026-10-23T02:32:55.730255+00:00",
+      "end_utc": "2026-10-23T03:52:24.110939+00:00",
+      "child_cpu_seconds_delta": 0.170478,
+      "scope": "Kernel accounting for completed child processes over this additional observation interval; this interval starts later than the main measurement and includes sleep. No full-system CPU or battery inference is made."
+    }
+  },
+  "limits": [
+    "Finite tests and a one-hour run cannot prove zero bugs or universally minimal resource usage.",
+    "The run observes this installed app in the background with recorded Settings open/close checks while the Mac is available for normal use; it is not a controlled benchmark of all UI interactions.",
+    "CPU, memory, wakeups and disk counters cover the app process only. OS helpers, networking services, cfprefsd and WindowServer are excluded.",
+    "No full battery discharge or attributable power measurement was performed. AC power readings are recorded; battery duration is not inferred from CPU usage.",
+    "System sleep and DarkWake occurred during the measurement and were observed in pmset logs. This was not a deliberately controlled sleep/wake experiment. No multi-day endurance run was performed.",
+    "Paid-account quotas were not deliberately exhausted. Alert transitions use labeled samples and deterministic fixtures; background usage fetches use actual providers.",
+    "Runtime testing covers this Apple Silicon macOS system. Intel and older macOS runtime behavior remain untested.",
+    "The macOS window-sharing indicator emitted geometry diagnostics during capture. The symbolicated stack points to NSThemeFrame._positionSharingIndicator and NSWindowSharingSessionRecipientIndicator; a separate Settings-window probe emitted no matching runtime issue. These OS-path diagnostics were recorded, not eliminated.",
+    "A temporary Mac lock prevented one in-run Settings inspection. After the run, Settings was accessible and both sample notifications were delivered again. The live menu popup was not directly clicked by automation; menu rendering and event-tracking behavior were covered by separate AppKit tests."
+  ]
+}

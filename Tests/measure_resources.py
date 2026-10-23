@@ -2,7 +2,9 @@
 """Read macOS per-process counters; no extra packages or administrator access.
 
 Usage: python3 Tests/measure_resources.py PID --seconds 60 --output report.json
-CPU is time / wall time on one core. Memory is sampled, not a lifetime maximum.
+CPU is time / monotonic elapsed time on one core. On macOS, deep sleep is excluded
+from that elapsed clock; UTC wall-clock duration is reported separately.
+Memory is sampled, not a lifetime maximum.
 This does not measure GPU work attributed to WindowServer or battery life.
 """
 import argparse
@@ -57,7 +59,8 @@ def measure(pid, seconds, interval=5, output=None):
 
     before = read()
     start = time.monotonic()
-    started_at = datetime.now(timezone.utc).isoformat()
+    start_utc = time.time()
+    started_at = datetime.fromtimestamp(start_utc, timezone.utc).isoformat()
     samples = [(0, before)]
     timeline = []
     last_progress = 0
@@ -69,6 +72,8 @@ def measure(pid, seconds, interval=5, output=None):
         cpu_seconds = (delta("user_time") + delta("system_time")) * seconds_per_tick
         return {
             "pid": pid, "requested_seconds": seconds, "seconds": round(elapsed, 3),
+            "elapsed_clock": time.get_clock_info("monotonic").implementation,
+            "wall_clock_seconds": round(time.time() - start_utc, 3),
             "completed": completed, "error": error, "started_at_utc": started_at,
             "reported_at_utc": datetime.now(timezone.utc).isoformat(),
             "sample_interval_seconds": interval, "sample_count": len(samples),
