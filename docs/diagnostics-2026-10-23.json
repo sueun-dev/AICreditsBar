@@ -259,5 +259,93 @@
       "https://support.apple.com/en-us/148830"
     ],
     "claim_limit": "Apple lists general bug fixes and a Platform SSO lock-screen fix; it does not identify the observed AppKit diagnostics as repaired."
+  },
+  "resumed_investigation": {
+    "baseline_commit": "e0dcbde6f3bb87f5a81ab6c469ca286738b3ed9d",
+    "pid": 38772,
+    "log_interval_start_utc": "2026-10-23T05:17:15+00:00",
+    "log_captured_at_utc": "2026-10-23T13:09:01.511097+00:00",
+    "error_fault_counts": {
+      "WindowServer task port": 1,
+      "negative view width": 3,
+      "negative view height": 3,
+      "InputAnalytics connection interrupted": 1,
+      "redacted accessibility guard": 1,
+      "App Intents": 0,
+      "status scene invalidation": 0,
+      "layout recursion": 0
+    },
+    "new_symbolication": {
+      "accessibility": "_NSAccessibilityLogUnsafeToVendElement",
+      "input_analytics": "__35-[IAXPCClient initWithServiceName:]_block_invoke.cold.1",
+      "limit": "The private accessibility payload and the server-side interruption cause remain unknown."
+    },
+    "sharing_indicator_trace": {
+      "start_utc": "2026-10-23T13:11:21.509092+00:00",
+      "end_utc": "2026-10-23T13:11:34.319765+00:00",
+      "observed_intrinsic_sizes": [
+        { "size": [-1, -1], "count": 6 },
+        { "size": [66, 20], "count": 5 }
+      ],
+      "mechanism": "AppKit passes the sharing indicator's negative intrinsic-size fallback directly to setFrameSize; its intrinsic-size implementation returns (-1, -1) when both checked internal references are nil.",
+      "application_layout_callback_on_stack": false,
+      "os_fault_repaired": false,
+      "debugger_detached": true
+    },
+    "settings_interaction": {
+      "final_refresh_interval_seconds": 300,
+      "notification_permission": "Allowed by macOS",
+      "additional_diagnostic": "ViewBridge cancellation code 18 while interacting with a text field; field remained usable."
+    },
+    "claude_authentication_recovery": {
+      "old_reading_utc": "2026-10-23T09:32:16.815529+00:00",
+      "live_error_before_recovery": "Claude Code login expired",
+      "in_flight": false,
+      "rate_limit_backoff_active": false,
+      "separate_cli_check": "Both providers returned a reading",
+      "running_app_automatic_refresh_utc": {
+        "Codex": "2026-10-23T13:17:10.824399+00:00",
+        "Claude": "2026-10-23T13:17:10.724395+00:00"
+      },
+      "live_errors_after_recovery": 0,
+      "manual_menu_refresh": false,
+      "credentials_modified_by_task": false,
+      "cause_is_sleep_clock_defect": false
+    },
+    "sleep_clock_regression": {
+      "baseline_clock": "ProcessInfo.systemUptime",
+      "corrected_clock": "clock_gettime_nsec_np(CLOCK_MONOTONIC_RAW)",
+      "baseline_passed": 3,
+      "baseline_failed": 2,
+      "corrected_passed": 5,
+      "corrected_failed": 0,
+      "method": "Real RefreshController with default clock selection and simulated platform clocks; no actual system sleep.",
+      "hardware_sleep_wake_verified": false,
+      "full_suite_passed": true
+    },
+    "updated_live_build": {
+      "pid": 90938,
+      "launched_at_utc": "2026-10-23T13:22:09+00:00",
+      "binary_sha256": "67f13728025e0b37b90118904c273aeff9eb38d5cb034d0b687b06dfd480d7fa",
+      "normal_build_sign_verify_restart": "passed",
+      "initial_readings_utc": {
+        "Codex": "2026-10-23T13:22:09.983927+00:00",
+        "Claude": "2026-10-23T13:22:09.968503+00:00"
+      },
+      "next_automatic_readings_utc": {
+        "Codex": "2026-10-23T13:27:39.857880+00:00",
+        "Claude": "2026-10-23T13:27:39.746549+00:00"
+      },
+      "fetched_at_delta_seconds": {
+        "Codex": 329.87395310401917,
+        "Claude": 329.77804613113403
+      },
+      "configured_interval_seconds": 300,
+      "timer_tolerance_seconds": 30,
+      "manual_refresh": false,
+      "log_captured_at_utc": "2026-10-23T13:28:25.174608+00:00",
+      "error_fault_count": 0,
+      "limit": "Short normal-running interval, without window capture or hardware sleep; not proof that the known OS warnings are repaired."
+    }
   }
 }

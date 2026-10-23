@@ -108,3 +108,70 @@ An update would therefore be a new environment to test, not an established fix.
 All log streams remained enabled. No private framework was patched or called to
 alter behavior. The OS faults and the unreproduced historical warning above are
 still open; passing tests and a clean startup interval do not establish their absence.
+
+## Resumed investigation and sleep-clock correction
+
+A fresh read at 08:09 America/Chicago covered PID 38772 from its 00:17:15 launch.
+The roughly 7-hour-52-minute interval contained nine error/fault entries: the
+previous task-port failure and six capture-geometry entries, one InputAnalytics
+connection interruption, and one redacted accessibility message. There were no
+App Intents, scene-invalidation, or layout-recursion entries in that interval.
+This is a retrospective log check, not a continuous performance measurement.
+
+Read-only symbolication placed the new accessibility entry in
+`_NSAccessibilityLogUnsafeToVendElement`, the same lock/shield protection path
+described above. The InputAnalytics entry came from the interruption logging block
+inside `IAXPCClient.initWithServiceName`; its server-side interruption cause was
+not recovered. Editing a Settings field also emitted a ViewBridge cancellation
+(code 18). The field remained usable and its original five-minute value was restored.
+Neither message is claimed to be repaired or conclusively harmless in all contexts.
+
+The sharing-indicator fault is now narrowed to actual input values. In the installed
+app, a read-only breakpoint immediately after the indicator's `intrinsicContentSize`
+call recorded six `(-1, -1)` results and five `(66, 20)` results. AppKit's
+`NSThemeFrame._positionSharingIndicator` passes that size directly to `setFrameSize`.
+Disassembly of `NSWindowSharingSessionRecipientIndicator.intrinsicContentSize` shows
+the `(-1, -1)` fallback when both checked internal references are nil. The captured stack
+runs through AppKit's sharing-state/appearance initialization, with no application
+layout callback. This explains the observed negative sizes; it is not an OS repair.
+The sharing indicator was left visible and all debugger attachments were detached.
+
+The live-state check also found an old Claude reading. Inspection of the running
+app identified **expired Claude Code login**, with no in-flight request or active
+429 backoff. A separate CLI request succeeded after the credential became valid;
+the running app then automatically refreshed both providers at approximately
+13:17:10 UTC and cleared the error, without a manual menu refresh. The app did not
+rotate or write credentials. This authentication interruption is separate from the
+clock defect below; `pmset` recorded no system sleep during this observation interval.
+
+Code review found that `RefreshController` used `systemUptime` for both its minimum
+request gap and 429 deadlines. That clock counts awake time. Consequently, sleeping
+does not consume a retry delay, and a long sleep just after a request can still
+leave the post-wake request blocked by the minimum gap. The default clock now uses
+`clock_gettime_nsec_np(CLOCK_MONOTONIC_RAW)`, which advances during sleep and is
+independent of wall-clock corrections. The API is available before the app's macOS
+11 deployment target. See Apple's documentation for
+[systemUptime](https://developer.apple.com/documentation/foundation/processinfo/systemuptime)
+and [continuous time](https://developer.apple.com/documentation/kernel/1646199-mach_continuous_time).
+
+`Tests/refresh-clock/run.sh` compiles the real controller with deterministic platform
+clock stand-ins, leaving its default clock argument intact. The previous source
+fails two assertions: refresh after an hour asleep, and expiration of a five-minute
+backoff including sleep. The corrected source passes all five assertions, including
+retaining a backoff when a short sleep has not exhausted it. The full suite also
+passes: 236 existing Swift assertions, five E2E scenarios, process scoping, eight
+signing cases, two resource tests, and six energy-tool tests. Actual hardware
+sleep/wake with this new build has not been tested; the Mac was not put to sleep.
+
+This clock fix does not claim to remove the remaining macOS diagnostics or identify
+the exact historical layout-recursion trigger. No OS update was installed.
+
+The normal build signed and restarted the updated app as PID 90938 at 08:22:09
+America/Chicago. Both providers saved successful readings at approximately 13:22:10
+UTC and again at 13:27:40 UTC without manual refresh. The intervals were 329.874
+seconds for Codex and 329.778 seconds for Claude, within the existing five-minute
+timer plus its 10% tolerance. Error/fault logs through 13:28:25 UTC contained zero
+entries for this process. This short interval did not include window capture or
+hardware sleep and does not establish that the known OS warnings are fixed.
+The updated binary SHA-256 is
+`67f13728025e0b37b90118904c273aeff9eb38d5cb034d0b687b06dfd480d7fa`.

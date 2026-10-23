@@ -1,4 +1,5 @@
 import Foundation
+import Darwin
 
 /// Fetches each provider on a background queue — at most one request per
 /// provider at a time, so a slow endpoint never holds up the other — and
@@ -23,7 +24,9 @@ final class RefreshController {
 
     init(sources: [Source] = [Source(provider: .codex, fetch: fetchCodexReading),
                               Source(provider: .claude, fetch: fetchClaudeReading)],
-         clock: @escaping () -> Double = { ProcessInfo.processInfo.systemUptime }) {
+         // Backoff and minimum gaps must elapse during sleep, without depending
+         // on wall-clock adjustments. systemUptime excludes time spent asleep.
+         clock: @escaping () -> Double = { Double(clock_gettime_nsec_np(CLOCK_MONOTONIC_RAW)) / 1e9 }) {
         self.sources = sources
         self.clock = clock
     }
