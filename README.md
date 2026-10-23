@@ -77,6 +77,9 @@ notification settings control whether banners appear. Alerts are silent.
 
 If an endpoint omits reset times, a full refill from exhausted to zero usage starts a
 new warning cycle. Ordinary percentage fluctuations do not repeatedly warn.
+Delayed responses cannot overwrite newer notification history. Temporarily omitted
+limits retain their history until reset (24 hours without a reset time), with up to
+32 omitted limits per provider retained to keep storage bounded.
 
 ### Requirements
 
@@ -140,11 +143,15 @@ scripts/               install-login-item.sh
 replies as fixtures) and an end-to-end pass in a scratch `HOME` with no Keychain access. It
 never touches the installed app or your settings.
 Regression coverage includes notification thresholds/restarts/delivery retries,
+out-of-order permission callbacks and responses, temporarily omitted limits,
 10,100 simulated readings, HTTP cancellation, offline/TLS errors, per-provider backoff,
 display scheduling, process locking, and checkout-specific restart behavior.
 
 To sample a running app's CPU time, memory footprint, wakeups and disk counters:
 `python3 Tests/measure_resources.py <PID> --seconds 60 --output report.json`.
+For a one-hour run, use `--seconds 3600 --interval 15`. The report records memory
+growth and a sample timeline, updates every minute, and reports an interrupted
+process as an incomplete measurement.
 This does not measure battery life or GPU work performed by WindowServer.
 See the [2026-10-22 validation record](docs/validation-2026-10-22.json) for the tested
 environment, live-app checks, resource samples and remaining limits.
@@ -208,6 +215,9 @@ Codex와 Claude 요금제 한도가 얼마나 남았는지 macOS 메뉴바에 �
 
 API에 리셋 시각이 없으면 완전히 소진된 한도가 사용량 0으로 충전됐을 때 다음 경고 주기를
 시작합니다. 잔량이 조금 오르내리는 것만으로 경고를 반복하지 않습니다.
+늦게 도착한 응답은 최신 알림 이력을 덮어쓰지 않습니다. API에서 일시적으로 빠진 한도도
+리셋 시각까지(리셋 시각이 없으면 24시간) 이력을 유지하며, 저장량을 제한하기 위해 서비스별
+최대 32개의 누락된 한도를 보관합니다.
 
 ### 요구 사항
 
@@ -248,11 +258,14 @@ $B --settings                 # 설정 창 열기 (필요하면 앱 실행)
 `bash Tests/run.sh` — 임시 바이너리를 빌드해 단위 테스트(실제 API 응답을 픽스처로 사용)와
 e2e(키체인 접근 없는 임시 `HOME`)를 실행합니다. 설치된 앱과 설정은 건드리지 않습니다.
 알림 경계값·재시작·재시도, 10,100회 연속 입력, HTTP 취소·연결 실패, 서비스별 재시도 대기,
-화면 갱신 시점, 중복 실행 방지와 다른 경로의 앱을 보존하는 재시작을 검사합니다.
+권한 콜백·응답의 순서 역전, 한도 일시 누락, 화면 갱신 시점, 중복 실행 방지와 다른 경로의
+앱을 보존하는 재시작을 검사합니다.
 
 `python3 Tests/measure_resources.py <PID> --seconds 60 --output report.json`으로 실행 중인
 앱의 CPU 시간·메모리·웨이크업·디스크 카운터를 측정할 수 있습니다. 이 스크립트로 배터리
 지속 시간이나 WindowServer가 수행한 GPU 작업을 측정할 수는 없습니다.
+1시간 측정에는 `--seconds 3600 --interval 15`를 사용합니다. 보고서는 메모리 변화와
+시점별 표본을 포함하고 매분 저장되며, 프로세스가 종료되면 미완료로 기록합니다.
 [2026-10-22 검증 기록](docs/validation-2026-10-22.json)에 환경·실제 앱 확인·성능 표본과
 검증하지 못한 범위를 남겼습니다.
 

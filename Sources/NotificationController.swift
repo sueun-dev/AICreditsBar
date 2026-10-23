@@ -3,12 +3,30 @@ import UserNotifications
 
 /// Uses the system notification service, without a notification polling timer.
 final class NotificationController: NSObject, UNUserNotificationCenterDelegate {
+    typealias AuthorizationReader = (@escaping (UNAuthorizationStatus) -> Void) -> Void
+    typealias Submitter = (UNNotificationRequest, @escaping (Error?) -> Void) -> Void
     private lazy var center = UNUserNotificationCenter.current()
+    private let authorization: AuthorizationReader
+    private let submit: Submitter
+    private let clock: () -> Double
     private var tracker = QuotaAlertTracker(data: Cfg.alertHistory)
     private var submitting = Set<String>()
     private var latestTestRun: String?
     var onStatus: (String) -> Void = { _ in }
     var onOpen: () -> Void = {}
+
+    init(clock: @escaping () -> Double = nowEpoch,
+         authorization: @escaping AuthorizationReader = { completion in
+             UNUserNotificationCenter.current().getNotificationSettings { completion($0.authorizationStatus) }
+         },
+         submit: @escaping Submitter = { request, completion in
+             UNUserNotificationCenter.current().add(request, withCompletionHandler: completion)
+         }) {
+        self.clock = clock
+        self.authorization = authorization
+        self.submit = submit
+        super.init()
+    }
 
     func start() { center.delegate = self; updatePermissionStatus() }
 
@@ -22,9 +40,9 @@ final class NotificationController: NSObject, UNUserNotificationCenterDelegate {
     }
 
     func updatePermissionStatus() {
-        center.getNotificationSettings { [weak self] settings in
+        authorization { [weak self] permission in
             let status: String
-            switch settings.authorizationStatus {
+            switch permission {
             case .authorized, .provisional: status = "Allowed by macOS · Focus may silence banners."
             case .denied: status = "Blocked in System Settings → Notifications."
             case .notDetermined: status = "Choose Enable Notifications to allow alerts."
@@ -35,11 +53,11 @@ final class NotificationController: NSObject, UNUserNotificationCenterDelegate {
     }
 
     func record(_ reading: Reading, provider: Provider) {
-        center.getNotificationSettings { [weak self] settings in
+        authorization { [weak self] permission in
             DispatchQueue.main.async {
                 guard let self = self, Cfg.isShown(provider) else { return }
-                let allowed = settings.authorizationStatus == .authorized || settings.authorizationStatus == .provisional
-                let alerts = self.tracker.observe(reading, provider: provider, now: nowEpoch(),
+                let allowed = permission == .authorized || permission == .provisional
+                let alerts = self.tracker.observe(reading, provider: provider, now: self.clock(),
                                                  lowEnabled: allowed && Cfg.lowAlerts,
                                                  recoveryEnabled: allowed && Cfg.recoveryAlerts)
                 Cfg.alertHistory = self.tracker.data
@@ -52,7 +70,7 @@ final class NotificationController: NSObject, UNUserNotificationCenterDelegate {
     /// without changing live quota or its persisted notification history.
     func testAlerts() {
         var sample = QuotaAlertTracker()
-        let now = nowEpoch()
+        let now = clock()
         func reading(_ used: Double, at: Double, reset: Double) -> Reading {
             Reading(windows: [UsageWindow(label: "5-hour (sample)", kind: .session, usedPercent: used, resetsAt: reset)], fetchedAt: at)
         }
@@ -66,9 +84,9 @@ final class NotificationController: NSObject, UNUserNotificationCenterDelegate {
     }
 
     private func send(_ alerts: [QuotaAlert], test: Bool = false) {
-        center.getNotificationSettings { [weak self] settings in
+        authorization { [weak self] permission in
             guard let self = self else { return }
-            guard settings.authorizationStatus == .authorized || settings.authorizationStatus == .provisional else {
+            guard permission == .authorized || permission == .provisional else {
                 DispatchQueue.main.async { self.onStatus("Alerts are blocked. Enable notifications first.") }
                 return
             }
@@ -78,6 +96,7 @@ final class NotificationController: NSObject, UNUserNotificationCenterDelegate {
                 for (index, alert) in alerts.enumerated() {
                     if !test {
                         guard Cfg.isShown(alert.provider), alert.kind == .low ? Cfg.lowAlerts : Cfg.recoveryAlerts,
+                              self.tracker.isPending(alert, now: self.clock()),
                               self.submitting.insert(alert.id).inserted else { continue }
                     }
                     let content = UNMutableNotificationContent()
@@ -88,7 +107,7 @@ final class NotificationController: NSObject, UNUserNotificationCenterDelegate {
                     let id = test ? "aicb-test-\(index)" : alert.id
                     // Space the two sample banners so both can be inspected.
                     let trigger = test ? UNTimeIntervalNotificationTrigger(timeInterval: Double(index * 5 + 1), repeats: false) : nil
-                    self.center.add(UNNotificationRequest(identifier: id, content: content, trigger: trigger)) { error in
+                    self.submit(UNNotificationRequest(identifier: id, content: content, trigger: trigger)) { error in
                         DispatchQueue.main.async {
                             if !test { self.submitting.remove(alert.id) }
                             if let error = error { self.onStatus("Could not schedule alert: \(error.localizedDescription)") }

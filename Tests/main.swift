@@ -335,6 +335,7 @@ Cfg.removeLegacyKeys()
 check(Cfg.d.object(forKey: "claudeSessionKey") == nil && Cfg.d.object(forKey: "claudeOrgUuid") == nil, "version-1 session cookie is removed")
 
 runRegressionTests(now: now)
+runNotificationTests(now: now)
 
 let summary = "\(passed) passed, \(failures) failed"
 print(failures == 0 ? "✓ unit: \(summary)" : "✗ unit: \(summary)")

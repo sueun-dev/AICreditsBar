@@ -7,6 +7,7 @@ struct QuotaAlert: Equatable {
     var window: String
     var left: Int
     var id: String
+    var fetchedAt: Double
 
     var title: String {
         kind == .low ? "\(provider.rawValue): \(left)% remaining" : "\(provider.rawValue) quota recovered"
@@ -39,6 +40,12 @@ struct QuotaAlertTracker {
         guard reading.fetchedAt.isFinite, reading.fetchedAt <= now + 5,
               now - reading.fetchedAt <= 60 else { return [] }
         let prefix = provider.rawValue + ":"
+        // Permission callbacks can arrive out of order even though requests
+        // themselves do not overlap. Reject the entire older response, including
+        // its window list, before it can remove any newer history.
+        let newest = checkpoints.filter { $0.key.hasPrefix(prefix) && $0.value.observedAt <= now + 5 }
+            .values.map { $0.observedAt }.max()
+        if let newest = newest, reading.fetchedAt <= newest { return [] }
         var alerts: [QuotaAlert] = []
         var present = Set<String>()
         for window in reading.windows {
@@ -64,22 +71,43 @@ struct QuotaAlertTracker {
                 && (recovered || (!newCycle && (previous?.pendingRecovery ?? false)))
             if pendingRecovery {
                 alerts.append(QuotaAlert(kind: .recovered, provider: provider, window: window.label,
-                                         left: window.leftPercent, id: "\(key):recovered:\(cycle)"))
+                                         left: window.leftPercent, id: "\(key):recovered:\(cycle)", fetchedAt: reading.fetchedAt))
             }
             // Use the reported value, not the rounded display (20.4% is still >20%).
             if window.usedPercent >= 80, !lowNotified {
                 if lowEnabled {
                     alerts.append(QuotaAlert(kind: .low, provider: provider, window: window.label,
-                                             left: window.leftPercent, id: "\(key):low:\(cycle)"))
+                                             left: window.leftPercent, id: "\(key):low:\(cycle)", fetchedAt: reading.fetchedAt))
                 }
             }
             checkpoints[key] = Checkpoint(used: window.usedPercent, reset: window.resetsAt,
                                           observedAt: reading.fetchedAt, lowNotified: lowNotified, cycle: cycle,
                                           pendingRecovery: pendingRecovery)
         }
-        // Bound persistence to the windows in this provider's latest response.
-        checkpoints = checkpoints.filter { !$0.key.hasPrefix(prefix) || present.contains($0.key) }
+        // An API may temporarily omit a model/window. Keep a small, bounded
+        // history so its return cannot repeat an already delivered warning.
+        let retained = checkpoints.filter {
+            $0.key.hasPrefix(prefix) && !present.contains($0.key)
+                && ($0.value.reset ?? ($0.value.observedAt + 86400)) > now
+        }.sorted {
+            $0.value.observedAt == $1.value.observedAt ? $0.key < $1.key : $0.value.observedAt > $1.value.observedAt
+        }.prefix(32).map { $0.key }
+        let keep = present.union(retained)
+        checkpoints = checkpoints.filter { !$0.key.hasPrefix(prefix) || keep.contains($0.key) }
         return alerts
+    }
+
+    /// Recheck immediately before scheduling: a delayed permission reply must
+    /// not deliver an alert superseded by a newer response or an expired window.
+    func isPending(_ alert: QuotaAlert, now: Double) -> Bool {
+        guard now - alert.fetchedAt <= 60, alert.fetchedAt <= now + 5,
+              let entry = checkpoints.first(where: { alert.id == "\($0.key):\(alert.kind.rawValue):\($0.value.cycle)" }),
+              entry.value.observedAt == alert.fetchedAt,
+              (entry.value.reset ?? .infinity) > now else { return false }
+        let prefix = alert.provider.rawValue + ":"
+        guard !checkpoints.contains(where: { $0.key.hasPrefix(prefix) && $0.value.observedAt <= now + 5
+            && $0.value.observedAt > alert.fetchedAt }) else { return false }
+        return alert.kind == .low ? !entry.value.lowNotified && entry.value.used >= 80 : entry.value.pendingRecovery
     }
 
     /// Only a successful OS scheduling callback consumes an alert. A denied

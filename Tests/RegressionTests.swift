@@ -116,9 +116,33 @@ func runRegressionTests(now: Double) {
     let multiLow = observe(&multi, multiReading)
     eq(multiLow.count, 3, "each limit including per-model limits is covered")
     multiLow.forEach { multi.acknowledge($0) }
+    var reordered = QuotaAlertTracker(data: multi.data)
+    _ = observe(&reordered, sample(86, now - 1, reset: now + 600))
+    eq(reordered.checkpoints.count, 3, "late partial response cannot discard newer windows")
+    var nextComplete = multiReading
+    nextComplete.fetchedAt = now + 2
+    eq(observe(&reordered, nextComplete).count, 0, "reordered response cannot re-arm an already delivered warning")
+
+    var missing = QuotaAlertTracker(data: multi.data)
+    _ = observe(&missing, sample(86, now + 1, reset: now + 600))
+    eq(observe(&missing, nextComplete).count, 0, "a window briefly omitted by the service does not warn twice")
     eq(observe(&multi, sample(85, now), provider: .claude).count, 1, "providers have independent notification history")
     _ = observe(&multi, sample(86, now + 1, reset: now + 600))
-    eq(multi.checkpoints.count, 2, "removed windows are pruned without deleting the other provider")
+    eq(multi.checkpoints.count, 4, "temporarily omitted windows and the other provider retain their history")
+    _ = observe(&multi, sample(86, now + 3601, reset: now + 5000))
+    eq(multi.checkpoints.count, 2, "omitted windows are pruned after their reset")
+    var churn = QuotaAlertTracker()
+    for index in 0..<100 {
+        _ = observe(&churn, sample(30, now + Double(index), reset: now + 3600, label: "model \(index)"))
+    }
+    eq(churn.checkpoints.count, 33, "inactive history is capped at 32 windows plus the current response")
+
+    var pending = QuotaAlertTracker()
+    let pendingLow = observe(&pending, sample(85, now, reset: now + 600))[0]
+    check(pending.isPending(pendingLow, now: now + 1), "current low alert may be scheduled")
+    check(!pending.isPending(pendingLow, now: now + 61), "a delayed stale alert is not scheduled")
+    _ = observe(&pending, sample(50, now + 2, reset: now + 600))
+    check(!pending.isPending(pendingLow, now: now + 2), "newer healthy reading invalidates delayed low alert")
     var duplicate = sample(85, now)
     duplicate.windows.append(duplicate.windows[0])
     var duplicates = QuotaAlertTracker()
