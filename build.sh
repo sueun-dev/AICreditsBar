@@ -4,6 +4,7 @@ set -euo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
 APP="$HERE/AICreditsBar.app"
 source "$HERE/scripts/app-process.sh"
+source "$HERE/scripts/signing-identity.sh"
 STAGING="$(mktemp -d "$HERE/.build-XXXXXX")"
 STAGED_APP="$STAGING/AICreditsBar.app"
 CONTENTS="$STAGED_APP/Contents"
@@ -45,8 +46,21 @@ cat > "$CONTENTS/Info.plist" <<'PLIST'
 </plist>
 PLIST
 
-# Ad-hoc sign so it launches cleanly. Surface real failures instead of hiding them.
-codesign --force --sign - "$STAGED_APP"
+# AppKit registers with App Intents even when the app defines no intents. Current
+# macOS rejects that connection without a signing Team ID. Use an available Apple
+# identity when unambiguous; keep ad-hoc builds available without a developer account.
+AVAILABLE_IDENTITIES=""
+if [ -z "${AICB_SIGN_IDENTITY:-}" ]; then
+  AVAILABLE_IDENTITIES="$(security find-identity -v -p codesigning)"
+fi
+SIGN_IDENTITY="$(select_signing_identity "${AICB_SIGN_IDENTITY:-}" "$AVAILABLE_IDENTITIES")"
+if [ "$SIGN_IDENTITY" = '-' ]; then
+  echo "Signing ad hoc (set AICB_SIGN_IDENTITY to use an Apple signing identity)"
+else
+  echo "Signing with the selected code-signing identity"
+fi
+codesign --force --sign "$SIGN_IDENTITY" "$STAGED_APP"
+codesign --verify --strict "$STAGED_APP"
 
 # Replace the installed bundle only after compilation and signing succeed.
 if [ -e "$APP" ]; then mv "$APP" "$STAGING/previous.app"; fi
@@ -57,9 +71,12 @@ fi
 
 echo "Built $APP"
 
-# Restart a running copy on the new build. macOS ties a registered login item to
-# the exact (ad-hoc signed) binary it was registered with and refuses to launch a
-# rebuilt one, so the login item is re-registered rather than just relaunched.
+# Refresh Launch Services after replacing the bundle: its record can still describe
+# the previous ad-hoc signature, causing App Intents to reject the newly signed app.
+/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister -f "$APP"
+
+# Restart a running copy on the new build, re-registering the login item so its
+# background-task registration follows the replaced binary.
 PLIST="$HOME/Library/LaunchAgents/com.sueun.aicreditsbar.plist"
 if [ -f "$PLIST" ] && [ "$(/usr/libexec/PlistBuddy -c 'Print :ProgramArguments:0' "$PLIST" 2>/dev/null)" = "$APP/Contents/MacOS/aicreditsbar" ]; then
   launchctl bootout "gui/$(id -u)/com.sueun.aicreditsbar" 2>/dev/null || true

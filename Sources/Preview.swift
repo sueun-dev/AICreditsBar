@@ -30,7 +30,7 @@ func renderPreview(to path: String) throws {
     let bar = NSView(frame: NSRect(x: 0, y: 0, width: width, height: barHeight))
     bar.wantsLayer = true
     bar.layer?.backgroundColor = (dark ? NSColor(white: 0.1, alpha: 1) : NSColor(white: 0.9, alpha: 1)).cgColor
-    let rings = menuBarImage(states, appearance: appearance)
+    let rings = menuBarImage(states)
     let title = NSImageView(image: rings)
     title.frame = NSRect(x: width - rings.size.width - 14, y: (barHeight - rings.size.height) / 2,
                          width: rings.size.width, height: rings.size.height)

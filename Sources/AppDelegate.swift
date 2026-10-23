@@ -17,7 +17,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private var lastGauges: [MenuBarGauge] = []
     private var lastProviders: [Provider] = []
     private var wakeWork: DispatchWorkItem?
-    private var appearanceObserver: NSKeyValueObservation?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
@@ -40,8 +39,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                                                           name: NSWorkspace.didWakeNotification, object: nil)
         DistributedNotificationCenter.default().addObserver(self, selector: #selector(openSettings),
                                                             name: showSettingsNotification, object: nil)
-        // The menu bar flips between light and dark text with the wallpaper; repaint the rings.
-        appearanceObserver = statusItem.button?.observe(\.effectiveAppearance) { [weak self] _, _ in self?.updateTitle(force: true) }
         updateTitle(force: true)
         refresher.start(every: Cfg.refreshInterval)
         scheduleDisplay()
@@ -89,7 +86,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         if force || gauges != lastGauges || shownProviders != lastProviders {
             button.image = items.isEmpty
                 ? NSImage(systemSymbolName: "speedometer", accessibilityDescription: "AICreditsBar")
-                : menuBarImage(items, appearance: button.effectiveAppearance, now: now)
+                : menuBarImage(items, now: now)
             lastGauges = gauges; lastProviders = shownProviders
         }
         // Exact numbers on hover; click for every limit.

@@ -2,6 +2,9 @@
 
 Local date: 2026-10-22, America/Chicago. Raw timestamps use UTC (2026-10-23).
 
+See the [2026-10-23 follow-up](diagnostics-2026-10-23.md) for the appearance/signing
+fixes and additional evidence. The results below describe the earlier build.
+
 The screen-sharing geometry fault was independently reproduced in a minimal
 AppKit program with no AICreditsBar source, networking, status item, or custom
 layout. Changing the title-bar or resizing options did not reliably prevent it.

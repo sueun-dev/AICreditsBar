@@ -1,0 +1,228 @@
+{
+  "date": "2026-10-23",
+  "environment": {
+    "os": "macOS 27.0",
+    "build": "26A428",
+    "architecture": "arm64"
+  },
+  "baseline_commit": "1071e89c3c68bc97c3ed53949763d720c946d25d",
+  "battery_measurement": "deferred by user",
+  "appearance": {
+    "baseline": {
+      "single_launch_image_assignments": 104,
+      "single_launch_steps": 12,
+      "settings_launches_exited_zero": 5,
+      "settings_total_image_assignments": 394,
+      "settings_appearance_steps": 60,
+      "layout_warning_count": 0,
+      "layout_breakpoint_hits": 0
+    },
+    "candidate": {
+      "single_launch_image_assignments": 1,
+      "single_launch_steps": 12,
+      "settings_launches_exited_zero": 5,
+      "settings_total_image_assignments": 5,
+      "settings_appearance_steps": 60,
+      "layout_warning_count": 0,
+      "layout_breakpoint_hits": 0
+    },
+    "regression": {
+      "baseline_failed_contrast_assertions": 2,
+      "updated_swift_assertions_passed": 236,
+      "updated_failed": 0,
+      "checks": "same NSImage drawn light/dark/light/dark; visible opaque pixels and contrasting ink"
+    }
+  },
+  "signing": {
+    "same_probe": {
+      "adhoc": {
+        "pid": 28149,
+        "error_fault_count": 9
+      },
+      "apple_development": {
+        "pid": 28232,
+        "error_fault_count": 0
+      }
+    },
+    "installed_before_registration_refresh": {
+      "pid": 27941,
+      "app_intents_errors": 9
+    },
+    "normal_final_build": {
+      "captured_at_utc": "2026-10-23T05:18:49.635740+00:00",
+      "pid": 38772,
+      "start_local": "Fri Oct 23 00:17:15 2026",
+      "error_fault_count": 0,
+      "binary_sha256": "503956d14b7a667adadcd15788f75d66f969ebf13d2fb09200b5294435c4bea9"
+    },
+    "identity_selection_cases_passed": 8,
+    "private_certificate_information_included": false
+  },
+  "independent_status_probe": {
+    "source": "Tests/diagnostics/status.swift",
+    "pid": 36447,
+    "lifecycle_steps": 41,
+    "counts": {
+      "No matching scene to invalidate": 160,
+      "BSBlockSentinel": 200,
+      "Unhandled disconnected": 200,
+      "layoutSubtreeIfNeeded": 0
+    },
+    "limit": "Independent lifecycle reproduction; historical DarkWake sequence was not recreated."
+  },
+  "windowserver": {
+    "target_pid": 418,
+    "captured_in_app_pid": 32283,
+    "stack": [
+      {
+        "module": "BaseBoard",
+        "function": "-[BSMachPortTaskNameRight initWithPID:]"
+      },
+      {
+        "module": "BaseBoard",
+        "function": "+[BSMachPortTaskNameRight taskNameForPID:]"
+      },
+      {
+        "module": "BaseBoard",
+        "function": "-[BSProcessHandle _initWithAuditToken:bundleID:]"
+      },
+      {
+        "module": "BaseBoard",
+        "function": "+[BSProcessHandle processHandleForXPCConnection:]"
+      },
+      {
+        "module": "BoardServices",
+        "function": "+[BSXPCServiceConnectionPeer peerOfConnection:]"
+      },
+      {
+        "module": "BoardServices",
+        "function": "__55-[BSXPCServiceConnection _lock_activateNowOrWhenReady:]_block_invoke.235"
+      },
+      {
+        "module": "libxpc.dylib",
+        "function": "_xpc_connection_call_event_handler"
+      },
+      {
+        "module": "libxpc.dylib",
+        "function": "_xpc_connection_mach_event"
+      },
+      {
+        "module": "libdispatch.dylib",
+        "function": "_dispatch_client_callout4"
+      },
+      {
+        "module": "libdispatch.dylib",
+        "function": "_dispatch_mach_msg_invoke"
+      },
+      {
+        "module": "libdispatch.dylib",
+        "function": "_dispatch_lane_serial_drain"
+      },
+      {
+        "module": "libdispatch.dylib",
+        "function": "_dispatch_mach_invoke"
+      },
+      {
+        "module": "libdispatch.dylib",
+        "function": "_dispatch_lane_serial_drain"
+      },
+      {
+        "module": "libdispatch.dylib",
+        "function": "_dispatch_lane_invoke"
+      },
+      {
+        "module": "libdispatch.dylib",
+        "function": "_dispatch_root_queue_drain_deferred_wlh"
+      },
+      {
+        "module": "libdispatch.dylib",
+        "function": "_dispatch_workloop_worker_thread"
+      },
+      {
+        "module": "libsystem_pthread.dylib",
+        "function": "_pthread_wqthread"
+      }
+    ],
+    "status": "Framework task-name-port request failure remains; no security settings changed."
+  },
+  "accessibility": {
+    "historical_sender": "_NSAccessibilityLogUnsafeToVendElement",
+    "inspected_guard": "_NSAccessibilitySafeToVendElement",
+    "branches": [
+      "secure screen-lock UI",
+      "window below system shield"
+    ],
+    "evidence": "Read-only disassembly and successful native accessibility checks while unlocked.",
+    "limit": "Historical payload remains private; exact guard branch is not recovered."
+  },
+  "automatic_refresh": {
+    "pid": 32283,
+    "manual_refresh": false,
+    "before": {
+      "utc": "2026-10-23T05:15:17.615651+00:00",
+      "providers": {
+        "Codex": {
+          "shown": true,
+          "fetchedAt": 1792732289.465158
+        },
+        "Claude": {
+          "shown": true,
+          "fetchedAt": 1792732289.339783
+        }
+      }
+    },
+    "after": {
+      "utc": "2026-10-23T05:16:48.406572+00:00",
+      "pid": 32283,
+      "providers": {
+        "Codex": {
+          "shown": true,
+          "fetchedAt": 1792732592.043319
+        },
+        "Claude": {
+          "shown": true,
+          "fetchedAt": 1792732591.963492
+        }
+      }
+    },
+    "fetched_at_delta_seconds": {
+      "Codex": 302.57816100120544,
+      "Claude": 302.62370896339417
+    }
+  },
+  "validation": {
+    "swift_assertions": 236,
+    "e2e_scenarios": 5,
+    "process_restart_scoping": "passed",
+    "signing_selection_cases": 8,
+    "resource_tests": 2,
+    "energy_tool_tests": 6,
+    "real_battery_discharge_measured": false,
+    "normal_build": "passed",
+    "signature_verification": "passed",
+    "native_settings": "both providers enabled; 5-minute polling; notification permission allowed",
+    "unresolved": [
+      "OS screen-sharing geometry fault",
+      "OS WindowServer task-port failure",
+      "OS status-item scene lifecycle faults",
+      "exact trigger and cure of historical layout-recursion warning"
+    ]
+  },
+  "final_build_live_check": {
+    "pid": 38772,
+    "captured_at_utc": "2026-10-23T05:23:28.443835+00:00",
+    "automatic_refresh_utc": {
+      "Codex": "2026-10-23T05:22:19.939764+00:00",
+      "Claude": "2026-10-23T05:22:19.717857+00:00"
+    },
+    "manual_refresh": false,
+    "error_fault_count": 7,
+    "diagnostic_counts": {
+      "Unable to obtain a task name port right for pid 418: (os/kern) failure (0x5)": 1,
+      "Invalid view geometry: width is negative.": 3,
+      "Invalid view geometry: height is negative.": 3
+    },
+    "app_intents_error_count": 0,
+    "layout_warning_count": 0
+  }
+}

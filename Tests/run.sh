@@ -23,6 +23,7 @@ echo "── e2e ──"
 "${SWIFTC[@]}" -O Sources/*.swift -o "$OUT/aicreditsbar"
 bash Tests/e2e.sh "$OUT/aicreditsbar"
 bash Tests/processes.sh
+bash Tests/signing.sh
 python3 Tests/test_resources.py
 python3 Tests/test_energy.py
 

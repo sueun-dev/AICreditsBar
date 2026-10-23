@@ -53,15 +53,17 @@ func menuBarGauge(_ state: ProviderState, now: Double) -> MenuBarGauge {
 
 /// The status-item image: each provider's mark inside a thin ring whose arc is
 /// the remaining %, clockwise from 12 o'clock. The menu bar doesn't tint images it
-/// isn't given as templates, so everything is painted in its text color for
-/// `appearance` — orange or red when low, faded when the number isn't current.
-func menuBarImage(_ items: [(Provider, ProviderState)], appearance: NSAppearance, now: Double = nowEpoch()) -> NSImage {
-    var ink = NSColor.labelColor
-    appearance.performAsCurrentDrawingAppearance { ink = NSColor.labelColor.usingColorSpace(.sRGB) ?? .labelColor }
+/// isn't given as templates, so resolve its text color when drawing — orange or
+/// red when low, faded when the number isn't current.
+func menuBarImage(_ items: [(Provider, ProviderState)], now: Double = nowEpoch()) -> NSImage {
     let gauges = items.map { ($0.0, menuBarGauge($0.1, now: now)) }
     let size: CGFloat = 19, gap: CGFloat = 6
     let width = CGFloat(gauges.count) * (size + gap) - gap
     let image = NSImage(size: NSSize(width: max(size, width), height: size), flipped: false) { _ in
+        // AppKit temporarily changes a status button's appearance while drawing
+        // menu-bar replicas. Resolve ink here; replacing button.image in an
+        // effectiveAppearance observer reenters that snapshot/layout work.
+        let ink = NSColor.labelColor.usingColorSpace(.sRGB) ?? .labelColor
         for (index, (provider, gauge)) in gauges.enumerated() {
             drawRing(provider, gauge, in: NSRect(x: CGFloat(index) * (size + gap), y: 0, width: size, height: size), ink: ink)
         }

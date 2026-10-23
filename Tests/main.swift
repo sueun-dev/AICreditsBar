@@ -161,9 +161,35 @@ let low = Reading(windows: [window("Weekly", .weekly, used: 75)], fetchedAt: now
 let critical = Reading(windows: [window("Weekly", .weekly, used: 95)], fetchedAt: now)
 eq(menuBarGauge(ProviderState(reading: low), now: now).level, .warning, "25% left → orange ring")
 eq(menuBarGauge(ProviderState(reading: critical), now: now).level, .critical, "5% left → red ring")
-let rings = menuBarImage([(.codex, ProviderState(reading: pro)), (.claude, ProviderState(reading: max20))], appearance: NSAppearance(named: .darkAqua)!, now: now)
+let rings = menuBarImage([(.codex, ProviderState(reading: pro)), (.claude, ProviderState(reading: max20))], now: now)
 eq(rings.size, NSSize(width: 19 + 6 + 19, height: 19), "two compact rings, no numbers in the menu bar")
 eq(rings.accessibilityDescription, "Codex 95%, Claude 57%", "rings still read out the numbers")
+// AppKit draws the same status image under different appearances for its menu-bar
+// replicas. Reusing it must resolve colors for each drawing, without replacing it.
+func opaquePixels(_ image: NSImage, appearance name: NSAppearance.Name) -> [NSColor] {
+    let bitmap = NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: Int(image.size.width * 2),
+                                 pixelsHigh: Int(image.size.height * 2), bitsPerSample: 8, samplesPerPixel: 4,
+                                 hasAlpha: true, isPlanar: false, colorSpaceName: .deviceRGB, bytesPerRow: 0, bitsPerPixel: 0)!
+    bitmap.size = image.size
+    NSGraphicsContext.saveGraphicsState()
+    NSGraphicsContext.current = NSGraphicsContext(bitmapImageRep: bitmap)
+    NSAppearance(named: name)!.performAsCurrentDrawingAppearance {
+        image.draw(in: NSRect(origin: .zero, size: image.size))
+    }
+    NSGraphicsContext.restoreGraphicsState()
+    return (0..<bitmap.pixelsHigh).flatMap { y in
+        (0..<bitmap.pixelsWide).compactMap { x in
+            let color = bitmap.colorAt(x: x, y: y)!.usingColorSpace(.sRGB)!
+            return color.alphaComponent > 0.75 ? color : nil
+        }
+    }
+}
+for (appearance, dark) in [(NSAppearance.Name.aqua, false), (.darkAqua, true), (.aqua, false), (.darkAqua, true)] {
+    let pixels = opaquePixels(rings, appearance: appearance)
+    check(!pixels.isEmpty, "reused status image renders visible pixels in \(appearance.rawValue)")
+    let brightness = pixels.reduce(CGFloat(0)) { $0 + ($1.redComponent + $1.greenComponent + $1.blueComponent) / 3 } / CGFloat(max(1, pixels.count))
+    check(dark ? brightness > 0.85 : brightness < 0.15, "reused status image has contrasting ink in \(appearance.rawValue): \(brightness)")
+}
 Cfg.warnBelow = 5; Cfg.criticalBelow = 50   // swapped by the user
 eq(level(forLeft: 30), .warning, "swapped thresholds still order correctly")
 Cfg.resetAll()

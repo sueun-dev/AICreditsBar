@@ -94,9 +94,16 @@ bash build.sh          # compile Sources/*.swift → AICreditsBar.app
 open AICreditsBar.app  # menu-bar only, no Dock icon
 ```
 
+The build uses your Apple Development or Developer ID Application signing identity
+when exactly one is available. Choose a specific identity with `AICB_SIGN_IDENTITY`
+(certificate name or hash), or set it to `-` to force ad-hoc signing. With no certificate
+or multiple candidates it falls back to ad hoc. On the tested macOS 27.0 build, an ad-hoc build logs
+App Intents connection errors because it has no Team ID; quota polling still works.
+Signing is local and does not notarize or publish the app.
+
 Start at login: `bash scripts/install-login-item.sh` (remove with `-u`); it also brings the
-app back if it ever crashes. macOS ties a login item to the exact ad-hoc-signed build, so
-`build.sh` re-registers it — and restarts the app — after every rebuild.
+app back if it ever crashes. `build.sh` re-registers the login item and restarts the app
+after every rebuild so it uses the newly signed binary.
 
 ### Command line
 
@@ -177,6 +184,8 @@ task CPU energy excludes WindowServer and other helpers. Neither is a per-app
 battery-life estimate. No measurement tool is bundled into the running app.
 See the [diagnostic investigation](docs/diagnostics-2026-10-22.md) for the minimal
 AppKit reproduction, measured energy, and issues that remain unresolved.
+The [follow-up](docs/diagnostics-2026-10-23.md) records the appearance and signing
+fixes, additional independent OS reproductions, and the remaining diagnostic limits.
 
 ### License
 
@@ -254,9 +263,14 @@ bash build.sh          # Sources/*.swift 컴파일 → AICreditsBar.app
 open AICreditsBar.app  # 메뉴바 전용 (Dock 아이콘 없음)
 ```
 
-로그인 시 자동 실행: `bash scripts/install-login-item.sh` (제거는 `-u`, 앱이 비정상 종료되면 다시 띄움). macOS는 로그인 항목을
-등록 당시의 ad-hoc 서명 빌드에 묶어두기 때문에, `build.sh`가 재빌드 후 다시 등록하고 앱을
-재시작합니다.
+사용 가능한 Apple Development 또는 Developer ID Application 인증서가 하나면 그 인증서로
+서명합니다. `AICB_SIGN_IDENTITY`에 인증서 이름이나 해시를 지정할 수 있고, `-`를 지정하면
+ad-hoc 서명을 사용합니다. 인증서가 없거나 후보가 여러 개면 ad-hoc으로 빌드됩니다.
+검사한 macOS 27.0 환경에서는 Team ID가 없는 ad-hoc 빌드에 App Intents 연결 오류가 기록되지만 한도 조회는
+동작합니다. 이 과정은 로컬 서명이며 앱 공증이나 배포를 하지 않습니다.
+
+로그인 시 자동 실행: `bash scripts/install-login-item.sh` (제거는 `-u`, 앱이 비정상 종료되면 다시 띄움).
+`build.sh`는 재빌드 후 로그인 항목을 다시 등록하고 앱을 재시작해 새 서명 바이너리를 사용합니다.
 
 ### 커맨드라인
 
