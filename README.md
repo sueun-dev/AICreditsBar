@@ -11,6 +11,8 @@
 ![Official data only](https://img.shields.io/badge/data-official%20APIs%20only-2EA043)
 ![License: MIT](https://img.shields.io/badge/License-MIT-3B82F6)
 
+https://github.com/user-attachments/assets/994acdf9-8a57-48b1-a5b2-71e3c6f1077f
+
 <img src="docs/images/menu.png" width="312" alt="Menu bar and dropdown, rendered by the app with live data">
 
 **[English](#english) · [한국어](#한국어)**
@@ -201,6 +203,8 @@ MIT — see [LICENSE](LICENSE).
 ---
 
 ## 한국어
+
+https://github.com/user-attachments/assets/534aa662-2ca6-4f3b-b360-a8fbff20b511
 
 Codex와 Claude 요금제 한도가 얼마나 남았는지 macOS 메뉴바에 보여주는 작은 네이티브 앱입니다.
 각 서비스 아이콘을 감싼 얇은 링이 **가장 먼저 닿을 한도의 남은 %** 만큼 채워집니다. 마우스를
