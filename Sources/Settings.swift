@@ -170,6 +170,7 @@ final class SettingsWindow: NSObject, NSWindowDelegate, NSTextFieldDelegate {
         grid.columnSpacing = 10
         grid.column(at: 0).xPlacement = .trailing
         grid.rowAlignment = .firstBaseline
+        grid.setContentHuggingPriority(.required, for: .horizontal)   // stay left-aligned like the other cards
         return grid
     }
 

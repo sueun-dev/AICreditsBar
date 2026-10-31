@@ -190,6 +190,17 @@ func runRegressionTests(now: Double) {
     check(!ProviderState(reading: sample(30, now + 100)).isCurrent(now: now), "clock skew cannot mark far-future data current")
     check(!ProviderState(reading: sample(30, .nan)).isCurrent(now: now), "non-finite timestamp cannot be current")
 
+    // Provider marks: packed numbers, relative commands and arcs read like a browser would.
+    let square = svgPath("M2 2h20v20H2z").bounds
+    check(square == NSRect(x: 2, y: 2, width: 20, height: 20), "SVG absolute/relative lines")
+    approx(Double(svgPath("m1-1.5.5-.5").currentPoint.x), 1.5, "SVG packed numbers split on '-' and second '.'")
+    let circle = svgPath("M2 12a10 10 0 1 0 20 0a10 10 0 1 0-20 0z").bounds
+    check(abs(circle.width - 20) < 0.01 && abs(circle.height - 20) < 0.01, "SVG arcs make a full circle")
+    for provider in [Provider.claude, .codex] {
+        let ink = providerGlyph(provider, size: 24).cgImage(forProposedRect: nil, context: nil, hints: nil)
+        check(ink != nil && ink!.width > 0, "\(provider.rawValue) mark renders")
+    }
+
     // JSON booleans cannot silently become 0% or 1% usage.
     eq(number(true), nil, "JSON true is not a usage number")
     eq(number(false), nil, "JSON false is not a usage number")
