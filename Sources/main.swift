@@ -1,7 +1,7 @@
 import AppKit
 
 // AICreditsBar — macOS menu-bar widget showing how much of your Codex and Claude
-// plan limits is left, from each provider's official usage API.
+// plan limits is left, from the usage endpoints each provider's own CLI uses.
 
 handleCLIFlags()   // --once / --dump-config / --render-preview / --render-settings exit here
 

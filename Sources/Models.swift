@@ -30,12 +30,12 @@ struct UsageWindow: Equatable, Codable {
     func isExpired(now: Double) -> Bool { resetsAt.map { $0 <= now } ?? false }
 }
 
-/// A successful reading from a provider's official usage endpoint.
+/// A successful reading from a provider's usage endpoint.
 struct Reading: Codable {
     var windows: [UsageWindow]
     var plan: String?
     var limitReached = false
-    var notes: [String] = []       // other official facts, e.g. "58,600 credits"
+    var notes: [String] = []       // other provider-reported facts, e.g. "58,600 credits"
     var fetchedAt: Double
 }
 

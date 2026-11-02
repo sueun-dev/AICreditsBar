@@ -8,7 +8,7 @@
 
 ![macOS 11+](https://img.shields.io/badge/macOS-11%2B-111?logo=apple&logoColor=white)
 ![Swift 5](https://img.shields.io/badge/Swift-5-F05138?logo=swift&logoColor=white)
-![Official data only](https://img.shields.io/badge/data-official%20APIs%20only-2EA043)
+![Provider-reported data](https://img.shields.io/badge/data-provider--reported-2EA043)
 ![License: MIT](https://img.shields.io/badge/License-MIT-3B82F6)
 
 https://github.com/user-attachments/assets/994acdf9-8a57-48b1-a5b2-71e3c6f1077f
@@ -34,8 +34,9 @@ limit, its reset countdown, and your plan.
 | **Codex** | `chatgpt.com/backend-api/wham/usage` | your Codex CLI login (`~/.codex/auth.json`) |
 | **Claude** | `api.anthropic.com/api/oauth/usage` | your Claude Code login (macOS Keychain) |
 
-These are the official usage endpoints — the same numbers as Codex's `/status` and
-Claude Code's `/usage`. Nothing is estimated:
+These are the internal usage endpoints that Codex and Claude Code themselves call — the same
+numbers as Codex's `/status` and Claude Code's `/usage`. They are not documented public APIs
+and may change without notice. Nothing is estimated:
 
 - Each plan limit is shown as the provider reports it. Codex windows are named by their real
   length (a Pro plan currently has a single 7-day window, so there is no 5-hour row).
@@ -217,7 +218,8 @@ Codex와 Claude 요금제 한도가 얼마나 남았는지 macOS 메뉴바에 �
 | **Codex** | `chatgpt.com/backend-api/wham/usage` | Codex CLI 로그인 (`~/.codex/auth.json`) |
 | **Claude** | `api.anthropic.com/api/oauth/usage` | Claude Code 로그인 (macOS 키체인) |
 
-두 서비스의 공식 사용량 API이며, Codex의 `/status`, Claude Code의 `/usage`와 같은 숫자입니다.
+Codex와 Claude Code가 직접 호출하는 내부 사용량 엔드포인트이며, Codex의 `/status`, Claude Code의 `/usage`와 같은 숫자입니다.
+공개 문서화된 API가 아니므로 예고 없이 바뀔 수 있습니다.
 추정치는 없습니다.
 
 - 요금제 한도는 서비스가 보고한 그대로 표시합니다. Codex 창 이름은 실제 길이로 정합니다

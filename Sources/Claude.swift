@@ -1,6 +1,6 @@
 import Foundation
 
-// MARK: - Claude: official usage from api.anthropic.com, signed in with Claude Code's own login
+// MARK: - Claude: usage from api.anthropic.com (the endpoint Claude Code uses), signed in with Claude Code's own login
 
 let claudeConfigDir = ProcessInfo.processInfo.environment["CLAUDE_CONFIG_DIR"] ?? (HOME as NSString).appendingPathComponent(".claude")
 

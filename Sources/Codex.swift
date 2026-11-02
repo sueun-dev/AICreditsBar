@@ -1,6 +1,6 @@
 import Foundation
 
-// MARK: - Codex: official usage from chatgpt.com, signed in with the Codex CLI's own login
+// MARK: - Codex: usage from chatgpt.com (the endpoint the Codex CLI uses), signed in with the Codex CLI's own login
 
 let codexHome = ProcessInfo.processInfo.environment["CODEX_HOME"] ?? (HOME as NSString).appendingPathComponent(".codex")
 

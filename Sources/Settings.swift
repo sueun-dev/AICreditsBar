@@ -68,8 +68,8 @@ final class SettingsWindow: NSObject, NSWindowDelegate, NSTextFieldDelegate {
         notificationStatus.preferredMaxLayoutWidth = cardWidth - 32
         let alertsCard = card("bell", "Notifications", [lowAlertBox, recoveryBox, row([enable, test]), notificationStatus])
         let sourcesCard = card("checkmark.shield.fill", "Data", [
-            note("Codex — the official usage API, using your Codex CLI login (~/.codex/auth.json)."),
-            note("Claude — the official usage API, using your Claude Code login (macOS Keychain)."),
+            note("Codex — the usage endpoint the Codex CLI uses, using your Codex CLI login (~/.codex/auth.json)."),
+            note("Claude — the usage endpoint Claude Code uses, using your Claude Code login (macOS Keychain)."),
             note("These are the numbers /status and /usage show. Nothing is estimated, and nothing is sent anywhere else.")])
 
         let reset = NSButton(title: "Reset to Defaults", target: self, action: #selector(resetDefaults))
