@@ -18,6 +18,7 @@ final class SettingsWindow: NSObject, NSWindowDelegate, NSTextFieldDelegate {
     private let criticalField = NSTextField()
     private let lowAlertBox = NSButton(checkboxWithTitle: "At or below 20% remaining · once per window", target: nil, action: nil)
     private let recoveryBox = NSButton(checkboxWithTitle: "When the provider confirms quota recovery", target: nil, action: nil)
+    private let updatesBox = NSButton(checkboxWithTitle: "Look for new versions on GitHub once a day", target: nil, action: nil)
     private let notificationStatus = NSTextField(wrappingLabelWithString: "Enable notifications to receive alerts.")
     private let cardWidth: CGFloat = 420
 
@@ -41,7 +42,7 @@ final class SettingsWindow: NSObject, NSWindowDelegate, NSTextFieldDelegate {
         win.delegate = self
 
         modePopup.addItems(withTitles: modes.map { $0.1 })
-        for control in [modePopup, codexBox, claudeBox, lowAlertBox, recoveryBox] as [NSControl] {
+        for control in [modePopup, codexBox, claudeBox, lowAlertBox, recoveryBox, updatesBox] as [NSControl] {
             control.target = self
             control.action = #selector(changed)
         }
@@ -67,10 +68,14 @@ final class SettingsWindow: NSObject, NSWindowDelegate, NSTextFieldDelegate {
         notificationStatus.textColor = .secondaryLabelColor
         notificationStatus.preferredMaxLayoutWidth = cardWidth - 32
         let alertsCard = card("bell", "Notifications", [lowAlertBox, recoveryBox, row([enable, test]), notificationStatus])
+        let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "development build"
+        let updatesCard = card("arrow.down.circle", "Updates", [
+            updatesBox,
+            note("Version \(version). A new version appears in the menu; nothing installs until you choose Update, and only a download signed by the developer is accepted.")])
         let sourcesCard = card("checkmark.shield.fill", "Data", [
             note("Codex — the usage endpoint the Codex CLI uses, using your Codex CLI login (~/.codex/auth.json)."),
             note("Claude — the usage endpoint Claude Code uses, using your Claude Code login (macOS Keychain)."),
-            note("These are the numbers /status and /usage show. Nothing is estimated, and nothing is sent anywhere else.")])
+            note("These are the numbers /status and /usage show. Nothing is estimated, and no usage data leaves your Mac — the only other request is the daily update check.")])
 
         let reset = NSButton(title: "Reset to Defaults", target: self, action: #selector(resetDefaults))
         let done = NSButton(title: "Done", target: self, action: #selector(closeWindow))
@@ -79,7 +84,7 @@ final class SettingsWindow: NSObject, NSWindowDelegate, NSTextFieldDelegate {
         footer.distribution = .fill
         footer.widthAnchor.constraint(equalToConstant: cardWidth).isActive = true
 
-        let column = NSStackView(views: [menuBarCard, warningCard, alertsCard, sourcesCard, footer])
+        let column = NSStackView(views: [menuBarCard, warningCard, alertsCard, updatesCard, sourcesCard, footer])
         column.orientation = .vertical
         column.alignment = .centerX
         column.spacing = 14
@@ -110,6 +115,7 @@ final class SettingsWindow: NSObject, NSWindowDelegate, NSTextFieldDelegate {
         criticalField.stringValue = String(Cfg.criticalBelow)
         lowAlertBox.state = Cfg.lowAlerts ? .on : .off
         recoveryBox.state = Cfg.recoveryAlerts ? .on : .off
+        updatesBox.state = Cfg.checkForUpdates ? .on : .off
     }
 
     @objc private func changed() {
@@ -118,6 +124,7 @@ final class SettingsWindow: NSObject, NSWindowDelegate, NSTextFieldDelegate {
         Cfg.setShown(.claude, claudeBox.state == .on)
         Cfg.lowAlerts = lowAlertBox.state == .on
         Cfg.recoveryAlerts = recoveryBox.state == .on
+        Cfg.checkForUpdates = updatesBox.state == .on
         if let minutes = Double(refreshField.stringValue) { Cfg.refreshInterval = minutes * 60 }
         if let percent = Int(warnField.stringValue) { Cfg.warnBelow = min(100, max(0, percent)) }
         if let percent = Int(criticalField.stringValue) { Cfg.criticalBelow = min(100, max(0, percent)) }

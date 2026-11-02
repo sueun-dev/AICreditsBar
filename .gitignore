@@ -9,3 +9,4 @@ aicb_test
 # Python
 __pycache__/
 *.pyc
+dist/

@@ -30,6 +30,10 @@ enum Cfg {
         get { d.object(forKey: "recoveryAlerts") as? Bool ?? true }
         set { d.set(newValue, forKey: "recoveryAlerts") }
     }
+    static var checkForUpdates: Bool {
+        get { d.object(forKey: "checkForUpdates") as? Bool ?? true }
+        set { d.set(newValue, forKey: "checkForUpdates") }
+    }
     static var alertHistory: Data? {
         get { d.data(forKey: "alertHistory") }
         set { if newValue != alertHistory { d.set(newValue, forKey: "alertHistory") } }
@@ -71,7 +75,7 @@ enum Cfg {
     }
 
     static func resetAll() {
-        for key in ["displayMode", "showCodex", "showClaude", "refreshInterval", "warnBelow", "criticalBelow", "lowAlerts", "recoveryAlerts"] {
+        for key in ["displayMode", "showCodex", "showClaude", "refreshInterval", "warnBelow", "criticalBelow", "lowAlerts", "recoveryAlerts", "checkForUpdates"] {
             d.removeObject(forKey: key)
         }
     }

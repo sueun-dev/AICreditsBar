@@ -9,6 +9,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private let settings = SettingsWindow()
     private let refresher = RefreshController()
     private let notifications = NotificationController()
+    private let updater = Updater()
     private var states: [Provider: ProviderState] = [:]
     private var cards: [Provider: ProviderCardView] = [:]
     private var displayTimer: Timer?
@@ -35,6 +36,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         notifications.onStatus = { [weak self] in self?.settings.setNotificationStatus($0) }
         notifications.onOpen = { [weak self] in self?.openSettings() }
         notifications.start()
+        updater.onFailure = { message in
+            let alert = NSAlert()
+            alert.messageText = "Couldn't update AICreditsBar"
+            alert.informativeText = message
+            alert.runModal()
+        }
+        if Cfg.checkForUpdates { updater.start() }
         NSWorkspace.shared.notificationCenter.addObserver(self, selector: #selector(didWake),
                                                           name: NSWorkspace.didWakeNotification, object: nil)
         DistributedNotificationCenter.default().addObserver(self, selector: #selector(openSettings),
@@ -47,7 +55,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
     func applicationWillTerminate(_ notification: Notification) {
         refresher.stop()
-        displayTimer?.invalidate(); wakeWork?.cancel()
+        displayTimer?.invalidate(); wakeWork?.cancel(); updater.stop()
         NSWorkspace.shared.notificationCenter.removeObserver(self)
         DistributedNotificationCenter.default().removeObserver(self)
     }
@@ -71,6 +79,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             refresher.start(every: Cfg.refreshInterval, refreshImmediately: false)
         }
         enabledProviders = enabled
+        if Cfg.checkForUpdates { updater.start() } else { updater.stop() }
         if !added.isEmpty { refresher.refresh(providers: added) }
         updateTitle()
         scheduleDisplay()
@@ -103,6 +112,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
     @objc private func refreshNow() { refresher.refresh() }
     @objc private func openSettings() { settings.show() }
+    @objc private func installUpdate() { updater.install() }
     @objc private func didWake() {
         // The network is often still coming back right after wake.
         wakeWork?.cancel()
@@ -144,6 +154,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             menu.addItem(empty)
         }
         menu.addItem(.separator())
+        if let release = updater.available {
+            let update = command(updater.installing ? "Updating to \(release.version)…" : "Update to \(release.version) and Restart",
+                                 #selector(installUpdate), key: "")
+            update.isEnabled = !updater.installing
+            menu.addItem(update)
+            menu.addItem(.separator())
+        }
         menu.addItem(command("Refresh Now", #selector(refreshNow), key: "r"))
         menu.addItem(command("Settings…", #selector(openSettings), key: ","))
         menu.addItem(.separator())

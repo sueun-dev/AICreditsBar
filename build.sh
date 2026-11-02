@@ -21,12 +21,19 @@ mkdir -p "$CONTENTS/MacOS" "$CONTENTS/Resources"
 cp "$HERE/Resources/AppIcon.icns" "$CONTENTS/Resources/AppIcon.icns"
 
 echo "compiling…"
-# Build native arch for this machine, but pin a low min-OS floor (macOS 11, 2020)
-# so the binary is portable and the compiler flags any too-new API at build time.
-ARCH="$(uname -m)"
-/usr/bin/swiftc -swift-version 5 -O -target "${ARCH}-apple-macos11" \
-  -framework AppKit -framework UserNotifications \
-  -o "$CONTENTS/MacOS/aicreditsbar" "$HERE"/Sources/*.swift
+# Build native arch for this machine (AICB_UNIVERSAL=1: arm64 + x86_64, for releases),
+# but pin a low min-OS floor (macOS 11, 2020) so the binary is portable and the
+# compiler flags any too-new API at build time.
+if [ -n "${AICB_UNIVERSAL:-}" ]; then ARCHS="arm64 x86_64"; else ARCHS="$(uname -m)"; fi
+BINARIES=()
+for ARCH in $ARCHS; do
+  /usr/bin/swiftc -swift-version 5 -O -target "${ARCH}-apple-macos11" \
+    -framework AppKit -framework UserNotifications \
+    -o "$STAGING/aicreditsbar-$ARCH" "$HERE"/Sources/*.swift
+  BINARIES+=("$STAGING/aicreditsbar-$ARCH")
+done
+/usr/bin/lipo -create "${BINARIES[@]}" -output "$CONTENTS/MacOS/aicreditsbar"
+rm -f "${BINARIES[@]}"
 
 cat > "$CONTENTS/Info.plist" <<'PLIST'
 <?xml version="1.0" encoding="UTF-8"?>
@@ -39,7 +46,7 @@ cat > "$CONTENTS/Info.plist" <<'PLIST'
     <key>CFBundleExecutable</key>         <string>aicreditsbar</string>
     <key>CFBundleIconFile</key>           <string>AppIcon</string>
     <key>CFBundleVersion</key>            <string>3</string>
-    <key>CFBundleShortVersionString</key> <string>2.0</string>
+    <key>CFBundleShortVersionString</key> <string>@VERSION@</string>
     <key>CFBundlePackageType</key>        <string>APPL</string>
     <key>LSMinimumSystemVersion</key>     <string>11.0</string>
     <key>LSUIElement</key>                <true/>
@@ -47,6 +54,7 @@ cat > "$CONTENTS/Info.plist" <<'PLIST'
 </dict>
 </plist>
 PLIST
+sed -i '' "s/@VERSION@/$(tr -d '[:space:]' < "$HERE/VERSION")/" "$CONTENTS/Info.plist"
 
 # AppKit registers with App Intents even when the app defines no intents. Current
 # macOS rejects that connection without a signing Team ID. Use an available Apple
@@ -61,7 +69,7 @@ if [ "$SIGN_IDENTITY" = '-' ]; then
 else
   echo "Signing with the selected code-signing identity"
 fi
-codesign --force --sign "$SIGN_IDENTITY" "$STAGED_APP"
+codesign --force ${AICB_SIGN_FLAGS:-} --sign "$SIGN_IDENTITY" "$STAGED_APP"
 codesign --verify --strict "$STAGED_APP"
 
 # Replace the installed bundle only after compilation and signing succeed.
