@@ -8,6 +8,8 @@ final class SettingsWindow: NSObject, NSWindowDelegate, NSTextFieldDelegate {
     var onEnableNotifications: () -> Void = {}
     var onTestAlerts: () -> Void = {}
     var onShow: () -> Void = {}
+    var onCheckUpdates: () -> Void = {}
+    var onInstallUpdate: () -> Void = {}
 
     private let modes = [("min", "Lowest remaining"), ("5h", "5-hour window"), ("week", "Weekly window")]
     private let modePopup = NSPopUpButton()
@@ -19,6 +21,9 @@ final class SettingsWindow: NSObject, NSWindowDelegate, NSTextFieldDelegate {
     private let lowAlertBox = NSButton(checkboxWithTitle: "At or below 20% remaining · once per window", target: nil, action: nil)
     private let recoveryBox = NSButton(checkboxWithTitle: "When the provider confirms quota recovery", target: nil, action: nil)
     private let updatesBox = NSButton(checkboxWithTitle: "Look for new versions on GitHub once a day", target: nil, action: nil)
+    private let updateButton = NSButton(title: "Check for Updates", target: nil, action: nil)
+    private let updateStatus = NSTextField(labelWithString: "")
+    private var updateReady = false
     private let notificationStatus = NSTextField(wrappingLabelWithString: "Enable notifications to receive alerts.")
     private let cardWidth: CGFloat = 420
 
@@ -69,8 +74,13 @@ final class SettingsWindow: NSObject, NSWindowDelegate, NSTextFieldDelegate {
         notificationStatus.preferredMaxLayoutWidth = cardWidth - 32
         let alertsCard = card("bell", "Notifications", [lowAlertBox, recoveryBox, row([enable, test]), notificationStatus])
         let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "development build"
+        updateButton.target = self
+        updateButton.action = #selector(updateClicked)
+        updateStatus.font = .systemFont(ofSize: 11)
+        updateStatus.textColor = .secondaryLabelColor
         let updatesCard = card("arrow.down.circle", "Updates", [
             updatesBox,
+            row([updateButton, updateStatus]),
             note("Version \(version). A new version appears in the menu; nothing installs until you choose Update, and only a download signed by the developer is accepted.")])
         let sourcesCard = card("checkmark.shield.fill", "Data", [
             note("Codex — the usage endpoint the Codex CLI uses, using your Codex CLI login (~/.codex/auth.json)."),
@@ -137,6 +147,14 @@ final class SettingsWindow: NSObject, NSWindowDelegate, NSTextFieldDelegate {
     }
 
     @objc private func resetDefaults() { Cfg.resetAll(); load(); onChange() }
+    @objc private func updateClicked() { updateReady ? onInstallUpdate() : onCheckUpdates() }
+
+    /// `available` is the new version when one can be installed; the button then installs it.
+    func setUpdateStatus(_ text: String, available: String?) {
+        updateStatus.stringValue = text
+        updateReady = available != nil
+        updateButton.title = available.map { "Update to \($0) and Restart" } ?? "Check for Updates"
+    }
     @objc private func enableNotifications() { onEnableNotifications() }
     @objc private func testAlerts() { onTestAlerts() }
     func setNotificationStatus(_ text: String) { notificationStatus.stringValue = text }

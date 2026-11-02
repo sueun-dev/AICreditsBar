@@ -82,16 +82,24 @@ final class Updater {
 
     func stop() { timer?.invalidate(); timer = nil }
 
-    private func check() {
-        guard let current = current, !installing else { return }
+    enum Outcome: Equatable { case upToDate, available(ReleaseInfo), failed(String) }
+
+    /// Asks GitHub now; `done` (main queue) gets what was found. The daily check passes no `done`.
+    func check(done: ((Outcome) -> Void)? = nil) {
+        guard let current = current, canUpdate else { done?(.failed("This is a development build, not an installed app.")); return }
+        guard !installing else { return }
         let feed = self.feed
         DispatchQueue.global(qos: .utility).async { [weak self] in
             let headers = ["Accept": "application/vnd.github+json", "User-Agent": userAgent]
             let reply = try? httpGet(feed, headers: headers, using: self?.client)
-            let release = reply?.status == 200 ? parseRelease(reply?.body) : nil
+            let release = reply.flatMap { $0.status == 200 ? parseRelease($0.body) : nil }
             DispatchQueue.main.async {
                 guard let self = self, !self.installing else { return }
-                self.available = release.flatMap { isNewerVersion($0.version, than: current) ? $0 : nil }
+                guard reply != nil else { done?(.failed("Couldn't reach GitHub.")); return }
+                guard let release = release else { done?(.failed("No release to install was found.")); return }
+                let newer = isNewerVersion(release.version, than: current) ? release : nil
+                self.available = newer
+                done?(newer.map { .available($0) } ?? .upToDate)
             }
         }
     }
