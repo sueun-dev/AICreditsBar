@@ -18,6 +18,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private var lastGauges: [MenuBarGauge] = []
     private var lastProviders: [Provider] = []
     private var wakeWork: DispatchWorkItem?
+    private var history = UsageHistory(data: Cfg.usageHistory)
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
@@ -68,9 +69,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         if case .success(let reading) = result {
             Cfg.save(reading, for: provider)
             notifications.record(reading, provider: provider)
+            if history.record(reading, provider: provider, now: nowEpoch()) { Cfg.usageHistory = history.data }
         }
         updateTitle()
-        if let state = states[provider] { cards[provider]?.update(state) }
+        if let state = states[provider] { cards[provider]?.update(state, forecast: forecast(for: provider)) }
         scheduleDisplay()
     }
 
@@ -89,6 +91,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
     private var shownProviders: [Provider] { Provider.allCases.filter(Cfg.isShown) }
 
+    private func forecast(for provider: Provider) -> ForecastSummary? {
+        Forecaster.summary(provider: provider, state: states[provider] ?? ProviderState(), history: history, now: nowEpoch())
+    }
+
     private func updateTitle(force: Bool = false) {
         guard let button = statusItem?.button else { return }
         let now = nowEpoch()
@@ -106,6 +112,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             var line = "\(provider.rawValue): \(gauge.text)"
             if gauge.left != nil, let window = state.reading.flatMap({ menuBarWindow($0, now: now) }) { line += " left · \(window.label)" }
             if let error = state.error { line += " (\(error.message))" }
+            if let advice = forecast(for: provider)?.advice { line += "\n  ↳ \(advice.headline) (estimate)" }
             return line
         }.joined(separator: "\n")
         button.toolTip = summary
@@ -154,7 +161,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         menu.removeAllItems()
         cards.removeAll()
         for provider in shownProviders {
-            let card = ProviderCardView(provider: provider, state: states[provider] ?? ProviderState())
+            let card = ProviderCardView(provider: provider, state: states[provider] ?? ProviderState(),
+                                        forecast: forecast(for: provider))
             let item = NSMenuItem()
             item.view = card
             cards[provider] = card

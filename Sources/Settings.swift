@@ -21,6 +21,10 @@ final class SettingsWindow: NSObject, NSWindowDelegate, NSTextFieldDelegate {
     private let lowAlertBox = NSButton(checkboxWithTitle: "At or below 20% remaining · once per window", target: nil, action: nil)
     private let recoveryBox = NSButton(checkboxWithTitle: "When the provider confirms quota recovery", target: nil, action: nil)
     private let updatesBox = NSButton(checkboxWithTitle: "Look for new versions on GitHub once a day", target: nil, action: nil)
+    private let forecastBox = NSButton(checkboxWithTitle: "Show usage forecast and model advice", target: nil, action: nil)
+    private let mainModelPopup = NSPopUpButton()
+    private let versionField = NSTextField()
+    private let weightFields: [ModelFamily: NSTextField] = Dictionary(uniqueKeysWithValues: ModelFamily.allCases.map { ($0, NSTextField()) })
     private let updateButton = NSButton(title: "Check for Updates", target: nil, action: nil)
     private let updateStatus = NSTextField(labelWithString: "")
     private var updateReady = false
@@ -47,11 +51,12 @@ final class SettingsWindow: NSObject, NSWindowDelegate, NSTextFieldDelegate {
         win.delegate = self
 
         modePopup.addItems(withTitles: modes.map { $0.1 })
-        for control in [modePopup, codexBox, claudeBox, lowAlertBox, recoveryBox, updatesBox] as [NSControl] {
+        mainModelPopup.addItems(withTitles: ModelFamily.allCases.map { $0.rawValue })
+        for control in [modePopup, codexBox, claudeBox, lowAlertBox, recoveryBox, updatesBox, forecastBox, mainModelPopup] as [NSControl] {
             control.target = self
             control.action = #selector(changed)
         }
-        for field in [refreshField, warnField, criticalField] {
+        for field in [refreshField, warnField, criticalField, versionField] + ModelFamily.allCases.compactMap({ weightFields[$0] }) {
             field.delegate = self
             field.target = self
             field.action = #selector(changed)
@@ -67,6 +72,11 @@ final class SettingsWindow: NSObject, NSWindowDelegate, NSTextFieldDelegate {
             form([("Show", modePopup), ("Providers", providers), ("Check every", refresh)]),
             note("Also checks when the menu opens (at most every 2 minutes) and after the Mac wakes. The usage services rate-limit frequent checks.")])
         let warningCard = card("exclamationmark.triangle.fill", "Warnings", [warnings])
+        let weights = row(ModelFamily.allCases.flatMap { [label($0.rawValue), weightFields[$0] ?? NSTextField()] }, spacing: 6)
+        let forecastCard = card("chart.line.uptrend.xyaxis", "Forecast", [
+            forecastBox,
+            form([("Main model", row([mainModelPopup, versionField])), ("Cost per hour", weights)]),
+            note("An estimate, shown apart from the reported numbers. It measures how fast you have used each limit this cycle and says which model that pace can afford and how many hours remain. \"Main model\" is the one that pace was spent on. Cost per hour is an assumption based on API price ratios (Haiku 1 · Sonnet 3 · Opus 5) — the providers don't publish how a model moves a plan limit — so adjust it to what you see.")])
         let enable = NSButton(title: "Enable Notifications", target: self, action: #selector(enableNotifications))
         let test = NSButton(title: "Test Alerts", target: self, action: #selector(testAlerts))
         notificationStatus.font = .systemFont(ofSize: 11)
@@ -85,7 +95,7 @@ final class SettingsWindow: NSObject, NSWindowDelegate, NSTextFieldDelegate {
         let sourcesCard = card("checkmark.shield.fill", "Data", [
             note("Codex — the usage endpoint the Codex CLI uses, using your Codex CLI login (~/.codex/auth.json)."),
             note("Claude — the usage endpoint Claude Code uses, using your Claude Code login (macOS Keychain)."),
-            note("These are the numbers /status and /usage show. Nothing is estimated, and no usage data leaves your Mac — the only other request is the daily update check.")])
+            note("These are the numbers /status and /usage show. The Forecast is the only estimate, and it is labeled as one. No usage data leaves your Mac — the only other request is the daily update check.")])
 
         let reset = NSButton(title: "Reset to Defaults", target: self, action: #selector(resetDefaults))
         let done = NSButton(title: "Done", target: self, action: #selector(closeWindow))
@@ -94,7 +104,7 @@ final class SettingsWindow: NSObject, NSWindowDelegate, NSTextFieldDelegate {
         footer.distribution = .fill
         footer.widthAnchor.constraint(equalToConstant: cardWidth).isActive = true
 
-        let column = NSStackView(views: [menuBarCard, warningCard, alertsCard, updatesCard, sourcesCard, footer])
+        let column = NSStackView(views: [menuBarCard, warningCard, forecastCard, alertsCard, updatesCard, sourcesCard, footer])
         column.orientation = .vertical
         column.alignment = .centerX
         column.spacing = 14
@@ -126,6 +136,10 @@ final class SettingsWindow: NSObject, NSWindowDelegate, NSTextFieldDelegate {
         lowAlertBox.state = Cfg.lowAlerts ? .on : .off
         recoveryBox.state = Cfg.recoveryAlerts ? .on : .off
         updatesBox.state = Cfg.checkForUpdates ? .on : .off
+        forecastBox.state = Cfg.forecastEnabled ? .on : .off
+        mainModelPopup.selectItem(at: ModelFamily.allCases.firstIndex(of: Cfg.mainModel) ?? 1)
+        versionField.stringValue = Cfg.modelVersion
+        for model in ModelFamily.allCases { weightFields[model]?.stringValue = String(format: "%g", Cfg.modelWeight(model)) }
     }
 
     @objc private func changed() {
@@ -135,6 +149,12 @@ final class SettingsWindow: NSObject, NSWindowDelegate, NSTextFieldDelegate {
         Cfg.lowAlerts = lowAlertBox.state == .on
         Cfg.recoveryAlerts = recoveryBox.state == .on
         Cfg.checkForUpdates = updatesBox.state == .on
+        Cfg.forecastEnabled = forecastBox.state == .on
+        Cfg.mainModel = ModelFamily.allCases[min(ModelFamily.allCases.count - 1, max(0, mainModelPopup.indexOfSelectedItem))]
+        Cfg.modelVersion = versionField.stringValue
+        for model in ModelFamily.allCases {
+            if let value = weightFields[model].flatMap({ Double($0.stringValue) }), value.isFinite, value > 0 { Cfg.setModelWeight(model, value) }
+        }
         if let minutes = Double(refreshField.stringValue) { Cfg.refreshInterval = minutes * 60 }
         if let percent = Int(warnField.stringValue) { Cfg.warnBelow = min(100, max(0, percent)) }
         if let percent = Int(criticalField.stringValue) { Cfg.criticalBelow = min(100, max(0, percent)) }

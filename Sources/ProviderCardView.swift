@@ -9,13 +9,15 @@ final class ProviderCardView: NSView {
 
     private let provider: Provider
     private var state: ProviderState
+    private var forecast: ForecastSummary?
     private let icon = NSImageView(frame: NSRect(x: left, y: 12, width: 16, height: 16))
     override var isFlipped: Bool { true }
 
-    init(provider: Provider, state: ProviderState) {
+    init(provider: Provider, state: ProviderState, forecast: ForecastSummary? = nil) {
         self.provider = provider
         self.state = state
-        super.init(frame: NSRect(x: 0, y: 0, width: Self.width, height: Self.height(for: state)))
+        self.forecast = forecast
+        super.init(frame: NSRect(x: 0, y: 0, width: Self.width, height: Self.height(for: state, forecast: forecast)))
         icon.image = providerGlyph(provider, size: 16)
         icon.contentTintColor = .labelColor
         addSubview(icon)
@@ -26,14 +28,27 @@ final class ProviderCardView: NSView {
 
     required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
 
-    static func height(for state: ProviderState) -> CGFloat {
+    static func height(for state: ProviderState, forecast: ForecastSummary? = nil) -> CGFloat {
         guard let reading = state.reading else { return 86 }
-        return 66 + CGFloat(reading.windows.count) * rowHeight
+        return 66 + CGFloat(reading.windows.count) * rowHeight + forecastHeight(forecast)
     }
 
-    func update(_ state: ProviderState) {
+    private static func lineHeight(_ style: ForecastLine.Style) -> CGFloat {
+        switch style {
+        case .headline: return 20
+        case .caption: return 18
+        case .detail, .pace, .hours: return 16
+        }
+    }
+    private static func forecastHeight(_ forecast: ForecastSummary?) -> CGFloat {
+        guard let lines = forecast?.lines, !lines.isEmpty else { return 0 }
+        return 24 + lines.reduce(0) { $0 + lineHeight($1.style) }
+    }
+
+    func update(_ state: ProviderState, forecast: ForecastSummary? = nil) {
         self.state = state
-        let height = Self.height(for: state)
+        self.forecast = forecast
+        let height = Self.height(for: state, forecast: forecast)
         if height != frame.height { setFrameSize(NSSize(width: Self.width, height: height)) }
         describe()
         needsDisplay = true
@@ -71,7 +86,52 @@ final class ProviderCardView: NSView {
             row(window, y: y, now: now)
             y += Self.rowHeight
         }
+        if let lines = forecast?.lines, !lines.isEmpty {
+            y = forecastBlock(lines, y: y, current: state.isCurrent(now: now))
+        }
         footer(reading, y: y + 2, now: now)
+    }
+
+    /// The estimate, set apart from the provider-reported rows above it.
+    private func forecastBlock(_ lines: [ForecastLine], y start: CGFloat, current: Bool) -> CGFloat {
+        var y = start + 2
+        NSColor.labelColor.withAlphaComponent(0.08).setFill()
+        NSRect(x: Self.left, y: y, width: Self.right - Self.left, height: 1).fill()
+        y += 7
+        text("FORECAST · ESTIMATE", x: Self.left, y: y, width: Self.right - Self.left,
+             font: .systemFont(ofSize: 9, weight: .semibold), color: .tertiaryLabelColor)
+        y += 15
+        for line in lines {
+            let tone = current ? toneColor(line.tone) : NSColor.secondaryLabelColor
+            switch line.style {
+            case .headline:
+                tone.setFill()
+                NSBezierPath(ovalIn: NSRect(x: Self.left, y: y + 6, width: 7, height: 7)).fill()
+                text(line.text, x: Self.left + 13, y: y, width: Self.right - Self.left - 13, font: .systemFont(ofSize: 12.5, weight: .semibold))
+            case .detail:
+                text(line.text, x: Self.left + 13, y: y, width: Self.right - Self.left - 13, font: .systemFont(ofSize: 11), color: .secondaryLabelColor)
+            case .pace:
+                text(line.text, x: Self.left, y: y, width: Self.right - Self.left, font: .systemFont(ofSize: 11),
+                     color: line.tone == .neutral ? .secondaryLabelColor : tone)
+            case .caption:
+                text(line.text.uppercased(), x: Self.left, y: y + 4, width: Self.right - Self.left,
+                     font: .systemFont(ofSize: 9, weight: .semibold), color: .tertiaryLabelColor)
+            case .hours:
+                text(line.text, x: Self.left, y: y, width: Self.right - Self.left,
+                     font: .monospacedDigitSystemFont(ofSize: 11, weight: .regular), color: .labelColor)
+            }
+            y += Self.lineHeight(line.style)
+        }
+        return y
+    }
+
+    private func toneColor(_ tone: ModelAdvice.Tone) -> NSColor {
+        switch tone {
+        case .good: return .systemGreen
+        case .watch: return .systemOrange
+        case .critical: return .systemRed
+        case .neutral: return .secondaryLabelColor
+        }
     }
 
     private func row(_ window: UsageWindow, y: CGFloat, now: Double) {
@@ -147,6 +207,10 @@ final class ProviderCardView: NSView {
                 lines.append("\(window.label): \(window.leftPercent)% left (\(pctClamp(window.usedPercent))% used)\(reset)")
             }
             lines += reading.notes
+            if let forecast = forecast?.lines, !forecast.isEmpty {
+                lines.append("Forecast (estimate):")
+                lines += forecast.map { $0.text }
+            }
         }
         if let error = state.error { lines.append(error.description) }
         let summary = lines.joined(separator: "\n")

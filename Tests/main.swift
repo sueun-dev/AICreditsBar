@@ -362,6 +362,7 @@ check(Cfg.d.object(forKey: "claudeSessionKey") == nil && Cfg.d.object(forKey: "c
 
 runRegressionTests(now: now)
 runNotificationTests(now: now)
+runForecastTests(now: now)
 
 let summary = "\(passed) passed, \(failures) failed"
 print(failures == 0 ? "✓ unit: \(summary)" : "✗ unit: \(summary)")
