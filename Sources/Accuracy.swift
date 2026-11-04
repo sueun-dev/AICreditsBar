@@ -25,21 +25,43 @@ struct SampleLog: Codable, Equatable {
         var reset: Double
         var points: [Point]
 
-        /// When the reported figure last fell inside this cycle — the limit was reset
-        /// (a reset coupon: 98% → 0%) without the reset time moving. Spending before
-        /// that no longer counts. The first reading after the drop dates it: if the app
-        /// was closed in between, the spending in the gap is left out, which errs toward
-        /// a faster pace rather than a slower one.
+        /// When the reported figure last fell inside this cycle: the limit was reset (a reset
+        /// coupon takes 98% to 0% without moving the reset time). The first reading after the
+        /// drop dates it.
         var refill: Double? {
             var found: Double?
-            for i in points.indices.dropFirst() where points[i].used < points[i - 1].used - SampleLog.refillDrop { found = points[i].t }
+            for i in points.indices.dropFirst() where SampleLog.isReset(from: points[i - 1].used, to: points[i].used) { found = points[i].t }
             return found
+        }
+
+        /// The use that resets have wiped from the counter, so the use before a reset is carried over
+        /// instead of thrown away. A reset to (nearly) zero wipes all of what the counter showed.
+        var refunded: Double { SampleLog.refund(points) }
+
+        /// The reported figures with that wiped use added back: one curve that keeps rising across a reset.
+        var cumulative: [Point] {
+            var offset = 0.0
+            var out: [Point] = []
+            for i in points.indices {
+                if i > 0, SampleLog.isReset(from: points[i - 1].used, to: points[i].used) { offset += SampleLog.wiped(from: points[i - 1].used, to: points[i].used) }
+                out.append(Point(t: points[i].t, used: points[i].used + offset))
+            }
+            return out
         }
     }
     static let bucket = 900.0          // one reading per 15 minutes
     static let maxPoints = 700         // a week of buckets, with slack
     static let horizon = 7 * 86400.0   // nothing older than a week is kept
     static let refillDrop = 2.0        // a fall of more than this many points is a reset, not a rounding wobble
+
+    static func isReset(from: Double, to: Double) -> Bool { to < from - refillDrop }
+    /// How much a fall wiped from the counter: all of it when it fell to (nearly) zero, else the difference.
+    static func wiped(from: Double, to: Double) -> Double { to <= 10 ? from : from - to }
+    static func refund(_ points: [Point]) -> Double {
+        var total = 0.0
+        for i in points.indices.dropFirst() where isReset(from: points[i - 1].used, to: points[i].used) { total += wiped(from: points[i - 1].used, to: points[i].used) }
+        return total
+    }
 
     private(set) var series: [String: Series] = [:]
 
@@ -48,11 +70,14 @@ struct SampleLog: Codable, Equatable {
     }
     var data: Data? { try? JSONEncoder().encode(series) }
 
-    /// The refill time of this window's current cycle, if its readings show one.
-    func refill(provider: Provider, window: UsageWindow) -> Double? {
+    private func series(_ provider: Provider, _ window: UsageWindow) -> Series? {
         guard let reset = window.resetsAt else { return nil }
-        return series["\(provider.rawValue)|\(window.kind.rawValue)|\(window.label)|\(Int((reset / 60).rounded()))"]?.refill
+        return series["\(provider.rawValue)|\(window.kind.rawValue)|\(window.label)|\(Int((reset / 60).rounded()))"]
     }
+    /// When this window's current cycle was last reset mid-cycle, if its readings show it.
+    func refill(provider: Provider, window: UsageWindow) -> Double? { series(provider, window)?.refill }
+    /// The use before such resets, to carry over.
+    func refunded(provider: Provider, window: UsageWindow) -> Double { series(provider, window)?.refunded ?? 0 }
 
     /// Returns whether anything changed, so the caller only saves when it must.
     @discardableResult
@@ -120,19 +145,20 @@ enum Accuracy {
         var misses: [Double] = [], signed: [Double] = []
         var actualSum = 0.0, predictedSum = 0.0, costChecks = 0
         for series in log.series.values where series.provider == provider.rawValue && series.kind == kind.rawValue {
-            let start = max(series.reset - series.length, series.refill ?? 0), last = series.points.last?.t ?? 0
+            let points = series.cumulative   // keeps rising across a reset, like the forecast does
+            let start = series.reset - series.length, last = points.last?.t ?? 0
             var next = start
-            for point in series.points where point.t >= next {
+            for point in points where point.t >= next {
                 next = point.t + spacing
                 let elapsed = point.t - start
                 guard elapsed > 60, !Forecaster.isLearning(kind, elapsed: elapsed, used: point.used) else { continue }
-                if point.t + paceAhead <= min(last, series.reset), let actual = value(at: point.t + paceAhead, in: series.points) {
-                    let predicted = min(100, point.used * (1 + paceAhead / elapsed))
+                if point.t + paceAhead <= min(last, series.reset), let actual = value(at: point.t + paceAhead, in: points) {
+                    let predicted = point.used * (1 + paceAhead / elapsed)
                     misses.append(abs(predicted - actual)); signed.append(predicted - actual)
                 }
                 guard let ledger = ledger, provider == .claude, start >= now - UsageLedger.horizon, point.used >= 2,
                       point.t + costAhead <= min(last, series.reset),
-                      let later = value(at: point.t + costAhead, in: series.points) else { continue }
+                      let later = value(at: point.t + costAhead, in: points) else { continue }
                 let spent = ledger.slice(from: start, to: point.t).actualCost
                 guard spent >= 1 else { continue }
                 let predicted = point.used / spent * ledger.slice(from: point.t, to: point.t + costAhead).actualCost

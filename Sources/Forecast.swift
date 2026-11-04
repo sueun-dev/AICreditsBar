@@ -13,17 +13,18 @@ import Foundation
 struct WindowForecast: Equatable {
     var label: String
     var kind: WindowKind
-    var used: Double                  // % used, as reported
+    var used: Double                  // % used on the counter now: what is left is 100 − used
+    var spent: Double                 // % used this cycle, counting use that a mid-cycle reset (a coupon) wiped
     var resetsAt: Double
     var length: Double                // seconds the window spans
     var learning: Bool                // too little of the cycle has passed for a firm forecast
 
-    var start: Double                 // the cycle's start, or later when the limit was refilled mid-cycle
     var left: Double { 100 - used }
+    var start: Double { resetsAt - length }
     func resetsIn(now: Double) -> Double { max(0, resetsAt - now) }
     func elapsed(now: Double) -> Double { max(1, min(length, now - start)) }
     /// % per hour averaged over the cycle so far, idle time included.
-    func avgPerHour(now: Double) -> Double { used / (elapsed(now: now) / 3600) }
+    func avgPerHour(now: Double) -> Double { spent / (elapsed(now: now) / 3600) }
     /// Left at the reset if the cycle's average pace continues (negative = runs out first).
     func projectedLeftAtReset(now: Double) -> Double { left - avgPerHour(now: now) * resetsIn(now: now) / 3600 }
     /// Seconds until empty at the average pace, only when that is before the reset.
@@ -79,17 +80,17 @@ enum Forecaster {
         }
     }
 
-    /// `since` is when the limit was last refilled inside this cycle, if it was: only use after it counts.
-    static func forecast(_ window: UsageWindow, now: Double, since: Double? = nil) -> WindowForecast? {
+    /// `refunded` is the use a mid-cycle reset wiped from the counter. It is carried over: the pace and
+    /// the tokens-to-% ratio were learned from it, and a reset doesn't unlearn them.
+    static func forecast(_ window: UsageWindow, now: Double, refunded: Double = 0) -> WindowForecast? {
         guard !window.modelScoped, !window.isExpired(now: now), window.usedPercent.isFinite,
               (0...100).contains(window.usedPercent), let reset = window.resetsAt,
               let length = windowLength(window) else { return nil }
-        let start = max(reset - length, since ?? 0)
-        let elapsed = min(length, now - start)
+        let elapsed = min(length, now - (reset - length))
         guard elapsed > 60 else { return nil }
-        let used = window.usedPercent
-        return WindowForecast(label: window.label, kind: window.kind, used: used, resetsAt: reset, length: length,
-                              learning: isLearning(window.kind, elapsed: elapsed, used: used), start: start)
+        let used = window.usedPercent, spent = used + max(0, refunded)
+        return WindowForecast(label: window.label, kind: window.kind, used: used, spent: spent, resetsAt: reset, length: length,
+                              learning: isLearning(window.kind, elapsed: elapsed, used: spent))
     }
 
     /// Too little of the cycle has passed, or too little is used, for a firm forecast.
@@ -106,10 +107,10 @@ enum Forecaster {
     /// appear soon after a reset; the per-day pace needs a day of the cycle.
     /// nil when there isn't enough of either to say.
     static func project(_ w: WindowForecast, ledger: UsageLedger, now: Double) -> ModelProjection? {
-        guard w.used >= 2, w.elapsed(now: now) >= 3600 else { return nil }
+        guard w.spent >= 2, w.elapsed(now: now) >= 3600 else { return nil }
         let cycle = ledger.slice(from: w.start, to: now)
         guard cycle.actualCost >= 1 else { return nil }
-        let perDollar = w.used / cycle.actualCost
+        let perDollar = w.spent / cycle.actualCost
         let days = max(1.0 / 24, w.elapsed(now: now) / 86400)
         let recent = ledger.slice(from: w.kind == .session ? w.start : max(w.start, now - 72 * 3600), to: now)
         let measured = recent.activeHours >= (w.kind == .session ? 1 : 2)
@@ -173,9 +174,8 @@ enum Forecaster {
         let general = reading.windows.filter { !$0.modelScoped && !$0.isExpired(now: now) }
         var resetAt: Double?   // the latest mid-cycle reset (a reset coupon) among the windows
         func window(_ w: UsageWindow) -> WindowForecast? {
-            let since = samples?.refill(provider: provider, window: w)
-            if let since = since { resetAt = max(resetAt ?? 0, since) }
-            return forecast(w, now: now, since: since)
+            if let at = samples?.refill(provider: provider, window: w) { resetAt = max(resetAt ?? 0, at) }
+            return forecast(w, now: now, refunded: samples?.refunded(provider: provider, window: w) ?? 0)
         }
         func pick(_ kind: WindowKind) -> WindowForecast? {
             general.filter { $0.kind == kind }.compactMap(window).min { $0.resetsAt < $1.resetsAt }
@@ -200,7 +200,7 @@ enum Forecaster {
             lines.append(ForecastLine(text: found.detail, style: .detail))
         }
         if let resetAt = resetAt, now - resetAt < 48 * 3600 {
-            lines.append(ForecastLine(text: "Limit was reset \(ago(now - resetAt)) · counting from then", style: .pace))
+            lines.append(ForecastLine(text: "Limit was reset \(ago(now - resetAt)) · your use before it counts", style: .pace))
         }
         for window in [weekly, session].compactMap({ $0 }) + others { lines.append(paceLine(window, now: now)) }
         if provider == .claude {

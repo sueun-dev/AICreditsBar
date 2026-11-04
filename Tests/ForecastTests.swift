@@ -288,7 +288,7 @@ func runForecastTests(now: Double) {
     kept.record(one(5, at: base + 15 * 86400, reset: base + 22 * 86400), provider: .claude, now: base + 15 * 86400)
     eq(kept.series.count, 1, "a cycle that ended more than a week ago is dropped")
 
-    // MARK: A limit refilled in the middle of a cycle (98% → 0% with the reset time unchanged)
+    // MARK: A limit reset in the middle of a cycle (a reset coupon: 98% → 0% with the reset time unchanged)
 
     func trail(_ used: [Double]) -> SampleLog {
         var l = SampleLog()
@@ -300,38 +300,40 @@ func runForecastTests(now: Double) {
     }
     let refilled = trail([95, 96, 98, 98, 0, 2])
     let weeklyWindow = weekly(used: 2, elapsedDays: 4)
-    check(abs((refilled.refill(provider: .claude, window: weeklyWindow) ?? 0) - (base - 3600)) < 1,
-          "a drop from 98% to 0% is a reset, dated by the first reading after it")
-    check(trail([10, 20, 30, 40]).refill(provider: .claude, window: weeklyWindow) == nil, "steadily rising use has no refill")
+    check(abs((refilled.refill(provider: .claude, window: weeklyWindow) ?? 0) - (base - 3600)) < 1, "a drop from 98% to 0% is a reset, dated by the first reading after it")
+    check(abs(refilled.refunded(provider: .claude, window: weeklyWindow) - 98) < 1e-9, "a reset to zero wipes all 98% the counter showed")
+    check(abs(trail([80, 50]).refunded(provider: .claude, window: weeklyWindow) - 30) < 1e-9, "a fall that doesn't reach zero wipes only the difference")
+    check(trail([10, 20, 30, 40]).refill(provider: .claude, window: weeklyWindow) == nil, "steadily rising use has no reset")
     check(trail([10, 20, 19.8, 30]).refill(provider: .claude, window: weeklyWindow) == nil, "a rounding wobble of a fraction of a percent isn't one")
     check(trail([10, 20, 18.5, 30]).refill(provider: .claude, window: weeklyWindow) == nil, "nor is a dip of a point or two")
-    let sinceRefill = Forecaster.forecast(weeklyWindow, now: base, since: refilled.refill(provider: .claude, window: weeklyWindow))!
-    check(sinceRefill.learning && sinceRefill.elapsed(now: base) < 7200, "only the time since the refill counts, so it is still learning")
-    check(!Forecaster.forecast(weeklyWindow, now: base)!.learning, "…while without the refill it would count four days")
-    // The 2% that is used now was spent after the refill; the $200 of work before it must not be set against it.
-    let before = Forecaster.summary(provider: .claude, reading: Reading(windows: [weeklyWindow], fetchedAt: base), ledger: sonnetWork, samples: nil, now: base)
-    let after = Forecaster.summary(provider: .claude, reading: Reading(windows: [weeklyWindow], fetchedAt: base), ledger: sonnetWork, samples: refilled, now: base)
-    check(before?.advice?.headline != "Not enough data yet", "without knowing about the refill the forecast treats four days as the cycle")
-    eq(after?.advice?.headline, "Not enough data yet", "knowing about it, the forecast starts over")
-    check(!(after?.lines.map { $0.text }.joined().contains("Haiku") ?? true), "…and shows no per-model numbers built on the old spending")
-    check(Accuracy.report(refilled, provider: .claude, kind: .weekly, ledger: nil, now: base).paceChecks == 0, "predictions made before the refill aren't scored against what came after")
-
-    // Soon after a reset coupon: hours of use left appear (they need only the recent active hours), the per-day pace waits.
+    // The use before the reset is carried over, not thrown away.
+    let carried = Forecaster.forecast(weeklyWindow, now: base, refunded: 98)!
+    check(abs(carried.spent - 100) < 1e-9 && abs(carried.left - 98) < 1e-9, "the counter says 2% used, but 100% was spent this cycle")
+    check(!carried.learning, "…so four days of use are still four days of use")
+    check(abs(carried.avgPerHour(now: base) * 96 - 100) < 1e-9, "…and the pace is 100% over 96 hours")
+    check(Forecaster.forecast(weeklyWindow, now: base)!.spent == 2, "without a record of the reset it is just 2%")
+    // $100 of Sonnet work this cycle: 100% spent means 1% per dollar, so Sonnet runs 25% a day; knowing nothing of the reset it would be 0.5%.
+    let knowing = Forecaster.summary(provider: .claude, reading: Reading(windows: [weeklyWindow], fetchedAt: base), ledger: sonnetWork, samples: refilled, now: base)
+    let ignoring = Forecaster.summary(provider: .claude, reading: Reading(windows: [weeklyWindow], fetchedAt: base), ledger: sonnetWork, samples: nil, now: base)
+    let knowingText = knowing?.lines.map { $0.text }.joined(separator: "\n") ?? ""
+    check(knowingText.contains("Sonnet 5.5 ≈25%/day"), "after a reset the per-model pace still comes from the use before it")
+    eq(knowing?.advice?.headline, "Stay on Sonnet 5.5", "…and so does the advice")
+    check(knowingText.contains("Limit was reset 1h ago · your use before it counts"), "the card says a reset was noticed, and when")
+    eq(ignoring?.advice?.headline, "Opus 5.5 is fine today", "ignoring the reset, the same 2% would wrongly make Opus look affordable")
+    check(!(ignoring?.lines.map { $0.text }.joined().contains("Limit was reset") ?? true), "with no record of a reset there is no such line")
+    // Soon after a coupon: $140 of Opus work in the cycle (one batch before the reset) matched to 103% spent.
     let coupon = trail([95, 96, 98, 0, 3, 5])
     var afterCoupon = UsageLedger()
-    afterCoupon.add(at: base - 3 * 3600 - 60, model: "claude-opus-5-5", tokens: TokenCounts(output: 5_000_000))   // before the reset: must not count
+    afterCoupon.add(at: base - 3 * 3600 - 60, model: "claude-opus-5-5", tokens: TokenCounts(output: 5_000_000))
     afterCoupon.add(at: base - 3660, model: "claude-opus-5-5", tokens: TokenCounts(output: 1_000_000))
     afterCoupon.add(at: base - 60, model: "claude-opus-5-5", tokens: TokenCounts(output: 1_000_000))
-    let couponReading = Reading(windows: [weekly(used: 5, elapsedDays: 4)], fetchedAt: base)
-    let couponSummary = Forecaster.summary(provider: .claude, reading: couponReading, ledger: afterCoupon, samples: coupon, now: base)
-    let couponText = couponSummary?.lines.map { $0.text }.joined(separator: "\n") ?? ""
-    check(couponText.contains("Limit was reset 2h ago · counting from then"), "the card says a reset was noticed, and when")
-    eq(couponSummary?.advice?.headline, "Not enough data yet", "the advice still waits for a day")
-    let couponOpus = couponText.split(separator: "\n").last { $0.hasPrefix("Opus 5.5") }.map(String.init) ?? ""
-    check(couponOpus.contains("—") && couponOpus.hasSuffix("38h left"), "…but the hours left are there: $40 of work since the reset is 5%, so 95% lasts 38 active hours on Opus")
-    check(!couponText.contains("Weekly per model: not enough data yet"), "…and the per-model block is shown")
-    check(Forecaster.summary(provider: .claude, reading: couponReading, ledger: afterCoupon, samples: nil, now: base)?.lines.map { $0.text }.joined().contains("Limit was reset") == false,
-          "with no record of the reset there is no such line")
+    let couponSummary = Forecaster.summary(provider: .claude, reading: Reading(windows: [weekly(used: 5, elapsedDays: 4)], fetchedAt: base), ledger: afterCoupon, samples: coupon, now: base)
+    let couponOpus = couponSummary?.lines.map { $0.text }.last { $0.hasPrefix("Opus 5.5") } ?? ""
+    check(couponOpus.contains("≈26%/day") && couponOpus.hasSuffix("2h 46m left"), "right after a coupon: 103% over $140 on Opus is 26%/day, and 95% left lasts 2h 46m of use")
+    eq(couponSummary?.advice?.headline, "Stay on Opus 5.5", "…and the advice is there at once")
+    // The accuracy checks keep going across a reset.
+    let across = Accuracy.report(readings({ $0 <= 30 ? $0 : $0 - 30 }, hours: 72), provider: .claude, kind: .weekly, ledger: nil, now: now3d)
+    check(across.hasPace && abs(across.paceMissPoints) < 1e-9, "the pace check goes on across a reset, with the use before it carried over")
 
     // The 20% warning is armed again once a reset has taken the figure back below it.
     var couponTracker = QuotaAlertTracker()
