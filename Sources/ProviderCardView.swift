@@ -37,7 +37,7 @@ final class ProviderCardView: NSView {
         switch style {
         case .headline: return 20
         case .caption: return 18
-        case .detail, .pace, .hours: return 16
+        case .detail, .pace, .model: return 16
         }
     }
     private static func forecastHeight(_ forecast: ForecastSummary?) -> CGFloat {
@@ -116,9 +116,9 @@ final class ProviderCardView: NSView {
             case .caption:
                 text(line.text.uppercased(), x: Self.left, y: y + 4, width: Self.right - Self.left,
                      font: .systemFont(ofSize: 9, weight: .semibold), color: .tertiaryLabelColor)
-            case .hours:
+            case .model:
                 text(line.text, x: Self.left, y: y, width: Self.right - Self.left,
-                     font: .monospacedDigitSystemFont(ofSize: 11, weight: .regular), color: .labelColor)
+                     font: .monospacedSystemFont(ofSize: 10.5, weight: .regular), color: .labelColor)
             }
             y += Self.lineHeight(line.style)
         }

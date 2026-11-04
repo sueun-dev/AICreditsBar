@@ -38,37 +38,15 @@ enum Cfg {
         get { d.data(forKey: "alertHistory") }
         set { if newValue != alertHistory { d.set(newValue, forKey: "alertHistory") } }
     }
-    /// Readings of the current cycle, kept to measure how fast a limit is being used.
-    static var usageHistory: Data? {
-        get { d.data(forKey: "usageHistory") }
-        set { if newValue != usageHistory { d.set(newValue, forKey: "usageHistory") } }
-    }
-
     // Forecast and model advice (estimates; the reported numbers are never changed).
     static var forecastEnabled: Bool {
         get { d.object(forKey: "forecastEnabled") as? Bool ?? true }
         set { d.set(newValue, forKey: "forecastEnabled") }
     }
-    /// The model your pace was spent on; advice is relative to it.
-    static var mainModel: ModelFamily {
-        get { ModelFamily(rawValue: d.string(forKey: "mainModel") ?? "") ?? .sonnet }
-        set { d.set(newValue.rawValue, forKey: "mainModel") }
-    }
-    static var modelVersion: String {
-        get {
-            let value = (d.string(forKey: "modelVersion") ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
-            return value.isEmpty ? "5.5" : String(value.prefix(8))
-        }
-        set { d.set(newValue, forKey: "modelVersion") }
-    }
-    static func modelWeight(_ model: ModelFamily) -> Double {
-        let value = d.double(forKey: "modelWeight\(model.rawValue)")
-        return value.isFinite && value > 0 ? min(100, max(0.1, value)) : model.defaultWeight
-    }
-    static func setModelWeight(_ model: ModelFamily, _ value: Double) { d.set(value, forKey: "modelWeight\(model.rawValue)") }
-    static var forecastSettings: ForecastSettings {
-        ForecastSettings(baseline: mainModel, version: modelVersion,
-                         weights: Dictionary(uniqueKeysWithValues: ModelFamily.allCases.map { ($0, modelWeight($0)) }))
+    /// Read Claude Code's own history on this Mac to compare models. Nothing leaves the Mac.
+    static var useClaudeHistory: Bool {
+        get { d.object(forKey: "useClaudeHistory") as? Bool ?? true }
+        set { d.set(newValue, forKey: "useClaudeHistory") }
     }
 
     /// Seconds between automatic checks. The usage endpoints rate-limit hard, so
@@ -101,14 +79,15 @@ enum Cfg {
     static func removeLegacyKeys() {
         for key in ["claudeSessionKey", "codexSessionToken", "claudeOrgUuid", "claudePlan", "claude5hBudget",
                     "claudeWeekBudget", "showGemini", "showLabels", "greenAbove", "yellowAbove",
-                    "colorHigh", "colorMid", "colorLow", "colorUnknown"] {
+                    "colorHigh", "colorMid", "colorLow", "colorUnknown",
+                    "usageHistory", "mainModel", "modelVersion", "modelWeightHaiku", "modelWeightSonnet", "modelWeightOpus"] {
             d.removeObject(forKey: key)
         }
     }
 
     static func resetAll() {
         for key in ["displayMode", "showCodex", "showClaude", "refreshInterval", "warnBelow", "criticalBelow", "lowAlerts", "recoveryAlerts", "checkForUpdates",
-                    "forecastEnabled", "mainModel", "modelVersion"] + ModelFamily.allCases.map({ "modelWeight\($0.rawValue)" }) {
+                    "forecastEnabled", "useClaudeHistory"] {
             d.removeObject(forKey: key)
         }
     }

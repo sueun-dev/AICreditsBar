@@ -66,25 +66,29 @@ and may change without notice. The numbers are never estimated (the separate, la
 ### Forecast and model advice
 
 Below each provider's limits the menu adds a block labeled **FORECAST · ESTIMATE**. It is
-computed on your Mac from the percentages above and never changes them. It is hidden when the
-reading isn't current, and **Settings → Forecast** turns it off.
+computed on your Mac and never changes the numbers above it. It is hidden when the reading
+isn't current, and **Settings → Forecast** turns it off.
 
-- **Pace.** Each 5-hour and weekly window says whether you are *on track* (and how much is
-  left at the reset) or *runs out in 2d 4h, 1d 20h before the reset*.
-- **Model advice (Claude).** Weekly % left ÷ days left is what you can spend per day; your
-  average so far is what you do spend, measured on your **main model** (default Sonnet).
-  The advice is the strongest model that pace can afford with a 15% margin: *Opus is fine
-  today*, *Stay on Sonnet*, *Use Haiku from now on*, or *Go easy — even Haiku runs short*.
-  Until about a day of the week has passed it says *Not enough data yet* instead of guessing.
-- **Hours of nonstop use left.** For the 5-hour and weekly windows, per model — Haiku,
-  Sonnet, Opus — based on the pace of the hours you actually used it (idle hours don't count).
-  Until the app has measured a few hours of your use, a line says *not enough data yet*; nothing is filled in with a guess.
+- **Pace.** Each limit says whether you are *on track* (and how much is left at the reset)
+  or *runs out in 8h 43m, 2d 10h early*.
+- **Per-model estimate (Claude).** Claude Code records every message's model and tokens in
+  `~/.claude/projects` on this Mac. The app prices those tokens at the published API rates,
+  matches the total to the percentage Claude reports for the same cycle (so it learns how
+  much of *your* limit one dollar of work uses), then reprices the same tokens as if Haiku,
+  Sonnet or Opus had done all of it. Each model gets its pace in %/day and the hours of
+  active use the remaining % lasts.
+- **Advice.** The strongest model whose pace fits what you can spend per day (remaining % ÷
+  days left, with a 15% margin): *Opus 5.5 is fine today*, *Stay on Sonnet 5.5*, *Use Haiku 5.5
+  from now on*, or *Go easy — even Haiku 5.5 runs short*. "Stay" and "from now on" are
+  relative to the model that did most of your recent work.
+- **No guessing.** Until a day of the week has passed, or without Claude Code history on this
+  Mac, the advice and per-model rows say *not enough data yet*.
 
-How much faster a model uses a plan limit isn't published, so the model costs are an
-assumption you can change in Settings: relative cost per hour of use, **Haiku 1 · Sonnet 3 ·
-Opus 5** (API price ratios). The model version shown (default 5.5) is also editable. Readings
-of the current cycle are kept locally, one per 15 minutes, to measure pace; nothing is sent
-anywhere.
+Limits: it assumes plan limits follow token prices (calibrated to your own usage, but not
+published by Anthropic); Claude Code use on other devices or in claude.ai counts toward the
+percentage but isn't in the local history; Haiku 5.5's newer tokenizer isn't adjusted for.
+The history is read locally, only what was added since the last read, and never sent
+anywhere. **Settings → Forecast** can turn the comparison off and forgets what was read.
 
 ### Notifications
 
@@ -268,19 +272,23 @@ Codex와 Claude Code가 직접 호출하는 내부 사용량 엔드포인트이�
 
 ### 예측과 모델 추천
 
-각 서비스의 한도 아래에 **FORECAST · ESTIMATE**(추정) 블록이 붙습니다. 위의 퍼센트로 Mac에서 계산하며
-그 숫자를 바꾸지 않습니다. 읽은 값이 최신이 아니면 숨겨지고, **설정 → Forecast**에서 끌 수 있습니다.
+각 서비스의 한도 아래에 **FORECAST · ESTIMATE**(추정) 블록이 붙습니다. Mac에서 계산하며 위의 숫자를 바꾸지 않습니다.
+읽은 값이 최신이 아니면 숨겨지고, **설정 → Forecast**에서 끌 수 있습니다.
 
-- **소진 속도.** 5시간·주간 한도마다 *순조로움*(리셋 때 남을 양) 또는 *2d 4h 뒤 소진, 리셋보다 1d 20h 일찍*을 알려줍니다.
-- **모델 추천(Claude).** 주간 남은 % ÷ 남은 일수가 하루에 쓸 수 있는 양이고, **주 모델**(기본 Sonnet)로 지금까지 쓴 평균이
-  실제 사용량입니다. 15% 여유를 두고 그 속도로 감당되는 가장 강한 모델을 추천합니다: *오늘은 Opus 써도 됨*, *Sonnet 유지*,
-  *지금부터 Haiku*, *아껴 쓰기 — Haiku도 부족*. 주간이 하루 정도 지나기 전에는 추측하지 않고 *데이터가 부족합니다(Not enough data yet)*로 표시합니다.
-- **쉬지 않고 쓸 때 남은 시간.** 5시간·주간 한도를 모델별(Haiku·Sonnet·Opus)로 보여줍니다. 실제로 사용한 시간대의 속도를
-  기준으로 하며 쉰 시간은 세지 않습니다. 앱이 몇 시간 이상의 사용을 측정하기 전에는 *not enough data yet*으로 표시하며, 추측값으로 채우지 않습니다.
+- **소진 속도.** 한도마다 *순조로움*(리셋 때 남을 양) 또는 *8h 43m 뒤 소진, 2d 10h 일찍*을 알려줍니다.
+- **모델별 추정(Claude).** Claude Code는 이 Mac의 `~/.claude/projects`에 메시지마다 모델과 토큰을 기록합니다. 앱은 그
+  토큰을 공식 API 단가로 환산하고, 같은 주기에 Claude가 알려준 사용률과 맞춰서(내 한도에서 1달러어치 작업이 몇 %인지
+  학습) 같은 토큰을 Haiku·Sonnet·Opus가 모두 처리했다면 어땠는지 다시 계산합니다. 모델마다 하루에 닳는 %와, 남은 %로
+  실제로 쓸 수 있는 시간이 나옵니다.
+- **추천.** 하루에 쓸 수 있는 양(남은 % ÷ 남은 일수, 15% 여유) 안에서 감당되는 가장 강한 모델입니다: *Opus 5.5 is fine
+  today*, *Stay on Sonnet 5.5*, *Use Haiku 5.5 from now on*, *Go easy — even Haiku 5.5 runs short*. "Stay"와 "from now on"은
+  최근에 가장 많이 쓴 모델을 기준으로 합니다.
+- **추측하지 않습니다.** 주간이 하루 지나기 전이거나 이 Mac에 Claude Code 기록이 없으면 *not enough data yet*으로 표시합니다.
 
-모델별로 한도가 얼마나 빨리 닳는지는 공개되어 있지 않으므로 모델 비용은 설정에서 바꿀 수 있는 가정값입니다(시간당 상대 비용
-**Haiku 1 · Sonnet 3 · Opus 5**, API 가격 비율). 표시되는 모델 버전(기본 5.5)도 바꿀 수 있습니다. 속도 계산을 위해 현재 주기의
-읽은 값을 15분에 하나씩 Mac에만 저장하며 어디로도 전송하지 않습니다.
+한계: 한도가 토큰 단가에 비례한다고 가정합니다(내 사용량에 맞춰 보정하지만 Anthropic이 공개한 사실은 아님). 다른 기기나
+claude.ai에서의 사용은 사용률에는 반영되지만 이 Mac의 기록에는 없습니다. Haiku 5.5의 새 토크나이저 차이는 보정하지 않습니다.
+기록은 로컬에서 마지막 읽은 이후 추가된 부분만 읽으며 어디로도 전송하지 않습니다. **설정 → Forecast**에서 비교를 끄면
+읽은 내용도 지웁니다.
 
 ### 알림
 

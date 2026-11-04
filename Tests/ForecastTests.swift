@@ -2,166 +2,229 @@ import AppKit
 
 /// The forecast is an estimate, so the tests pin down the arithmetic and the
 /// wording a person acts on: which model is advised, and how many hours remain.
+/// The history used here is written by the tests themselves, never real usage.
 func runForecastTests(now: Double) {
     Cfg.resetAll()
-    var utc = Calendar(identifier: .gregorian)
-    utc.timeZone = TimeZone(identifier: "UTC")!
-    let base = (now / 86400).rounded(.down) * 86400 + 6 * 3600   // 06:00 UTC, so "today" began 6 hours ago
-    let settings = ForecastSettings()
+    let base = (now / 900).rounded(.down) * 900
 
     func weekly(used: Double, elapsedDays: Double, label: String = "Weekly") -> UsageWindow {
-        let reset = base + (7 - elapsedDays) * 86400
-        return UsageWindow(label: label, kind: .weekly, usedPercent: used, resetsAt: reset)
+        UsageWindow(label: label, kind: .weekly, usedPercent: used, resetsAt: base + (7 - elapsedDays) * 86400)
     }
-    func advise(used: Double, elapsedDays: Double, _ s: ForecastSettings = settings) -> ModelAdvice {
-        let window = weekly(used: used, elapsedDays: elapsedDays)
-        let f = Forecaster.forecast(window, samples: [], now: base, calendar: utc)!
-        return Forecaster.advice(weekly: f, settings: s, now: base)
-    }
+    func forecast(_ window: UsageWindow) -> WindowForecast { Forecaster.forecast(window, now: base)! }
 
     // The cycle average: 20% in 2 days of a 7-day week is 10%/day.
-    let f = Forecaster.forecast(weekly(used: 20, elapsedDays: 2), samples: [], now: base, calendar: utc)!
-    check(abs(f.avgPerHour * 24 - 10) < 1e-9, "20% over 2 days is 10% per day")
+    let f = forecast(weekly(used: 20, elapsedDays: 2))
+    check(abs(f.avgPerHour(now: base) * 24 - 10) < 1e-9, "20% over 2 days is 10% per day")
     check(abs(f.left - 80) < 1e-9, "80% left")
     check(abs(f.projectedLeftAtReset(now: base) - 30) < 1e-9, "10%/day for 5 more days leaves 30% at the reset")
     check(f.runsOutIn(now: base) == nil, "it does not run out before the reset at that pace")
     check(!f.learning, "two days is enough to forecast")
-
-    // Advice ladder with Sonnet as the main model (weights 1 : 3 : 5).
-    eq(advise(used: 10, elapsedDays: 2).headline, "Opus 5.5 is fine today", "plenty of headroom: Opus is affordable")
-    eq(advise(used: 10, elapsedDays: 2).model, .opus, "…and the advised model is Opus")
-    eq(advise(used: 20, elapsedDays: 2).headline, "Stay on Sonnet 5.5", "a tighter budget stays on the main model")
-    eq(advise(used: 40, elapsedDays: 2).headline, "Use Haiku 5.5 from now on", "little left and many days to go: Haiku")
-    eq(advise(used: 40, elapsedDays: 2).tone, .watch, "dropping a model is a watch, not an alarm")
-    check(advise(used: 60, elapsedDays: 2).headline.hasPrefix("Go easy"), "not even Haiku lasts: conserve")
-    check(advise(used: 60, elapsedDays: 2).detail.count < 60, "…with a line short enough for the card")
-    eq(advise(used: 60, elapsedDays: 2).tone, .critical, "…and says so")
-    eq(advise(used: 99.9, elapsedDays: 3).headline, "Weekly limit used up", "nothing left is stated plainly")
-    eq(advise(used: 1, elapsedDays: 0.5).headline, "Not enough data yet", "half a day is too little to advise anything")
-    eq(advise(used: 1, elapsedDays: 0.5).model, nil, "…and no model is named")
-    check(advise(used: 1, elapsedDays: 0.5).detail.contains("day"), "…and says what it is waiting for")
-
-    var haikuMain = settings
-    haikuMain.baseline = .haiku
-    eq(advise(used: 20, elapsedDays: 2, haikuMain).headline, "Stay on Haiku 5.5", "Haiku as the main model is never pushed lower")
-    var flat = settings
-    flat.weights = [.haiku: 1, .sonnet: 1, .opus: 1]
-    eq(advise(used: 20, elapsedDays: 2, flat).headline, "Opus 5.5 is fine today", "equal costs make the top model affordable")
-    var versioned = settings
-    versioned.version = "6"
-    eq(advise(used: 10, elapsedDays: 2, versioned).headline, "Opus 6 is fine today", "the version is editable")
-
-    // Running out before the reset is stated with time.
-    let fast = Forecaster.forecast(weekly(used: 70, elapsedDays: 2), samples: [], now: base, calendar: utc)!
-    check(fast.runsOutIn(now: base) != nil, "35%/day on 30% left runs out before the reset")
-    check(abs((fast.runsOutIn(now: base) ?? 0) / 3600 - 30 / (70.0 / 48)) < 1e-6, "…at left ÷ pace")
-
-    // Hours of nonstop use, scaled by the model's cost against the main model.
-    var window = f
-    window.left = 50
-    window.activePerHour = 5
-    check(abs((window.hoursOfUse() ?? 0) - 10) < 1e-9, "50% left at 5%/hour is 10 hours")
-    check(abs((window.hoursOfUse(scale: settings.scale(.opus)) ?? 0) - 6) < 1e-9, "Opus uses it 5/3 as fast: 6 hours")
-    check(abs((window.hoursOfUse(scale: settings.scale(.haiku)) ?? 0) - 30) < 1e-9, "Haiku uses it a third as fast: 30 hours")
-    window.activePerHour = nil
-    check(window.hoursOfUse() == nil, "a weekly window with no measured active pace gives no hours")
-    window.kind = .session
-    window.avgPerHour = 10
-    check(abs((window.hoursOfUse() ?? 0) - 5) < 1e-9, "a 5-hour window falls back to its average, which is its active pace")
-
-    // History: one sample per 15 minutes, a new cycle starts over, a falling figure starts over.
-    var history = UsageHistory()
-    let key = UsageWindow(label: "Weekly", kind: .weekly, usedPercent: 0, resetsAt: base + 86400)
-    func reading(_ used: Double, at: Double, reset: Double) -> Reading {
-        Reading(windows: [UsageWindow(label: "Weekly", kind: .weekly, usedPercent: used, resetsAt: reset)], fetchedAt: at)
-    }
-    let t0 = (base / 900).rounded(.down) * 900
-    check(history.record(reading(10, at: t0 + 10, reset: base + 86400), provider: .claude, now: t0 + 10), "the first reading is recorded")
-    check(!history.record(reading(10, at: t0 + 20, reset: base + 86400), provider: .claude, now: t0 + 20), "an unchanged reading in the same 15 minutes changes nothing")
-    check(history.record(reading(11, at: t0 + 30, reset: base + 86400), provider: .claude, now: t0 + 30), "a changed reading in the same 15 minutes replaces it")
-    eq(history.samples(.claude, key).count, 1, "…without adding a sample")
-    history.record(reading(12, at: t0 + 1000, reset: base + 86400), provider: .claude, now: t0 + 1000)
-    eq(history.samples(.claude, key).count, 2, "the next 15 minutes adds a sample")
-    history.record(reading(5, at: t0 + 2000, reset: base + 86400), provider: .claude, now: t0 + 2000)
-    eq(history.samples(.claude, key).count, 1, "a figure that falls inside one cycle starts the history over")
-    history.record(reading(6, at: t0 + 3000, reset: base + 86400 + 7 * 86400), provider: .claude, now: t0 + 3000)
-    eq(history.samples(.claude, key).count, 1, "a later reset is a new cycle")
-    history.record(reading(7, at: t0 + 3500, reset: base + 86400 + 7 * 86400), provider: .codex, now: t0 + 3500)
-    eq(history.samples(.claude, key).count, 1, "providers keep separate histories")
-    let reloaded = UsageHistory(data: history.data)
-    eq(reloaded.samples(.claude, key), history.samples(.claude, key), "history survives a restart")
-    check(!history.record(reading(8, at: t0 + 100, reset: base + 86400), provider: .claude, now: t0 + 3600), "a reading older than a minute is ignored")
-
-    // Interpolation and the active pace: +4% in each of the first four hours, then idle.
-    let h0 = (base / 3600).rounded(.down) * 3600
-    var samples: [UsageSample] = []
-    for i in 0...40 {
-        let t = h0 + Double(i) * 900
-        samples.append(UsageSample(t: t, used: min(16, Double(i) * 1.0)))
-    }
-    check(abs((UsageHistory.value(at: h0 + 450, in: samples) ?? -1) - 0.5) < 1e-9, "a value between two readings is interpolated")
-    check(UsageHistory.value(at: h0 - 10, in: samples) == nil, "nothing before the first reading")
-    var gappy = samples
-    gappy.removeSubrange(5...20)
-    check(UsageHistory.value(at: h0 + 3600 * 2, in: gappy) == nil, "no value across a long gap in readings")
-    let rate = Forecaster.activeRate(samples, kind: .weekly, from: h0, now: h0 + 10 * 3600)
-    check(abs((rate ?? -1) - 4) < 1e-9, "four active hours of +4% is 4% per active hour, idle hours ignored")
-    check(Forecaster.activeRate(samples, kind: .weekly, from: h0 + 5 * 3600, now: h0 + 9 * 3600) == nil, "no active hour, no pace")
-
-    // Today's use needs a reading from around midnight.
-    let midnight = utc.startOfDay(for: Date(timeIntervalSince1970: base)).timeIntervalSince1970
-    let overnight = [UsageSample(t: midnight - 600, used: 30), UsageSample(t: midnight + 600, used: 32)]
-    let today = Forecaster.forecast(weekly(used: 38, elapsedDays: 2), samples: overnight, now: base, calendar: utc)
-    check(abs((today?.usedToday ?? -1) - 7) < 1e-9, "usage since midnight comes from the history around it")
-    check(Forecaster.forecast(weekly(used: 38, elapsedDays: 2), samples: [], now: base, calendar: utc)?.usedToday == nil,
-          "without history it isn't guessed")
+    let fast = forecast(weekly(used: 70, elapsedDays: 2))
+    check(abs((fast.runsOutIn(now: base) ?? 0) / 3600 - 30 / (70.0 / 48)) < 1e-6, "35%/day on 30% left runs out at left ÷ pace")
 
     // Windows that can't be forecast.
-    check(Forecaster.forecast(UsageWindow(label: "Weekly (Fable)", kind: .weekly, usedPercent: 5, resetsAt: base + 86400, modelScoped: true),
-                              samples: [], now: base) == nil, "model-scoped limits get no forecast")
-    check(Forecaster.forecast(UsageWindow(label: "Weekly", kind: .weekly, usedPercent: 50, resetsAt: base - 100), samples: [], now: base) == nil,
-          "an expired window gets none")
-    check(Forecaster.forecast(weekly(used: 50, elapsedDays: -1), samples: [], now: base) == nil, "a window that hasn't started gets none")
-    check(Forecaster.forecast(UsageWindow(label: "x", kind: .other, usedPercent: 5, resetsAt: base + 86400), samples: [], now: base) == nil,
-          "a window of unknown length gets none")
-    check(Forecaster.forecast(UsageWindow(label: "Weekly", kind: .weekly, usedPercent: .nan, resetsAt: base + 86400), samples: [], now: base) == nil,
-          "a non-finite figure gets none")
+    check(Forecaster.forecast(UsageWindow(label: "Weekly (Fable)", kind: .weekly, usedPercent: 5, resetsAt: base + 86400, modelScoped: true), now: base) == nil,
+          "model-scoped limits get no forecast")
+    check(Forecaster.forecast(UsageWindow(label: "Weekly", kind: .weekly, usedPercent: 50, resetsAt: base - 100), now: base) == nil, "an expired window gets none")
+    check(Forecaster.forecast(weekly(used: 50, elapsedDays: -1), now: base) == nil, "a window that hasn't started gets none")
+    check(Forecaster.forecast(UsageWindow(label: "x", kind: .other, usedPercent: 5, resetsAt: base + 86400), now: base) == nil, "a window of unknown length gets none")
+    check(Forecaster.forecast(UsageWindow(label: "Weekly", kind: .weekly, usedPercent: .nan, resetsAt: base + 86400), now: base) == nil, "a non-finite figure gets none")
 
-    // The menu summary: Claude gets advice and hours per model; Codex only the pace.
-    let claude = Reading(windows: [
-        UsageWindow(label: "5-hour", kind: .session, usedPercent: 30, resetsAt: base + 2 * 3600),
-        weekly(used: 10, elapsedDays: 2)], plan: "Max 5x", fetchedAt: base)
-    let claudeSummary = Forecaster.summary(provider: .claude, reading: claude, history: UsageHistory(), settings: settings, now: base)
-    eq(claudeSummary?.advice?.headline, "Opus 5.5 is fine today", "the summary leads with the advice")
-    let text = claudeSummary?.lines.map { $0.text }.joined(separator: "\n") ?? ""
+    // MARK: Prices and the ledger
+
+    let sample = TokenCounts(input: 1000, output: 2000, cacheRead: 1_000_000)
+    check(abs(priceOf(modelID: "claude-opus-5-5", longPrompt: false)!.cost(sample) - 0.244) < 1e-9, "Opus 5.5: $4 in, $20 out, $0.20 cache read per MTok")
+    check(abs(priceOf(modelID: "claude-sonnet-5-5", longPrompt: false)!.cost(TokenCounts(write5m: 1_000_000)) - 2.5) < 1e-9, "a 5-minute cache write costs 1.25x the input price")
+    check(abs(priceOf(modelID: "claude-sonnet-5-5", longPrompt: false)!.cost(TokenCounts(write1h: 1_000_000)) - 4) < 1e-9, "a 1-hour cache write costs 2x")
+    check(priceOf(modelID: "claude-opus-4-8", longPrompt: false) != nil, "an older model in the history is priced")
+    check(priceOf(modelID: "<synthetic>", longPrompt: false) == nil && priceOf(modelID: "claude-new-9", longPrompt: false) == nil, "an unknown model has no price")
+    check(abs(priceOf(modelID: "claude-haiku-5-5", longPrompt: true)!.input - 0.50) < 1e-9, "Haiku 5.5 costs more past a 100K-token prompt")
+    eq(familyOf(modelID: "claude-sonnet-5-5"), .sonnet, "model id → family")
+    eq(familyOf(modelID: "claude-fable-5"), nil, "Fable isn't one of the three families")
+
+    var ledger = UsageLedger()
+    check(!ledger.add(at: base, model: "claude-new-9", tokens: sample), "an unpriced model is left out, never guessed")
+    ledger.add(at: base - 100, model: "claude-haiku-5-5", tokens: TokenCounts(input: 200_000))
+    let tier = ledger.slice(from: base - 3600, to: base)
+    check(abs(tier.actualCost - 0.10) < 1e-9, "a prompt over 100K tokens on Haiku 5.5 is priced at the higher rate")
+    check(abs((tier.repriced[.opus] ?? 0) - 0.8) < 1e-9, "…and the same tokens on Opus 5.5 cost 200K × $4")
+    check(abs((tier.repriced[.haiku] ?? 0) - 0.10) < 1e-9, "…and on Haiku 5.5 the same")
+    eq(tier.activeHours, 1, "one active hour")
+    check(UsageLedger().slice(from: base, to: base - 1) == LedgerSlice(), "an empty or inverted range is empty")
+
+    // Ten messages of 1M output tokens over five distinct hours, on one model.
+    func work(_ model: String) -> UsageLedger {
+        var l = UsageLedger()
+        for hour in 1...5 { for _ in 0..<2 { l.add(at: base - Double(hour) * 3600 - 100, model: model, tokens: TokenCounts(output: 1_000_000)) } }
+        return l
+    }
+    let opusWork = work("claude-opus-5-5"), sonnetWork = work("claude-sonnet-5-5")
+    let slice = opusWork.slice(from: base - 2 * 86400, to: base)
+    check(abs(slice.actualCost - 200) < 1e-9, "10 × 1M output tokens on Opus 5.5 is $200")
+    check(abs((slice.repriced[.sonnet] ?? 0) - 100) < 1e-9 && abs((slice.repriced[.haiku] ?? 0) - 5) < 1e-9,
+          "the same tokens cost $100 on Sonnet 5.5 and $5 on Haiku 5.5")
+    eq(slice.activeHours, 5, "five active hours")
+
+    // MARK: Projection — calibrated against the reported percentage
+
+    let twoDays = forecast(weekly(used: 20, elapsedDays: 2))
+    let opusP = Forecaster.project(twoDays, ledger: opusWork, now: base)!
+    // 20% reported ↔ $200 of work: 0.1% per dollar.
+    check(abs(opusP.estimate(.opus)!.pctPerDay - 10) < 1e-9, "Opus: $200 over 2 days at 0.1%/$ is 10%/day")
+    check(abs(opusP.estimate(.sonnet)!.pctPerDay - 5) < 1e-9, "the same work on Sonnet is half: 5%/day")
+    check(abs(opusP.estimate(.haiku)!.pctPerDay - 0.25) < 1e-9, "…and on Haiku 0.25%/day")
+    check(abs((opusP.estimate(.opus)!.hoursLeft ?? 0) - 20) < 1e-9, "80% left at 4%/active hour on Opus is 20 hours")
+    check(abs((opusP.estimate(.sonnet)!.hoursLeft ?? 0) - 40) < 1e-9, "…40 on Sonnet")
+    check(abs((opusP.estimate(.haiku)!.hoursLeft ?? 0) - 800) < 1e-9, "…800 on Haiku")
+    eq(opusP.dominant, .opus, "the family that did the work is the dominant one")
+    check(Forecaster.project(twoDays, ledger: UsageLedger(), now: base) == nil, "no history, no projection")
+    check(Forecaster.project(forecast(weekly(used: 1, elapsedDays: 0.5)), ledger: opusWork, now: base) == nil, "half a day in: too early to project")
+    check(Forecaster.project(forecast(weekly(used: 1.5, elapsedDays: 3)), ledger: opusWork, now: base) == nil, "under 2% used: too little to calibrate")
+    var tiny = UsageLedger()
+    tiny.add(at: base - 3600, model: "claude-opus-5-5", tokens: TokenCounts(output: 1000))
+    check(Forecaster.project(twoDays, ledger: tiny, now: base) == nil, "under $1 of recorded work can't calibrate 20%")
+    var oneHour = UsageLedger()
+    oneHour.add(at: base - 3600, model: "claude-opus-5-5", tokens: TokenCounts(output: 1_000_000))
+    check(Forecaster.project(twoDays, ledger: oneHour, now: base)!.estimate(.opus)!.hoursLeft == nil, "one active hour isn't a measured pace: no hours")
+
+    // MARK: Advice
+
+    func advise(used: Double, elapsedDays: Double, _ ledger: UsageLedger?) -> ModelAdvice {
+        let window = forecast(weekly(used: used, elapsedDays: elapsedDays))
+        return Forecaster.advice(weekly: window, projection: ledger.flatMap { Forecaster.project(window, ledger: $0, now: base) }, now: base)
+    }
+    eq(advise(used: 10, elapsedDays: 2, sonnetWork).headline, "Opus 5.5 is fine today", "Sonnet is doing the work and Opus is affordable")
+    eq(advise(used: 10, elapsedDays: 2, sonnetWork).model, .opus, "…the advised model is Opus")
+    eq(advise(used: 10, elapsedDays: 2, sonnetWork).tone, .good, "…and it's good news")
+    eq(advise(used: 20, elapsedDays: 2, sonnetWork).headline, "Stay on Sonnet 5.5", "a tighter budget stays on the model doing the work")
+    eq(advise(used: 40, elapsedDays: 2, sonnetWork).headline, "Use Haiku 5.5 from now on", "little left and many days to go: Haiku")
+    eq(advise(used: 40, elapsedDays: 2, sonnetWork).tone, .watch, "dropping a model is a watch, not an alarm")
+    check(advise(used: 95, elapsedDays: 2, sonnetWork).headline.hasPrefix("Go easy"), "not even Haiku lasts: conserve")
+    eq(advise(used: 95, elapsedDays: 2, sonnetWork).tone, .critical, "…and says so")
+    check(advise(used: 40, elapsedDays: 2, sonnetWork).detail.contains("Can spend ≈12%/day") && advise(used: 40, elapsedDays: 2, sonnetWork).detail.contains("Haiku pace ≈1.0%/day"),
+          "the line gives the budget and the pace on the advised model")
+    check(advise(used: 40, elapsedDays: 2, sonnetWork).detail.count < 70, "…and fits the card")
+    eq(advise(used: 99.9, elapsedDays: 3, sonnetWork).headline, "Weekly limit used up", "nothing left is stated plainly")
+    eq(advise(used: 1, elapsedDays: 0.5, sonnetWork).headline, "Not enough data yet", "half a day is too little to advise anything")
+    eq(advise(used: 1, elapsedDays: 0.5, sonnetWork).model, nil, "…and no model is named")
+    eq(advise(used: 20, elapsedDays: 2, nil).headline, "Not enough data yet", "no Claude Code history: not enough data")
+    check(advise(used: 20, elapsedDays: 2, nil).detail.contains("Claude Code"), "…and says what is missing")
+
+    // MARK: Summary
+
+    let claude = Reading(windows: [weekly(used: 10, elapsedDays: 2)], plan: "Max 20x", fetchedAt: base)
+    let withHistory = Forecaster.summary(provider: .claude, reading: claude, ledger: sonnetWork, now: base)
+    eq(withHistory?.advice?.headline, "Opus 5.5 is fine today", "the summary leads with the advice")
+    let text = withHistory?.lines.map { $0.text }.joined(separator: "\n") ?? ""
     check(text.contains("Weekly: on track"), "weekly pace is stated")
-    check(text.contains("5-hour:"), "the 5-hour pace is stated")
-    check(text.contains("5-hour  Haiku") && text.contains("Sonnet") && text.contains("Opus"), "the 5-hour hours are given per model")
-    check(text.contains("Weekly  not enough data yet"), "weekly hours without a measured active pace say so, not a guess")
-    let young = Reading(windows: [UsageWindow(label: "5-hour", kind: .session, usedPercent: 0.5, resetsAt: base + 5 * 3600 - 300),
-                                  weekly(used: 0.5, elapsedDays: 0.1)], fetchedAt: base)
-    let youngText = Forecaster.summary(provider: .claude, reading: young, history: UsageHistory(), settings: settings, now: base)?
-        .lines.map { $0.text }.joined(separator: "\n") ?? ""
-    check(youngText.contains("Not enough data yet") && youngText.contains("5-hour: not enough data yet")
-          && youngText.contains("5-hour  not enough data yet"), "a cycle that just began shows no numbers at all")
-    check(!youngText.contains("Haiku"), "…and no per-model hours")
-    let codex = Forecaster.summary(provider: .codex, reading: claude, history: UsageHistory(), settings: settings, now: base)
-    check(codex?.advice == nil, "Codex gets no Claude model advice")
-    check(!(codex?.lines.map { $0.text }.joined().contains("Haiku") ?? true), "…and no Claude model names")
-    check(Forecaster.summary(provider: .claude, reading: Reading(windows: [], fetchedAt: base), history: UsageHistory(),
-                             settings: settings, now: base) == nil, "nothing to forecast, nothing shown")
+    check(text.contains("Weekly · pace and hours of use left"), "the per-model block is introduced")
+    for model in ModelFamily.allCases { check(text.contains(model.title), "\(model.title) has its own row") }
+    check(text.contains("Sonnet 5.5 ≈5.0%/day") && text.contains("Opus 5.5   ≈10%/day"), "a row gives the pace per day, in aligned columns")
+    check(text.contains("left"), "…and the hours of use left")
+    let rows = withHistory?.lines.filter { $0.style == .model }.map { $0.text.count } ?? []
+    check(rows.count == 3 && rows.allSatisfy { $0 < 40 }, "three model rows, short enough for the card")
+    let without = Forecaster.summary(provider: .claude, reading: claude, ledger: nil, now: base)
+    let withoutText = without?.lines.map { $0.text }.joined(separator: "\n") ?? ""
+    check(withoutText.contains("Weekly per model: not enough data yet") && !withoutText.contains("Haiku"), "without history the model rows say so, with no numbers")
+    let codex = Forecaster.summary(provider: .codex, reading: claude, ledger: sonnetWork, now: base)
+    check(codex?.advice == nil && !(codex?.lines.map { $0.text }.joined().contains("Haiku") ?? true), "Codex gets no Claude model advice")
+    let month = Reading(windows: [UsageWindow(label: "30-day", kind: .other, usedPercent: 78, resetsAt: base + 20 * 86400, length: 30 * 86400)], fetchedAt: base)
+    check(Forecaster.summary(provider: .codex, reading: month, ledger: nil, now: base)?.lines.map { $0.text }.joined().contains("30-day: runs out in") == true,
+          "a 30-day window 78% used ten days in runs out before its reset")
+    check(Forecaster.summary(provider: .claude, reading: Reading(windows: [], fetchedAt: base), ledger: nil, now: base) == nil, "nothing to forecast, nothing shown")
+    let young = Reading(windows: [UsageWindow(label: "5-hour", kind: .session, usedPercent: 0.5, resetsAt: base + 5 * 3600 - 300), weekly(used: 0.5, elapsedDays: 0.1)], fetchedAt: base)
+    let youngText = Forecaster.summary(provider: .claude, reading: young, ledger: sonnetWork, now: base)?.lines.map { $0.text }.joined(separator: "\n") ?? ""
+    check(youngText.contains("Not enough data yet") && youngText.contains("5-hour: not enough data yet") && !youngText.contains("Haiku"),
+          "a cycle that just began shows no numbers at all")
+    // Gated by the setting, and only for a current reading.
+    let current = ProviderState(reading: claude)
+    check(Forecaster.summary(provider: .claude, state: current, ledger: sonnetWork, now: base) != nil, "a current reading is forecast")
+    Cfg.forecastEnabled = false
+    check(Forecaster.summary(provider: .claude, state: current, ledger: sonnetWork, now: base) == nil, "turned off in Settings: nothing")
+    Cfg.resetAll()
+    check(Forecaster.summary(provider: .claude, state: ProviderState(reading: claude, restored: true), ledger: sonnetWork, now: base) == nil,
+          "a restored reading isn't projected forward")
 
-    // A window of another length (Codex Free reports a 30-day one) is forecast from its own length.
-    let month = Reading(windows: [UsageWindow(label: "30-day", kind: .other, usedPercent: 78, resetsAt: base + 20 * 86400, length: 30 * 86400)],
-                        fetchedAt: base)
-    let monthText = Forecaster.summary(provider: .codex, reading: month, history: UsageHistory(), settings: settings, now: base)?
-        .lines.map { $0.text }.joined(separator: "\n") ?? ""
-    check(monthText.contains("30-day: runs out in"), "a 30-day window 78% used ten days in runs out before its reset")
-    check(Forecaster.summary(provider: .codex, reading: Reading(windows: [UsageWindow(label: "x", kind: .other, usedPercent: 5, resetsAt: base + 86400)],
-                                                                fetchedAt: base), history: UsageHistory(), settings: settings, now: base) == nil,
-          "an unknown length still gets no forecast")
+    // MARK: Reading Claude Code's files
 
-    // Wording never traps.
+    let real = nowEpoch()
+    let root = NSTemporaryDirectory() + "aicb-ledger-\(UUID().uuidString)"
+    let nested = root + "/project-a/sub"
+    try? FileManager.default.createDirectory(atPath: nested, withIntermediateDirectories: true)
+    defer { try? FileManager.default.removeItem(atPath: root) }
+    let iso = ISO8601DateFormatter()
+    iso.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+    func line(_ id: String, _ model: String, _ at: Double, output: Int = 1_000_000, type: String = "assistant", trailing: String = "\n") -> String {
+        "{\"type\":\"\(type)\",\"timestamp\":\"\(iso.string(from: Date(timeIntervalSince1970: at)))\",\"message\":{\"model\":\"\(model)\",\"id\":\"\(id)\","
+            + "\"usage\":{\"input_tokens\":0,\"output_tokens\":\(output),\"cache_read_input_tokens\":0,\"cache_creation_input_tokens\":0}}}" + trailing
+    }
+    func append(_ text: String, to path: String) {
+        if let handle = FileHandle(forWritingAtPath: path) { handle.seekToEndOfFile(); handle.write(Data(text.utf8)); try? handle.close() }
+        else { try? text.write(toFile: path, atomically: true, encoding: .utf8) }
+    }
+    let file = nested + "/session.jsonl"
+    append(line("A", "claude-opus-5-5", real - 600) + line("A", "claude-opus-5-5", real - 600)            // one message, written twice
+           + line("B", "claude-sonnet-5-5", real - 500) + line("U", "claude-opus-5-5", real - 400, type: "user")
+           + line("OLD", "claude-opus-5-5", real - 20 * 86400) + line("X", "claude-new-9", real - 300)
+           + line("S", "<synthetic>", real - 200), to: file)
+    var scanned = UsageLedger()
+    check(scanned.scan(root: root, now: real), "the first scan reads the file")
+    var cost = scanned.slice(from: real - 3600, to: real + 1).actualCost
+    check(abs(cost - 30) < 1e-9, "a message written twice counts once; user lines, old, unknown and synthetic ones don't ($20 Opus + $10 Sonnet)")
+    check(!scanned.scan(root: root, now: real), "a scan with nothing new changes nothing")
+    append(line("C", "claude-opus-5-5", real - 100) + line("C", "claude-opus-5-5", real - 100), to: file)
+    scanned.scan(root: root, now: real)
+    cost = scanned.slice(from: real - 3600, to: real + 1).actualCost
+    check(abs(cost - 50) < 1e-9, "only what was appended is read, and a duplicate across scans counts once")
+    let partial = line("D", "claude-opus-5-5", real - 50, trailing: "")
+    append(String(partial.prefix(60)), to: file)
+    scanned.scan(root: root, now: real)
+    check(abs(scanned.slice(from: real - 3600, to: real + 1).actualCost - 50) < 1e-9, "a line still being written isn't read")
+    append(String(partial.dropFirst(60)) + "\n", to: file)
+    scanned.scan(root: root, now: real)
+    check(abs(scanned.slice(from: real - 3600, to: real + 1).actualCost - 70) < 1e-9, "…until it is complete")
+    // Another field order is still parsed, and still counted once.
+    let reordered = "{\"type\":\"assistant\",\"timestamp\":\"\(iso.string(from: Date(timeIntervalSince1970: real - 40)))\",\"message\":{\"id\":\"F\",\"model\":\"claude-sonnet-5-5\","
+        + "\"usage\":{\"input_tokens\":0,\"output_tokens\":1000000,\"cache_read_input_tokens\":0,\"cache_creation_input_tokens\":0}}}\n"
+    append(reordered + reordered, to: file)
+    scanned.scan(root: root, now: real)
+    check(abs(scanned.slice(from: real - 3600, to: real + 1).actualCost - 80) < 1e-9, "a message with another field order counts once ($10 Sonnet)")
+    // A week is all that is kept.
+    var weekOld = UsageLedger()
+    weekOld.add(at: real - 7.5 * 86400, model: "claude-opus-5-5", tokens: TokenCounts(output: 1_000_000))
+    weekOld.add(at: real - 6.5 * 86400, model: "claude-opus-5-5", tokens: TokenCounts(output: 1_000_000))
+    try? FileManager.default.createDirectory(atPath: root + "/empty", withIntermediateDirectories: true)
+    weekOld.scan(root: root + "/empty", now: real)
+    check(abs(weekOld.slice(from: real - 8 * 86400, to: real).actualCost - 20) < 1e-9, "a scan drops what is older than seven days and keeps the rest")
+    let stale = nested + "/stale.jsonl"
+    append(line("Z", "claude-opus-5-5", real - 60), to: stale)
+    try? FileManager.default.setAttributes([.modificationDate: Date(timeIntervalSince1970: real - 20 * 86400)], ofItemAtPath: stale)
+    var other = UsageLedger()
+    other.scan(root: root, now: real)
+    check(abs(other.slice(from: real - 3600, to: real + 1).actualCost - 80) < 1e-9, "a file untouched for 20 days isn't read")
+    var nothing = UsageLedger()
+    check(!nothing.scan(root: root + "/missing", now: real), "a missing folder is fine")
+    try? FileManager.default.removeItem(atPath: file)
+    scanned.scan(root: root, now: real)
+    check(scanned.files[file] == nil, "a deleted file is forgotten")
+
+    // The store keeps it across a restart, and can forget it.
+    let stateFile = URL(fileURLWithPath: root + "/state/usage-ledger.json")
+    let store = LedgerStore(root: root, file: stateFile)
+    append(line("E", "claude-opus-5-5", real - 30), to: file)
+    var finished = false
+    store.refresh(minimumGap: 0) { finished = true }
+    let deadline = Date().addingTimeInterval(15)
+    while !finished && Date() < deadline { RunLoop.main.run(until: Date().addingTimeInterval(0.05)) }
+    check(finished && abs(store.snapshot.slice(from: real - 3600, to: nowEpoch() + 1).actualCost - 20) < 1e-9, "the store scans in the background")
+    check(FileManager.default.fileExists(atPath: stateFile.path), "…and saves what it read")
+    let reopened = LedgerStore(root: root, file: stateFile)
+    eq(reopened.snapshot.buckets, store.snapshot.buckets, "a restart keeps it without rescanning")
+    reopened.clear()
+    check(reopened.snapshot.isEmpty && !FileManager.default.fileExists(atPath: stateFile.path), "clearing forgets it, in memory and on disk")
+
+    // MARK: Wording and settings
+
     eq(durationText(35 * 60), "35m", "minutes")
     eq(durationText(12000), "3h 20m", "hours and minutes")
     eq(durationText(21 * 3600), "21h", "whole hours past ten")
@@ -174,22 +237,15 @@ func runForecastTests(now: Double) {
     eq(percentText(12.4), "12%", "none above ten")
     eq(percentText(.nan), "0%", "a non-finite percent")
 
-    // Settings round trip.
     Cfg.resetAll()
-    eq(Cfg.forecastSettings, ForecastSettings(), "defaults: Sonnet 5.5 as the main model, costs 1 : 3 : 5")
-    Cfg.mainModel = .opus
-    Cfg.modelVersion = " 6 "
-    Cfg.setModelWeight(.opus, 8)
-    eq(Cfg.forecastSettings.baseline, .opus, "main model is saved")
-    eq(Cfg.forecastSettings.version, "6", "version is trimmed")
-    eq(Cfg.forecastSettings.weights[.opus], 8, "cost is saved")
-    Cfg.setModelWeight(.haiku, -3)
-    eq(Cfg.modelWeight(.haiku), 1, "a nonsense cost falls back to the default")
+    check(Cfg.forecastEnabled && Cfg.useClaudeHistory, "forecast and the local history are on by default")
+    Cfg.useClaudeHistory = false
+    check(!Cfg.useClaudeHistory, "the local history can be turned off")
     Cfg.resetAll()
-    eq(Cfg.forecastSettings, ForecastSettings(), "Reset to Defaults restores the forecast settings")
+    check(Cfg.useClaudeHistory, "Reset to Defaults turns it back on")
 
     // The card grows to hold the forecast and stays the same without one.
     let state = ProviderState(reading: claude)
     eq(ProviderCardView.height(for: state, forecast: nil), ProviderCardView.height(for: state), "no forecast, same height")
-    check(ProviderCardView.height(for: state, forecast: claudeSummary) > ProviderCardView.height(for: state), "the forecast adds height")
+    check(ProviderCardView.height(for: state, forecast: withHistory) > ProviderCardView.height(for: state), "the forecast adds height")
 }
