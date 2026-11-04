@@ -86,8 +86,13 @@ enum Forecaster {
         let elapsed = min(length, now - (reset - length))
         guard elapsed > 60 else { return nil }
         let used = window.usedPercent
-        let learning = window.kind == .session ? (elapsed < 1200 || used < 1) : (elapsed < 86400 || used < 2)
-        return WindowForecast(label: window.label, kind: window.kind, used: used, resetsAt: reset, length: length, learning: learning)
+        return WindowForecast(label: window.label, kind: window.kind, used: used, resetsAt: reset, length: length,
+                              learning: isLearning(window.kind, elapsed: elapsed, used: used))
+    }
+
+    /// Too little of the cycle has passed, or too little is used, for a firm forecast.
+    static func isLearning(_ kind: WindowKind, elapsed: Double, used: Double) -> Bool {
+        kind == .session ? (elapsed < 1200 || used < 1) : (elapsed < 86400 || used < 2)
     }
 
     // MARK: Per-model projection
@@ -155,12 +160,12 @@ enum Forecaster {
     // MARK: Summary for the menu
 
     /// Only a current reading is projected forward; a stale, restored or failed one isn't.
-    static func summary(provider: Provider, state: ProviderState, ledger: UsageLedger?, now: Double) -> ForecastSummary? {
+    static func summary(provider: Provider, state: ProviderState, ledger: UsageLedger?, samples: SampleLog? = nil, now: Double) -> ForecastSummary? {
         guard Cfg.forecastEnabled, state.isCurrent(now: now), let reading = state.reading else { return nil }
-        return summary(provider: provider, reading: reading, ledger: ledger, now: now)
+        return summary(provider: provider, reading: reading, ledger: ledger, samples: samples, now: now)
     }
 
-    static func summary(provider: Provider, reading: Reading, ledger: UsageLedger?, now: Double) -> ForecastSummary? {
+    static func summary(provider: Provider, reading: Reading, ledger: UsageLedger?, samples: SampleLog? = nil, now: Double) -> ForecastSummary? {
         let general = reading.windows.filter { !$0.modelScoped && !$0.isExpired(now: now) }
         func pick(_ kind: WindowKind) -> WindowForecast? {
             general.filter { $0.kind == kind }.compactMap { forecast($0, now: now) }.min { $0.resetsAt < $1.resetsAt }
@@ -201,6 +206,7 @@ enum Forecaster {
                 lines.append(ForecastLine(text: "Priced at API rates, matched to your own use", style: .detail))
             }
         }
+        lines += Accuracy.lines(samples, provider: provider, kind: weekly?.kind ?? others.first?.kind, ledger: ledger, now: now)
         return ForecastSummary(advice: advice, lines: lines)
     }
 

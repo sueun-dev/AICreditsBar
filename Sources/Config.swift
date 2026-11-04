@@ -43,6 +43,11 @@ enum Cfg {
         get { d.object(forKey: "forecastEnabled") as? Bool ?? true }
         set { d.set(newValue, forKey: "forecastEnabled") }
     }
+    /// The readings kept to check earlier forecasts against what happened (a week at most).
+    static var sampleLog: Data? {
+        get { d.data(forKey: "sampleLog") }
+        set { if newValue != sampleLog { d.set(newValue, forKey: "sampleLog") } }
+    }
     /// Read Claude Code's own history on this Mac to compare models. Nothing leaves the Mac.
     static var useClaudeHistory: Bool {
         get { d.object(forKey: "useClaudeHistory") as? Bool ?? true }

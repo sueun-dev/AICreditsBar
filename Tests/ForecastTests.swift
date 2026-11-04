@@ -223,6 +223,71 @@ func runForecastTests(now: Double) {
     reopened.clear()
     check(reopened.snapshot.isEmpty && !FileManager.default.fileExists(atPath: stateFile.path), "clearing forgets it, in memory and on disk")
 
+    // MARK: Checking forecasts against what happened
+
+    func readings(_ used: (Double) -> Double, hours: Int, provider: Provider = .claude, reset: Double? = nil) -> SampleLog {
+        var l = SampleLog()
+        for h in 0...hours {
+            let t = base + Double(h) * 3600
+            l.record(Reading(windows: [UsageWindow(label: "Weekly", kind: .weekly, usedPercent: min(100, used(Double(h))), resetsAt: reset ?? base + 7 * 86400)], fetchedAt: t),
+                     provider: provider, now: t)
+        }
+        return l
+    }
+    let now3d = base + 72 * 3600
+    // Steady use: the average-pace forecast 24 hours ahead is exactly right.
+    let steady = Accuracy.report(readings({ $0 * 10 / 24 }, hours: 72), provider: .claude, kind: .weekly, ledger: nil, now: now3d)
+    check(steady.hasPace && steady.paceChecks == 25, "a day to learn, a day to look ahead: 25 hourly checks in three days")
+    check(abs(steady.paceMissPoints) < 1e-9 && abs(steady.paceBiasPoints) < 1e-9, "steady use: the 24-hour forecast misses by nothing")
+    // Use that speeds up: the average-pace forecast runs low.
+    let speeding = Accuracy.report(readings({ ($0 / 24) * ($0 / 24) * 5 }, hours: 72), provider: .claude, kind: .weekly, ledger: nil, now: now3d)
+    check(speeding.paceMissPoints > 2 && speeding.paceBiasPoints < -2, "use that speeds up: the forecast misses by points and runs low")
+    check(!Accuracy.report(readings({ $0 * 10 / 24 }, hours: 40), provider: .claude, kind: .weekly, ledger: nil, now: base + 40 * 3600).hasPace,
+          "less than two days of readings: no pace check yet")
+    check(Accuracy.report(readings({ $0 * 10 / 24 }, hours: 72), provider: .codex, kind: .weekly, ledger: nil, now: now3d).paceChecks == 0, "another provider's readings aren't mixed in")
+
+    // The model-cost check: the same dollars always use the same %, or they don't.
+    func spending(second: Int) -> UsageLedger {
+        var l = UsageLedger()
+        for k in 1...72 { l.add(at: base + Double(k) * 3600 - 60, model: "claude-opus-5-5", tokens: TokenCounts(output: k > 36 ? second : 100_000)) }
+        return l
+    }
+    let proportional = Accuracy.report(readings({ $0 }, hours: 72), provider: .claude, kind: .weekly, ledger: spending(second: 100_000), now: now3d)
+    check(proportional.hasCost && abs(proportional.costRatio - 1) < 0.01, "% proportional to the priced tokens: real burn ×1.00 of priced")
+    let doubled = Accuracy.report(readings({ $0 }, hours: 72), provider: .claude, kind: .weekly, ledger: spending(second: 200_000), now: now3d)
+    check(doubled.costRatio < 0.9, "dollars doubled but the % didn't: the priced tokens over-predicted, ratio below 1")
+    check(Accuracy.report(readings({ $0 }, hours: 72), provider: .codex, kind: .weekly, ledger: spending(second: 100_000), now: now3d).costChecks == 0,
+          "the model-cost check is Claude's alone")
+    check(Accuracy.report(readings({ $0 }, hours: 72), provider: .claude, kind: .weekly, ledger: nil, now: now3d).costChecks == 0, "no history, no cost check")
+
+    // What the card says.
+    let sayings = Accuracy.lines(readings({ $0 * 10 / 24 }, hours: 72), provider: .claude, kind: .weekly, ledger: spending(second: 100_000), now: now3d).map { $0.text }.joined(separator: "\n")
+    check(sayings.contains("24h pace: off by 0.0 pts · 25 checks"), "the pace line gives the miss and the number of checks")
+    check(sayings.contains("Model costs: real burn ×"), "the cost line gives the ratio")
+    eq(Accuracy.lines(readings({ $0 * 10 / 24 }, hours: 30), provider: .claude, kind: .weekly, ledger: nil, now: base + 30 * 3600).map { $0.text }, ["Accuracy check: not enough data yet"],
+       "too few checks: it says so instead of showing a number")
+    eq(Accuracy.lines(nil, provider: .claude, kind: .weekly, ledger: nil, now: now3d).count, 0, "no log, no lines")
+    let withLog = Forecaster.summary(provider: .claude, reading: claude, ledger: sonnetWork, samples: readings({ $0 * 10 / 24 }, hours: 72), now: base)
+    check(withLog?.lines.contains { $0.text == "Checked against what happened" } == true, "the summary carries the accuracy check")
+
+    // Keeping the readings.
+    var kept = SampleLog()
+    func one(_ used: Double, at: Double, reset: Double = base + 7 * 86400) -> Reading {
+        Reading(windows: [UsageWindow(label: "Weekly", kind: .weekly, usedPercent: used, resetsAt: reset)], fetchedAt: at)
+    }
+    check(kept.record(one(10, at: base + 10), provider: .claude, now: base + 10), "the first reading is kept")
+    check(!kept.record(one(10, at: base + 20), provider: .claude, now: base + 20), "an unchanged figure in the same 15 minutes changes nothing")
+    check(kept.record(one(11, at: base + 30), provider: .claude, now: base + 30), "a changed figure replaces it")
+    kept.record(one(12, at: base + 1000, reset: base + 7 * 86400 + 0.012), provider: .claude, now: base + 1000)
+    eq(kept.series.count, 1, "a reset time that jitters by milliseconds is the same cycle")
+    eq(kept.series.values.first?.points.count, 2, "the next 15 minutes adds a point")
+    check(!kept.record(one(13, at: base + 100), provider: .claude, now: base + 3600), "a reading older than a minute is ignored")
+    check(!kept.record(Reading(windows: [UsageWindow(label: "Weekly (Fable)", kind: .weekly, usedPercent: 5, resetsAt: base + 86400, modelScoped: true)], fetchedAt: base + 2000),
+                       provider: .claude, now: base + 2000), "a model-scoped limit isn't logged")
+    eq(SampleLog(data: kept.data).series, kept.series, "the log survives a restart")
+    kept.record(one(5, at: base + 15 * 86400, reset: base + 22 * 86400), provider: .claude, now: base + 15 * 86400)
+    eq(kept.series.count, 1, "a cycle that ended more than a week ago is dropped")
+
     // MARK: Wording and settings
 
     eq(durationText(35 * 60), "35m", "minutes")

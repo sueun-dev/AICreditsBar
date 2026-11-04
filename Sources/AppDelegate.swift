@@ -19,6 +19,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private var lastProviders: [Provider] = []
     private var wakeWork: DispatchWorkItem?
     private let ledgerStore = LedgerStore()
+    private var samples = SampleLog(data: Cfg.sampleLog)
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
@@ -71,6 +72,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             Cfg.save(reading, for: provider)
             notifications.record(reading, provider: provider)
             if provider == .claude { refreshLedger() }
+            if Cfg.forecastEnabled, samples.record(reading, provider: provider, now: nowEpoch()) { Cfg.sampleLog = samples.data }
         }
         updateTitle()
         if let state = states[provider] { cards[provider]?.update(state, forecast: forecast(for: provider)) }
@@ -95,7 +97,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
     private func forecast(for provider: Provider) -> ForecastSummary? {
         Forecaster.summary(provider: provider, state: states[provider] ?? ProviderState(),
-                           ledger: Cfg.useClaudeHistory ? ledgerStore.snapshot : nil, now: nowEpoch())
+                           ledger: Cfg.useClaudeHistory ? ledgerStore.snapshot : nil, samples: samples, now: nowEpoch())
     }
 
     /// Claude Code's history is read in the background; the cards redraw when it has been.

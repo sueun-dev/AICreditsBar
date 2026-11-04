@@ -90,6 +90,22 @@ percentage but isn't in the local history; Haiku 5.5's newer tokenizer isn't adj
 The history is read locally, only what was added since the last read, and never sent
 anywhere. **Settings → Forecast** can turn the comparison off and forgets what was read.
 
+**Checked against what happened.** The app keeps the readings it gets (one per 15 minutes,
+a week at most, on this Mac) and, as time passes, compares its earlier forecasts with the
+readings that followed. The card shows two lines once there are at least 3 checks of each:
+
+- *24h pace: off by 3.1 pts · 12 checks* — the used % it predicted a day ahead from the
+  cycle's average pace, against the used % Claude/Codex then reported (it says *ran high* or
+  *ran low* when it was consistently off one way).
+- *Model costs: real burn ×1.08 of priced* — the % the priced Claude Code tokens predicted for the
+  next 6 hours, against the % actually used. ×1.00 means limits really are used up in
+  proportion to API prices; below 1 means the priced tokens over-predicted, above 1 under.
+  This tests the one assumption the per-model numbers rest on.
+
+Until then it says *Accuracy check: not enough data yet*. Both start from the app's first
+reading, so the cost check has its first numbers after about 9 hours and the pace check after
+about a day (a cycle must also be at least a day old).
+
 ### Notifications
 
 In **Settings → Notifications**, choose **Enable Notifications** once to grant macOS
@@ -289,6 +305,18 @@ Codex와 Claude Code가 직접 호출하는 내부 사용량 엔드포인트이�
 claude.ai에서의 사용은 사용률에는 반영되지만 이 Mac의 기록에는 없습니다. Haiku 5.5의 새 토크나이저 차이는 보정하지 않습니다.
 기록은 로컬에서 마지막 읽은 이후 추가된 부분만 읽으며 어디로도 전송하지 않습니다. **설정 → Forecast**에서 비교를 끄면
 읽은 내용도 지웁니다.
+
+**실제와 비교.** 앱은 받은 읽기값을 이 Mac에 15분에 하나씩, 최대 일주일치만 보관하고, 시간이 지나면 앞서 낸
+예측을 그 뒤에 들어온 실제 값과 비교합니다. 각각 3번 이상 확인되면 카드에 두 줄이 나옵니다.
+
+- *24h pace: off by 3.1 pts · 12 checks* — 주기 평균 속도로 하루 앞을 예측한 사용률과 실제 보고된 사용률의 차이입니다
+  (계속 한쪽으로 틀리면 *ran high* 또는 *ran low*가 붙습니다).
+- *Model costs: real burn ×1.08 of priced* — 환산한 토큰으로 예측한 앞으로 6시간의 %와 실제로 닳은 %의 비율입니다.
+  ×1.00이면 한도가 정말 API 단가에 비례해 닳는다는 뜻이고, 1보다 작으면 환산이 과하게, 크면 모자라게 예측한 것입니다.
+  모델별 숫자가 기대는 유일한 가정을 직접 확인하는 줄입니다.
+
+그 전에는 *Accuracy check: not enough data yet*으로 표시합니다. 둘 다 앱이 처음 받은 읽기값부터 쌓이므로 비용 확인은 약 9시간,
+속도 확인은 약 하루 뒤에 첫 숫자가 나옵니다(주기가 최소 하루는 지나 있어야 합니다).
 
 ### 알림
 

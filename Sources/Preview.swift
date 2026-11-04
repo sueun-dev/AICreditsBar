@@ -23,7 +23,8 @@ func renderPreview(to path: String) throws {
     var ledger = LedgerStore().snapshot
     if Cfg.useClaudeHistory { ledger.scan(root: (claudeConfigDir as NSString).appendingPathComponent("projects"), now: nowEpoch()) }
     let forecasts = Dictionary(uniqueKeysWithValues: states.map {
-        ($0.0, Forecaster.summary(provider: $0.0, state: $0.1, ledger: Cfg.useClaudeHistory ? ledger : nil, now: nowEpoch()))
+        ($0.0, Forecaster.summary(provider: $0.0, state: $0.1, ledger: Cfg.useClaudeHistory ? ledger : nil,
+                                  samples: SampleLog(data: Cfg.sampleLog), now: nowEpoch()))
     })
     let width = ProviderCardView.width + 12, barHeight: CGFloat = 30
     let cardsHeight = states.reduce(CGFloat(0)) { $0 + ProviderCardView.height(for: $1.1, forecast: forecasts[$1.0] ?? nil) }
