@@ -70,7 +70,7 @@ computed on your Mac and never changes the numbers above it. It is hidden when t
 isn't current, and **Settings → Forecast** turns it off.
 
 - **Pace.** Each limit says whether you are *on track* (and how much is left at the reset)
-  or *runs out in 8h 43m, 2d 10h early*.
+  or *ends ≈2d 10h early (at avg pace)* — the average includes the hours you don't use it.
 - **Per-model estimate (Claude).** Claude Code records every message's model and tokens in
   `~/.claude/projects` on this Mac. The app prices those tokens at the published API rates,
   matches the total to the percentage Claude reports for the same cycle (so it learns how
@@ -291,7 +291,7 @@ Codex와 Claude Code가 직접 호출하는 내부 사용량 엔드포인트이�
 각 서비스의 한도 아래에 **FORECAST · ESTIMATE**(추정) 블록이 붙습니다. Mac에서 계산하며 위의 숫자를 바꾸지 않습니다.
 읽은 값이 최신이 아니면 숨겨지고, **설정 → Forecast**에서 끌 수 있습니다.
 
-- **소진 속도.** 한도마다 *순조로움*(리셋 때 남을 양) 또는 *8h 43m 뒤 소진, 2d 10h 일찍*을 알려줍니다.
+- **소진 속도.** 한도마다 *순조로움*(리셋 때 남을 양) 또는 *평균 속도면 리셋보다 ≈2d 10h 일찍 끝남*(안 쓰는 시간까지 포함한 평균입니다)을 알려줍니다.
 - **모델별 추정(Claude).** Claude Code는 이 Mac의 `~/.claude/projects`에 메시지마다 모델과 토큰을 기록합니다. 앱은 그
   토큰을 공식 API 단가로 환산하고, 같은 주기에 Claude가 알려준 사용률과 맞춰서(내 한도에서 1달러어치 작업이 몇 %인지
   학습) 같은 토큰을 Haiku·Sonnet·Opus가 모두 처리했다면 어땠는지 다시 계산합니다. 모델마다 하루에 닳는 %와, 남은 %로

@@ -129,7 +129,7 @@ func runForecastTests(now: Double) {
     let codex = Forecaster.summary(provider: .codex, reading: claude, ledger: sonnetWork, now: base)
     check(codex?.advice == nil && !(codex?.lines.map { $0.text }.joined().contains("Haiku") ?? true), "Codex gets no Claude model advice")
     let month = Reading(windows: [UsageWindow(label: "30-day", kind: .other, usedPercent: 78, resetsAt: base + 20 * 86400, length: 30 * 86400)], fetchedAt: base)
-    check(Forecaster.summary(provider: .codex, reading: month, ledger: nil, now: base)?.lines.map { $0.text }.joined().contains("30-day: runs out in") == true,
+    check(Forecaster.summary(provider: .codex, reading: month, ledger: nil, now: base)?.lines.map { $0.text }.joined().contains("30-day: ends ≈") == true,
           "a 30-day window 78% used ten days in runs out before its reset")
     check(Forecaster.summary(provider: .claude, reading: Reading(windows: [], fetchedAt: base), ledger: nil, now: base) == nil, "nothing to forecast, nothing shown")
     let young = Reading(windows: [UsageWindow(label: "5-hour", kind: .session, usedPercent: 0.5, resetsAt: base + 5 * 3600 - 300), weekly(used: 0.5, elapsedDays: 0.1)], fetchedAt: base)

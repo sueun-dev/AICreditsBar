@@ -223,7 +223,7 @@ enum Forecaster {
         if let out = w.runsOutIn(now: now) {
             let before = w.resetsIn(now: now) - out
             let tone: ModelAdvice.Tone = before > (w.kind == .session ? 3600 : 86400) ? .critical : .watch
-            return ForecastLine(text: "\(name): runs out in \(durationText(out)), \(durationText(before)) early",
+            return ForecastLine(text: "\(name): ends ≈\(durationText(before)) early (at avg pace)",
                                 style: .pace, tone: tone)
         }
         if w.avgPerHour(now: now) <= 0.0001 { return ForecastLine(text: "\(name): not used yet this cycle", style: .pace, tone: .good) }
