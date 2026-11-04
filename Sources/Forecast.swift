@@ -195,12 +195,12 @@ enum Forecaster {
         let elapsed = min(length, now - start)
         guard elapsed > 60 else { return nil }
         let used = window.usedPercent
-        let learning = window.kind == .weekly ? (elapsed < 86400 || used < 2) : (elapsed < 1200 || used < 1)
+        let learning = window.kind == .session ? (elapsed < 1200 || used < 1) : (elapsed < 86400 || used < 2)
         let cycle = samples.filter { $0.t >= start - 60 }
         var result = WindowForecast(label: window.label, kind: window.kind, left: 100 - used, resetsAt: reset,
                                     avgPerHour: used / (elapsed / 3600), activePerHour: nil, usedToday: nil,
                                     learning: learning)
-        result.activePerHour = activeRate(cycle, kind: window.kind, from: window.kind == .weekly ? now - 72 * 3600 : start, now: now)
+        result.activePerHour = activeRate(cycle, kind: window.kind, from: window.kind == .session ? start : max(start, now - 72 * 3600), now: now)
         let midnight = calendar.startOfDay(for: Date(timeIntervalSince1970: now)).timeIntervalSince1970
         if midnight <= start {
             result.usedToday = used   // the cycle began today
@@ -237,8 +237,8 @@ enum Forecaster {
                                detail: "It resets \(countdown(to: w.resetsAt, now: now)).", tone: .critical)
         }
         if w.learning {
-            return ModelAdvice(model: base, headline: "Keep \(name(base))",
-                               detail: "Still learning your pace — it takes about a day of use.", tone: .neutral)
+            return ModelAdvice(model: nil, headline: "Not enough data yet",
+                               detail: "It needs about a day of this week's use to measure your pace.", tone: .neutral)
         }
         let daysLeft = max(w.resetsIn(now: now) / 86400, 1.0 / 24)
         let budget = w.left / daysLeft                       // % per day that can be spent
@@ -248,10 +248,8 @@ enum Forecaster {
 
         guard let pick = ModelFamily.allCases.reversed().first(where: { need($0) * margin <= budget }) else {
             let cheapest = ModelFamily.allCases.min { settings.scale($0) < settings.scale($1) } ?? .haiku
-            let hours = need(cheapest) > 0 ? w.left / need(cheapest) * 24 : 0
-            let short = max(0, w.resetsIn(now: now) - hours * 3600)
             return ModelAdvice(model: cheapest, headline: "Go easy — even \(name(cheapest)) runs short",
-                               detail: "At that pace it ends ≈\(durationText(short)) before the reset. Can spend ≈\(percentText(budget))/day.",
+                               detail: "Can spend ≈\(percentText(budget))/day · \(cheapest.rawValue) pace ≈\(percentText(need(cheapest)))/day",
                                tone: .critical)
         }
         if pick == base {
@@ -286,7 +284,10 @@ enum Forecaster {
                 .min { $0.resetsAt < $1.resetsAt }
         }
         let session = pick(.session), weekly = pick(.weekly)
-        guard session != nil || weekly != nil else { return nil }
+        // Any other window the provider reports with a known length (e.g. a 30-day one).
+        let others = general.filter { $0.kind == .other && $0.length != nil }
+            .compactMap { forecast($0, samples: history.samples(provider, $0), now: now) }
+        guard session != nil || weekly != nil || !others.isEmpty else { return nil }
 
         var lines: [ForecastLine] = []
         var advice: ModelAdvice?
@@ -296,34 +297,36 @@ enum Forecaster {
             lines.append(ForecastLine(text: found.headline, style: .headline, tone: found.tone))
             lines.append(ForecastLine(text: found.detail, style: .detail))
         }
-        for window in [weekly, session].compactMap({ $0 }) {
+        for window in [weekly, session].compactMap({ $0 }) + others {
             lines.append(paceLine(window, now: now))
         }
         if provider == .claude {
             var hours: [ForecastLine] = []
             for window in [session, weekly].compactMap({ $0 }) {
-                let parts = ModelFamily.allCases.compactMap { model -> String? in
+                let name = window.kind == .session ? "5-hour" : "Weekly"
+                let parts = window.learning ? [] : ModelFamily.allCases.compactMap { model -> String? in
                     window.hoursOfUse(scale: settings.scale(model)).map { "\(model.rawValue) \(durationText($0 * 3600))" }
                 }
-                if parts.count == ModelFamily.allCases.count {
-                    hours.append(ForecastLine(text: "\(window.kind == .session ? "5-hour" : "Weekly")  " + parts.joined(separator: " · "),
-                                              style: .hours))
-                }
+                // Hours come only from measured use; without enough of it, say so.
+                hours.append(ForecastLine(text: "\(name)  " + (parts.count == ModelFamily.allCases.count
+                                                              ? parts.joined(separator: " · ") : "not enough data yet"),
+                                          style: .hours))
             }
             if !hours.isEmpty {
                 lines.append(ForecastLine(text: "Hours of nonstop use left", style: .caption))
                 lines += hours
+                lines.append(ForecastLine(text: "Model costs are assumed — see Settings", style: .detail))
             }
         }
         return ForecastSummary(advice: advice, lines: lines)
     }
 
     private static func paceLine(_ w: WindowForecast, now: Double) -> ForecastLine {
-        let name = w.kind == .session ? "5-hour" : "Weekly"
-        if w.learning { return ForecastLine(text: "\(name): still learning your pace", style: .pace) }
+        let name = w.kind == .session ? "5-hour" : w.kind == .weekly ? "Weekly" : w.label
+        if w.learning { return ForecastLine(text: "\(name): not enough data yet", style: .pace) }
         if let out = w.runsOutIn(now: now) {
             let before = w.resetsIn(now: now) - out
-            let tone: ModelAdvice.Tone = before > (w.kind == .weekly ? 86400 : 3600) ? .critical : .watch
+            let tone: ModelAdvice.Tone = before > (w.kind == .session ? 3600 : 86400) ? .critical : .watch
             return ForecastLine(text: "\(name): runs out in \(durationText(out)), \(durationText(before)) before the reset",
                                 style: .pace, tone: tone)
         }

@@ -75,10 +75,10 @@ reading isn't current, and **Settings → Forecast** turns it off.
   average so far is what you do spend, measured on your **main model** (default Sonnet).
   The advice is the strongest model that pace can afford with a 15% margin: *Opus is fine
   today*, *Stay on Sonnet*, *Use Haiku from now on*, or *Go easy — even Haiku runs short*.
-  It says *still learning* until about a day of the week has passed.
+  Until about a day of the week has passed it says *Not enough data yet* instead of guessing.
 - **Hours of nonstop use left.** For the 5-hour and weekly windows, per model — Haiku,
   Sonnet, Opus — based on the pace of the hours you actually used it (idle hours don't count).
-  The weekly line appears once the app has a few hours of history.
+  Until the app has measured a few hours of your use, a line says *not enough data yet*; nothing is filled in with a guess.
 
 How much faster a model uses a plan limit isn't published, so the model costs are an
 assumption you can change in Settings: relative cost per hour of use, **Haiku 1 · Sonnet 3 ·
@@ -274,9 +274,9 @@ Codex와 Claude Code가 직접 호출하는 내부 사용량 엔드포인트이�
 - **소진 속도.** 5시간·주간 한도마다 *순조로움*(리셋 때 남을 양) 또는 *2d 4h 뒤 소진, 리셋보다 1d 20h 일찍*을 알려줍니다.
 - **모델 추천(Claude).** 주간 남은 % ÷ 남은 일수가 하루에 쓸 수 있는 양이고, **주 모델**(기본 Sonnet)로 지금까지 쓴 평균이
   실제 사용량입니다. 15% 여유를 두고 그 속도로 감당되는 가장 강한 모델을 추천합니다: *오늘은 Opus 써도 됨*, *Sonnet 유지*,
-  *지금부터 Haiku*, *아껴 쓰기 — Haiku도 부족*. 주간이 하루 정도 지나기 전에는 *속도 파악 중*으로 표시합니다.
+  *지금부터 Haiku*, *아껴 쓰기 — Haiku도 부족*. 주간이 하루 정도 지나기 전에는 추측하지 않고 *데이터가 부족합니다(Not enough data yet)*로 표시합니다.
 - **쉬지 않고 쓸 때 남은 시간.** 5시간·주간 한도를 모델별(Haiku·Sonnet·Opus)로 보여줍니다. 실제로 사용한 시간대의 속도를
-  기준으로 하며 쉰 시간은 세지 않습니다. 주간 줄은 앱에 몇 시간 이상의 기록이 쌓이면 나타납니다.
+  기준으로 하며 쉰 시간은 세지 않습니다. 앱이 몇 시간 이상의 사용을 측정하기 전에는 *not enough data yet*으로 표시하며, 추측값으로 채우지 않습니다.
 
 모델별로 한도가 얼마나 빨리 닳는지는 공개되어 있지 않으므로 모델 비용은 설정에서 바꿀 수 있는 가정값입니다(시간당 상대 비용
 **Haiku 1 · Sonnet 3 · Opus 5**, API 가격 비율). 표시되는 모델 버전(기본 5.5)도 바꿀 수 있습니다. 속도 계산을 위해 현재 주기의

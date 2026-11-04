@@ -4,7 +4,6 @@ import AppKit
 /// the running app last saved (no extra API call — the usage endpoints rate-limit
 /// hard); a provider with nothing saved is fetched live. For QA and the README.
 /// AICB_APPEARANCE=light switches from the dark to the light look.
-/// AICB_PREVIEW_DEMO=1 draws made-up readings instead (nothing live, nothing saved).
 func renderPreview(to path: String) throws {
     _ = NSApplication.shared
     NSApp.setActivationPolicy(.accessory)
@@ -13,7 +12,7 @@ func renderPreview(to path: String) throws {
     NSApp.appearance = appearance
 
     let fetchers: [Provider: () throws -> Reading] = [.codex: fetchCodexReading, .claude: fetchClaudeReading]
-    let states: [(Provider, ProviderState)] = ProcessInfo.processInfo.environment["AICB_PREVIEW_DEMO"] != nil ? demoStates() : Provider.allCases.filter(Cfg.isShown).map { provider in
+    let states: [(Provider, ProviderState)] = Provider.allCases.filter(Cfg.isShown).map { provider in
         if let saved = Cfg.savedReading(provider) { return (provider, ProviderState(reading: saved)) }
         var state = ProviderState()
         state.record(Result { try fetchers[provider]!() })
@@ -62,17 +61,6 @@ func renderPreview(to path: String) throws {
     appearance.performAsCurrentDrawingAppearance { root.cacheDisplay(in: root.bounds, to: rep) }
     guard let png = rep.representation(using: .png, properties: [:]) else { throw UsageError("PNG encoding failed") }
     try png.write(to: URL(fileURLWithPath: path))
-}
-
-/// Made-up readings: a Max 5x Claude plan two and a half days into its week, and a Codex Pro plan.
-private func demoStates() -> [(Provider, ProviderState)] {
-    let now = nowEpoch()
-    let claude = Reading(windows: [
-        UsageWindow(label: "5-hour", kind: .session, usedPercent: 38, resetsAt: now + 2.9 * 3600),
-        UsageWindow(label: "Weekly", kind: .weekly, usedPercent: 18, resetsAt: now + 4.6 * 86400)], plan: "Max 5x", fetchedAt: now)
-    let codex = Reading(windows: [UsageWindow(label: "Weekly", kind: .weekly, usedPercent: 22, resetsAt: now + 3.2 * 86400,
-                                             length: 7 * 86400)], plan: "Pro", fetchedAt: now)
-    return [(.codex, ProviderState(reading: codex)), (.claude, ProviderState(reading: claude))]
 }
 
 private final class FlippedView: NSView {

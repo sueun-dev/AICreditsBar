@@ -34,10 +34,12 @@ func runForecastTests(now: Double) {
     eq(advise(used: 40, elapsedDays: 2).headline, "Use Haiku 5.5 from now on", "little left and many days to go: Haiku")
     eq(advise(used: 40, elapsedDays: 2).tone, .watch, "dropping a model is a watch, not an alarm")
     check(advise(used: 60, elapsedDays: 2).headline.hasPrefix("Go easy"), "not even Haiku lasts: conserve")
+    check(advise(used: 60, elapsedDays: 2).detail.count < 60, "…with a line short enough for the card")
     eq(advise(used: 60, elapsedDays: 2).tone, .critical, "…and says so")
     eq(advise(used: 99.9, elapsedDays: 3).headline, "Weekly limit used up", "nothing left is stated plainly")
-    eq(advise(used: 1, elapsedDays: 0.5).headline, "Keep Sonnet 5.5", "half a day is too early to advise a change")
-    check(advise(used: 1, elapsedDays: 0.5).detail.contains("learning"), "…and explains why")
+    eq(advise(used: 1, elapsedDays: 0.5).headline, "Not enough data yet", "half a day is too little to advise anything")
+    eq(advise(used: 1, elapsedDays: 0.5).model, nil, "…and no model is named")
+    check(advise(used: 1, elapsedDays: 0.5).detail.contains("day"), "…and says what it is waiting for")
 
     var haikuMain = settings
     haikuMain.baseline = .haiku
@@ -135,11 +137,29 @@ func runForecastTests(now: Double) {
     check(text.contains("Weekly: on track"), "weekly pace is stated")
     check(text.contains("5-hour:"), "the 5-hour pace is stated")
     check(text.contains("5-hour  Haiku") && text.contains("Sonnet") && text.contains("Opus"), "the 5-hour hours are given per model")
+    check(text.contains("Weekly  not enough data yet"), "weekly hours without a measured active pace say so, not a guess")
+    let young = Reading(windows: [UsageWindow(label: "5-hour", kind: .session, usedPercent: 0.5, resetsAt: base + 5 * 3600 - 300),
+                                  weekly(used: 0.5, elapsedDays: 0.1)], fetchedAt: base)
+    let youngText = Forecaster.summary(provider: .claude, reading: young, history: UsageHistory(), settings: settings, now: base)?
+        .lines.map { $0.text }.joined(separator: "\n") ?? ""
+    check(youngText.contains("Not enough data yet") && youngText.contains("5-hour: not enough data yet")
+          && youngText.contains("5-hour  not enough data yet"), "a cycle that just began shows no numbers at all")
+    check(!youngText.contains("Haiku"), "…and no per-model hours")
     let codex = Forecaster.summary(provider: .codex, reading: claude, history: UsageHistory(), settings: settings, now: base)
     check(codex?.advice == nil, "Codex gets no Claude model advice")
     check(!(codex?.lines.map { $0.text }.joined().contains("Haiku") ?? true), "…and no Claude model names")
     check(Forecaster.summary(provider: .claude, reading: Reading(windows: [], fetchedAt: base), history: UsageHistory(),
                              settings: settings, now: base) == nil, "nothing to forecast, nothing shown")
+
+    // A window of another length (Codex Free reports a 30-day one) is forecast from its own length.
+    let month = Reading(windows: [UsageWindow(label: "30-day", kind: .other, usedPercent: 78, resetsAt: base + 20 * 86400, length: 30 * 86400)],
+                        fetchedAt: base)
+    let monthText = Forecaster.summary(provider: .codex, reading: month, history: UsageHistory(), settings: settings, now: base)?
+        .lines.map { $0.text }.joined(separator: "\n") ?? ""
+    check(monthText.contains("30-day: runs out in"), "a 30-day window 78% used ten days in runs out before its reset")
+    check(Forecaster.summary(provider: .codex, reading: Reading(windows: [UsageWindow(label: "x", kind: .other, usedPercent: 5, resetsAt: base + 86400)],
+                                                                fetchedAt: base), history: UsageHistory(), settings: settings, now: base) == nil,
+          "an unknown length still gets no forecast")
 
     // Wording never traps.
     eq(durationText(35 * 60), "35m", "minutes")
