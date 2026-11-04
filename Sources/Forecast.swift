@@ -18,8 +18,8 @@ struct WindowForecast: Equatable {
     var length: Double                // seconds the window spans
     var learning: Bool                // too little of the cycle has passed for a firm forecast
 
+    var start: Double                 // the cycle's start, or later when the limit was refilled mid-cycle
     var left: Double { 100 - used }
-    var start: Double { resetsAt - length }
     func resetsIn(now: Double) -> Double { max(0, resetsAt - now) }
     func elapsed(now: Double) -> Double { max(1, min(length, now - start)) }
     /// % per hour averaged over the cycle so far, idle time included.
@@ -38,7 +38,7 @@ struct WindowForecast: Equatable {
 /// What one family would use if all of this cycle's work had run on it.
 struct ModelEstimate: Equatable {
     var model: ModelFamily
-    var pctPerDay: Double             // % of the limit per day, averaged over the cycle
+    var pctPerDay: Double?            // % of the limit per day, averaged over the cycle; nil while too little of it has passed
     var hoursLeft: Double?            // hours of active use the remaining % lasts; nil when no active hours were measured
 }
 
@@ -79,15 +79,17 @@ enum Forecaster {
         }
     }
 
-    static func forecast(_ window: UsageWindow, now: Double) -> WindowForecast? {
+    /// `since` is when the limit was last refilled inside this cycle, if it was: only use after it counts.
+    static func forecast(_ window: UsageWindow, now: Double, since: Double? = nil) -> WindowForecast? {
         guard !window.modelScoped, !window.isExpired(now: now), window.usedPercent.isFinite,
               (0...100).contains(window.usedPercent), let reset = window.resetsAt,
               let length = windowLength(window) else { return nil }
-        let elapsed = min(length, now - (reset - length))
+        let start = max(reset - length, since ?? 0)
+        let elapsed = min(length, now - start)
         guard elapsed > 60 else { return nil }
         let used = window.usedPercent
         return WindowForecast(label: window.label, kind: window.kind, used: used, resetsAt: reset, length: length,
-                              learning: isLearning(window.kind, elapsed: elapsed, used: used))
+                              learning: isLearning(window.kind, elapsed: elapsed, used: used), start: start)
     }
 
     /// Too little of the cycle has passed, or too little is used, for a firm forecast.
@@ -100,9 +102,11 @@ enum Forecaster {
     /// The provider's % against the same cycle's tokens priced at published API
     /// rates gives the % of the limit one dollar of work uses; repricing those
     /// tokens per family says what the same work would have used on each.
+    /// Hours of use left need only that ratio and the recent active hours, so they
+    /// appear soon after a reset; the per-day pace needs a day of the cycle.
     /// nil when there isn't enough of either to say.
     static func project(_ w: WindowForecast, ledger: UsageLedger, now: Double) -> ModelProjection? {
-        guard !w.learning, w.used >= 2 else { return nil }
+        guard w.used >= 2, w.elapsed(now: now) >= 3600 else { return nil }
         let cycle = ledger.slice(from: w.start, to: now)
         guard cycle.actualCost >= 1 else { return nil }
         let perDollar = w.used / cycle.actualCost
@@ -115,7 +119,7 @@ enum Forecaster {
                 let perHour = perDollar * (recent.repriced[family] ?? 0) / Double(recent.activeHours)
                 if perHour > 1e-6 { hours = w.left / perHour }
             }
-            return ModelEstimate(model: family, pctPerDay: perDollar * (cycle.repriced[family] ?? 0) / days, hoursLeft: hours)
+            return ModelEstimate(model: family, pctPerDay: w.learning ? nil : perDollar * (cycle.repriced[family] ?? 0) / days, hoursLeft: hours)
         }
         let dominant = ledger.slice(from: now - 3 * 86400, to: now).actualByFamily.max { $0.value < $1.value }?.key
         return ModelProjection(estimates: estimates, dominant: dominant)
@@ -131,7 +135,7 @@ enum Forecaster {
         }
         guard !w.learning else {
             return ModelAdvice(model: nil, headline: "Not enough data yet",
-                               detail: "It needs about a day of this week's use to measure your pace.", tone: .neutral)
+                               detail: "Needs about a day of use to measure pace.", tone: .neutral)
         }
         guard let projection = projection else {
             return ModelAdvice(model: nil, headline: "Not enough data yet",
@@ -139,9 +143,9 @@ enum Forecaster {
         }
         let budget = w.left / max(w.resetsIn(now: now) / 86400, 1.0 / 24)     // % per day that can be spent
         func detail(_ estimate: ModelEstimate) -> String {
-            "Can spend ≈\(percentText(budget))/day · \(estimate.model.rawValue) pace ≈\(percentText(estimate.pctPerDay))/day"
+            "Can spend ≈\(percentText(budget))/day · \(estimate.model.rawValue) pace ≈\(percentText(estimate.pctPerDay ?? 0))/day"
         }
-        guard let pick = projection.estimates.reversed().first(where: { $0.pctPerDay * 1.15 <= budget }) else {
+        guard let pick = projection.estimates.reversed().first(where: { ($0.pctPerDay ?? .infinity) * 1.15 <= budget }) else {
             let cheapest = projection.estimate(.haiku) ?? ModelEstimate(model: .haiku, pctPerDay: 0, hoursLeft: nil)
             return ModelAdvice(model: .haiku, headline: "Go easy — even \(cheapest.model.title) runs short",
                                detail: detail(cheapest), tone: .critical)
@@ -167,12 +171,18 @@ enum Forecaster {
 
     static func summary(provider: Provider, reading: Reading, ledger: UsageLedger?, samples: SampleLog? = nil, now: Double) -> ForecastSummary? {
         let general = reading.windows.filter { !$0.modelScoped && !$0.isExpired(now: now) }
+        var resetAt: Double?   // the latest mid-cycle reset (a reset coupon) among the windows
+        func window(_ w: UsageWindow) -> WindowForecast? {
+            let since = samples?.refill(provider: provider, window: w)
+            if let since = since { resetAt = max(resetAt ?? 0, since) }
+            return forecast(w, now: now, since: since)
+        }
         func pick(_ kind: WindowKind) -> WindowForecast? {
-            general.filter { $0.kind == kind }.compactMap { forecast($0, now: now) }.min { $0.resetsAt < $1.resetsAt }
+            general.filter { $0.kind == kind }.compactMap(window).min { $0.resetsAt < $1.resetsAt }
         }
         let session = pick(.session), weekly = pick(.weekly)
         // Any other window the provider reports with a known length (e.g. a 30-day one).
-        let others = general.filter { $0.kind == .other && $0.length != nil }.compactMap { forecast($0, now: now) }
+        let others = general.filter { $0.kind == .other && $0.length != nil }.compactMap(window)
         guard session != nil || weekly != nil || !others.isEmpty else { return nil }
 
         var lines: [ForecastLine] = []
@@ -189,6 +199,9 @@ enum Forecaster {
             lines.append(ForecastLine(text: found.headline, style: .headline, tone: found.tone))
             lines.append(ForecastLine(text: found.detail, style: .detail))
         }
+        if let resetAt = resetAt, now - resetAt < 48 * 3600 {
+            lines.append(ForecastLine(text: "Limit was reset \(ago(now - resetAt)) · counting from then", style: .pace))
+        }
         for window in [weekly, session].compactMap({ $0 }) + others { lines.append(paceLine(window, now: now)) }
         if provider == .claude {
             for window in [weekly, session].compactMap({ $0 }) {
@@ -199,7 +212,7 @@ enum Forecaster {
                 }
                 lines.append(ForecastLine(text: "\(name) · pace and hours of use left", style: .caption))
                 for estimate in projection.estimates {
-                    lines.append(ForecastLine(text: modelRow(estimate, showPace: window.kind != .session), style: .model))
+                    lines.append(ForecastLine(text: modelRow(estimate, showPace: window.kind != .session, resetsIn: window.resetsIn(now: now)), style: .model))
                 }
             }
             if !projections.isEmpty {
@@ -210,10 +223,11 @@ enum Forecaster {
         return ForecastSummary(advice: advice, lines: lines)
     }
 
-    private static func modelRow(_ estimate: ModelEstimate, showPace: Bool) -> String {
+    private static func modelRow(_ estimate: ModelEstimate, showPace: Bool, resetsIn: Double) -> String {
         func pad(_ text: String, _ width: Int) -> String { text.padding(toLength: width, withPad: " ", startingAt: 0) }
-        let pace = showPace ? pad("≈\(percentText(estimate.pctPerDay))/day", 12) : ""
-        let hours = estimate.hoursLeft.map { "≈\(durationText($0 * 3600)) left" } ?? "—"
+        let pace = showPace ? pad(estimate.pctPerDay.map { "≈\(percentText($0))/day" } ?? "—", 12) : ""
+        // Even nonstop use can't last longer than the time to the reset, so a longer figure says only that.
+        let hours = estimate.hoursLeft.map { $0 * 3600 >= resetsIn ? "lasts to reset" : "≈\(durationText($0 * 3600)) left" } ?? "—"
         return pad(estimate.model.title, 11) + pace + hours
     }
 

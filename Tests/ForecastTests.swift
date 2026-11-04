@@ -70,9 +70,9 @@ func runForecastTests(now: Double) {
     let twoDays = forecast(weekly(used: 20, elapsedDays: 2))
     let opusP = Forecaster.project(twoDays, ledger: opusWork, now: base)!
     // 20% reported ↔ $200 of work: 0.1% per dollar.
-    check(abs(opusP.estimate(.opus)!.pctPerDay - 10) < 1e-9, "Opus: $200 over 2 days at 0.1%/$ is 10%/day")
-    check(abs(opusP.estimate(.sonnet)!.pctPerDay - 5) < 1e-9, "the same work on Sonnet is half: 5%/day")
-    check(abs(opusP.estimate(.haiku)!.pctPerDay - 0.25) < 1e-9, "…and on Haiku 0.25%/day")
+    check(abs((opusP.estimate(.opus)!.pctPerDay ?? 0) - 10) < 1e-9, "Opus: $200 over 2 days at 0.1%/$ is 10%/day")
+    check(abs((opusP.estimate(.sonnet)!.pctPerDay ?? 0) - 5) < 1e-9, "the same work on Sonnet is half: 5%/day")
+    check(abs((opusP.estimate(.haiku)!.pctPerDay ?? 0) - 0.25) < 1e-9, "…and on Haiku 0.25%/day")
     check(abs((opusP.estimate(.opus)!.hoursLeft ?? 0) - 20) < 1e-9, "80% left at 4%/active hour on Opus is 20 hours")
     check(abs((opusP.estimate(.sonnet)!.hoursLeft ?? 0) - 40) < 1e-9, "…40 on Sonnet")
     check(abs((opusP.estimate(.haiku)!.hoursLeft ?? 0) - 800) < 1e-9, "…800 on Haiku")
@@ -287,6 +287,73 @@ func runForecastTests(now: Double) {
     eq(SampleLog(data: kept.data).series, kept.series, "the log survives a restart")
     kept.record(one(5, at: base + 15 * 86400, reset: base + 22 * 86400), provider: .claude, now: base + 15 * 86400)
     eq(kept.series.count, 1, "a cycle that ended more than a week ago is dropped")
+
+    // MARK: A limit refilled in the middle of a cycle (98% → 0% with the reset time unchanged)
+
+    func trail(_ used: [Double]) -> SampleLog {
+        var l = SampleLog()
+        for (i, u) in used.enumerated() {
+            let t = base - Double(used.count - 1 - i) * 3600
+            l.record(Reading(windows: [UsageWindow(label: "Weekly", kind: .weekly, usedPercent: u, resetsAt: base + 3 * 86400)], fetchedAt: t), provider: .claude, now: t)
+        }
+        return l
+    }
+    let refilled = trail([95, 96, 98, 98, 0, 2])
+    let weeklyWindow = weekly(used: 2, elapsedDays: 4)
+    check(abs((refilled.refill(provider: .claude, window: weeklyWindow) ?? 0) - (base - 3600)) < 1,
+          "a drop from 98% to 0% is a reset, dated by the first reading after it")
+    check(trail([10, 20, 30, 40]).refill(provider: .claude, window: weeklyWindow) == nil, "steadily rising use has no refill")
+    check(trail([10, 20, 19.8, 30]).refill(provider: .claude, window: weeklyWindow) == nil, "a rounding wobble of a fraction of a percent isn't one")
+    check(trail([10, 20, 18.5, 30]).refill(provider: .claude, window: weeklyWindow) == nil, "nor is a dip of a point or two")
+    let sinceRefill = Forecaster.forecast(weeklyWindow, now: base, since: refilled.refill(provider: .claude, window: weeklyWindow))!
+    check(sinceRefill.learning && sinceRefill.elapsed(now: base) < 7200, "only the time since the refill counts, so it is still learning")
+    check(!Forecaster.forecast(weeklyWindow, now: base)!.learning, "…while without the refill it would count four days")
+    // The 2% that is used now was spent after the refill; the $200 of work before it must not be set against it.
+    let before = Forecaster.summary(provider: .claude, reading: Reading(windows: [weeklyWindow], fetchedAt: base), ledger: sonnetWork, samples: nil, now: base)
+    let after = Forecaster.summary(provider: .claude, reading: Reading(windows: [weeklyWindow], fetchedAt: base), ledger: sonnetWork, samples: refilled, now: base)
+    check(before?.advice?.headline != "Not enough data yet", "without knowing about the refill the forecast treats four days as the cycle")
+    eq(after?.advice?.headline, "Not enough data yet", "knowing about it, the forecast starts over")
+    check(!(after?.lines.map { $0.text }.joined().contains("Haiku") ?? true), "…and shows no per-model numbers built on the old spending")
+    check(Accuracy.report(refilled, provider: .claude, kind: .weekly, ledger: nil, now: base).paceChecks == 0, "predictions made before the refill aren't scored against what came after")
+
+    // Soon after a reset coupon: hours of use left appear (they need only the recent active hours), the per-day pace waits.
+    let coupon = trail([95, 96, 98, 0, 3, 5])
+    var afterCoupon = UsageLedger()
+    afterCoupon.add(at: base - 3 * 3600 - 60, model: "claude-opus-5-5", tokens: TokenCounts(output: 5_000_000))   // before the reset: must not count
+    afterCoupon.add(at: base - 3660, model: "claude-opus-5-5", tokens: TokenCounts(output: 1_000_000))
+    afterCoupon.add(at: base - 60, model: "claude-opus-5-5", tokens: TokenCounts(output: 1_000_000))
+    let couponReading = Reading(windows: [weekly(used: 5, elapsedDays: 4)], fetchedAt: base)
+    let couponSummary = Forecaster.summary(provider: .claude, reading: couponReading, ledger: afterCoupon, samples: coupon, now: base)
+    let couponText = couponSummary?.lines.map { $0.text }.joined(separator: "\n") ?? ""
+    check(couponText.contains("Limit was reset 2h ago · counting from then"), "the card says a reset was noticed, and when")
+    eq(couponSummary?.advice?.headline, "Not enough data yet", "the advice still waits for a day")
+    let couponOpus = couponText.split(separator: "\n").last { $0.hasPrefix("Opus 5.5") }.map(String.init) ?? ""
+    check(couponOpus.contains("—") && couponOpus.hasSuffix("38h left"), "…but the hours left are there: $40 of work since the reset is 5%, so 95% lasts 38 active hours on Opus")
+    check(!couponText.contains("Weekly per model: not enough data yet"), "…and the per-model block is shown")
+    check(Forecaster.summary(provider: .claude, reading: couponReading, ledger: afterCoupon, samples: nil, now: base)?.lines.map { $0.text }.joined().contains("Limit was reset") == false,
+          "with no record of the reset there is no such line")
+
+    // The 20% warning is armed again once a reset has taken the figure back below it.
+    var couponTracker = QuotaAlertTracker()
+    func tick(_ used: Double, _ at: Double) -> [QuotaAlert] {
+        couponTracker.observe(Reading(windows: [UsageWindow(label: "Weekly", kind: .weekly, usedPercent: used, resetsAt: base + 3 * 86400)], fetchedAt: at),
+                              provider: .claude, now: at, lowEnabled: true, recoveryEnabled: true)
+    }
+    let firstWarning = tick(85, base)
+    eq(firstWarning.map { $0.kind }, [.low], "climbing past 80% warns once")
+    firstWarning.forEach { couponTracker.acknowledge($0) }
+    eq(tick(86, base + 300).count, 0, "…and only once")
+    eq(tick(2, base + 600).count, 0, "a reset coupon announces nothing")
+    eq(tick(84, base + 900).map { $0.kind }, [.low], "after the reset, the next climb past 80% warns again")
+
+    // A figure longer than the time left to the reset says so, instead of "873d".
+    var barely = UsageLedger()
+    for hour in 1...6 { barely.add(at: base - Double(hour) * 3600 - 60, model: "claude-sonnet-5-5", tokens: TokenCounts(output: 1_000_000)) }
+    let light = Reading(windows: [weekly(used: 10, elapsedDays: 4)], fetchedAt: base)
+    let lightText = Forecaster.summary(provider: .claude, reading: light, ledger: barely, now: base)?.lines.map { $0.text }.joined(separator: "\n") ?? ""
+    let haikuRow = lightText.split(separator: "\n").last { $0.hasPrefix("Haiku 5.5") }.map(String.init) ?? ""
+    check(haikuRow.hasSuffix("lasts to reset"), "hours that outlast the reset are shown as lasting to the reset")
+    check(lightText.split(separator: "\n").last { $0.hasPrefix("Opus 5.5") }?.hasSuffix(" left") == true, "…while a figure inside the time to the reset is still given")
 
     // MARK: Wording and settings
 

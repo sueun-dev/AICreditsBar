@@ -24,10 +24,22 @@ struct SampleLog: Codable, Equatable {
         var length: Double
         var reset: Double
         var points: [Point]
+
+        /// When the reported figure last fell inside this cycle — the limit was reset
+        /// (a reset coupon: 98% → 0%) without the reset time moving. Spending before
+        /// that no longer counts. The first reading after the drop dates it: if the app
+        /// was closed in between, the spending in the gap is left out, which errs toward
+        /// a faster pace rather than a slower one.
+        var refill: Double? {
+            var found: Double?
+            for i in points.indices.dropFirst() where points[i].used < points[i - 1].used - SampleLog.refillDrop { found = points[i].t }
+            return found
+        }
     }
     static let bucket = 900.0          // one reading per 15 minutes
     static let maxPoints = 700         // a week of buckets, with slack
     static let horizon = 7 * 86400.0   // nothing older than a week is kept
+    static let refillDrop = 2.0        // a fall of more than this many points is a reset, not a rounding wobble
 
     private(set) var series: [String: Series] = [:]
 
@@ -35,6 +47,12 @@ struct SampleLog: Codable, Equatable {
         series = data.flatMap { try? JSONDecoder().decode([String: Series].self, from: $0) } ?? [:]
     }
     var data: Data? { try? JSONEncoder().encode(series) }
+
+    /// The refill time of this window's current cycle, if its readings show one.
+    func refill(provider: Provider, window: UsageWindow) -> Double? {
+        guard let reset = window.resetsAt else { return nil }
+        return series["\(provider.rawValue)|\(window.kind.rawValue)|\(window.label)|\(Int((reset / 60).rounded()))"]?.refill
+    }
 
     /// Returns whether anything changed, so the caller only saves when it must.
     @discardableResult
@@ -102,7 +120,7 @@ enum Accuracy {
         var misses: [Double] = [], signed: [Double] = []
         var actualSum = 0.0, predictedSum = 0.0, costChecks = 0
         for series in log.series.values where series.provider == provider.rawValue && series.kind == kind.rawValue {
-            let start = series.reset - series.length, last = series.points.last?.t ?? 0
+            let start = max(series.reset - series.length, series.refill ?? 0), last = series.points.last?.t ?? 0
             var next = start
             for point in series.points where point.t >= next {
                 next = point.t + spacing

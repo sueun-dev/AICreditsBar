@@ -83,6 +83,11 @@ isn't current, and **Settings → Forecast** turns it off.
   relative to the model that did most of your recent work.
 - **No guessing.** Until a day of the week has passed, or without Claude Code history on this
   Mac, the advice and per-model rows say *not enough data yet*.
+- **Limit resets.** If the limit is reset mid-cycle (a reset coupon: 98% → 0% with the same reset
+  time), the app sees the figure fall, counts only the use since then, and says so on the card.
+  Hours of use left reappear after a couple of active hours; the per-day pace and the advice
+  wait a day. A reset that happens while the app is closed is noticed at the next reading,
+  dated by it. The 20% warning is armed again too.
 
 Limits: it assumes plan limits follow token prices (calibrated to your own usage, but not
 published by Anthropic); Claude Code use on other devices or in claude.ai counts toward the
@@ -300,6 +305,10 @@ Codex와 Claude Code가 직접 호출하는 내부 사용량 엔드포인트이�
   today*, *Stay on Sonnet 5.5*, *Use Haiku 5.5 from now on*, *Go easy — even Haiku 5.5 runs short*. "Stay"와 "from now on"은
   최근에 가장 많이 쓴 모델을 기준으로 합니다.
 - **추측하지 않습니다.** 주간이 하루 지나기 전이거나 이 Mac에 Claude Code 기록이 없으면 *not enough data yet*으로 표시합니다.
+- **한도 리셋.** 주기 중간에 한도가 리셋되면(리셋 쿠폰: 리셋 시각은 그대로인데 98% → 0%) 앱이 사용률이 내려간 것을 보고
+  그 이후 사용분만 세며, 카드에도 그렇게 표시합니다. 모델별 남은 사용 시간은 활동 시간이 몇 시간 쌓이면 다시 나오고, 하루 소모량과
+  추천은 하루 뒤에 나옵니다. 앱이 꺼져 있는 동안 리셋됐다면 다음에 읽는 값으로 알아채며 그 시각을 기준으로 삼습니다.
+  20% 경고도 다시 켜집니다.
 
 한계: 한도가 토큰 단가에 비례한다고 가정합니다(내 사용량에 맞춰 보정하지만 Anthropic이 공개한 사실은 아님). 다른 기기나
 claude.ai에서의 사용은 사용률에는 반영되지만 이 Mac의 기록에는 없습니다. Haiku 5.5의 새 토크나이저 차이는 보정하지 않습니다.
