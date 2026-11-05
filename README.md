@@ -46,7 +46,12 @@ and may change without notice. The numbers are never estimated (the separate, la
 - If a refresh fails, the last reading stays visible but greyed, with its age and the reason.
 - A window whose reset time has passed shows **—** until the next reading. It is never
   assumed to be back at 100%.
-- Not signed in, or a login expired? The menu says so and shows no numbers.
+- Not signed in? The menu says so and shows no numbers.
+- Claude Code renews its login token only while it is running, so someone who works in the desktop
+  app or an editor can be signed in with a stored token that expired hours ago. When that happens the
+  app starts the official `claude` CLI once, headless, so it renews and stores its own token: nothing
+  is sent to the model, no session is saved, the app never reads or uses the refresh token, and it
+  tries at most every 15 minutes. If that doesn't work the menu says the login expired.
 
 ### The menu bar
 
@@ -276,7 +281,11 @@ Codex와 Claude Code가 직접 호출하는 내부 사용량 엔드포인트이�
   (예: *Weekly (Fable)*)는 별도 줄로 보여줍니다. Codex의 별도 코드리뷰 한도는 표시하지 않습니다.
 - 갱신에 실패하면 마지막 값을 회색으로 남기고, 몇 분 전 값인지와 실패 이유를 표시합니다.
 - 리셋 시각이 지난 창은 새 값을 받을 때까지 **—** 로 표시합니다. 100%로 가정하지 않습니다.
-- 로그인이 없거나 만료되면 그렇게 알려주고 숫자는 표시하지 않습니다.
+- 로그인이 없으면 그렇게 알려주고 숫자는 표시하지 않습니다.
+- Claude Code는 실행 중일 때만 로그인 토큰을 갱신합니다. 데스크톱 앱이나 에디터로만 쓰면 로그인은 되어 있는데 저장된 토큰이
+  몇 시간 전에 만료되어 있을 수 있습니다. 그럴 때 앱이 공식 `claude` CLI를 화면 없이 한 번 실행해서 CLI가 스스로 토큰을 갱신·저장하게
+  합니다. 모델에는 아무것도 보내지 않고, 세션도 저장하지 않으며, 앱은 리프레시 토큰을 읽거나 쓰지 않고, 최대 15분에 한 번만
+  시도합니다. 그래도 안 되면 로그인이 만료됐다고 표시합니다.
 
 ### 메뉴바
 
