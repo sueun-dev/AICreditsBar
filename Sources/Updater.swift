@@ -90,7 +90,15 @@ func replaceApp(at installed: URL, with staged: URL) throws {
     _ = try FileManager.default.replaceItemAt(installed, withItemAt: staged)
 }
 
-/// Asks GitHub once a day for the latest release. When it is newer, the menu offers
+/// Due once a day by the wall clock, so time the Mac spends asleep counts. Never asked
+/// yet, or a clock that moved backwards, means due.
+func isCheckDue(last: Date?, now: Date) -> Bool {
+    guard let last = last else { return true }
+    let elapsed = now.timeIntervalSince(last)
+    return elapsed < 0 || elapsed >= 86400
+}
+
+/// Asks GitHub about once a day for the latest release. When it is newer, the menu offers
 /// "Update"; choosing it downloads the release, checks its signature, swaps the app
 /// bundle in place and relaunches. Nothing is installed without that choice.
 final class Updater {
@@ -105,6 +113,7 @@ final class Updater {
         ?? "https://api.github.com/repos/sueun-dev/AICreditsBar/releases/latest"
     private let current = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String
     private var timer: Timer?
+    private var lastCheck: Date?   // the last time GitHub answered
     private let client: URLSession = {
         let config = URLSessionConfiguration.ephemeral
         config.timeoutIntervalForRequest = 30
@@ -116,15 +125,21 @@ final class Updater {
     /// Only a packaged app can replace itself; a bare test binary has no version.
     private var canUpdate: Bool { current != nil && Bundle.main.bundleURL.pathExtension == "app" }
 
+    /// Safe to call on every settings change: a running schedule is left as it is.
     func start() {
-        stop()
-        guard canUpdate else { return }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 20) { [weak self] in self?.check() }
-        timer = Timer.scheduledTimer(withTimeInterval: 86400, repeats: true) { [weak self] _ in self?.check() }
-        timer?.tolerance = 600
+        guard canUpdate, timer == nil else { return }
+        // A timer pauses while the Mac sleeps, so wake hourly and ask the wall clock instead.
+        timer = Timer.scheduledTimer(withTimeInterval: 3600, repeats: true) { [weak self] _ in self?.checkIfDue() }
+        timer?.tolerance = 300
+        DispatchQueue.main.asyncAfter(deadline: .now() + 20) { [weak self] in self?.checkIfDue() }
     }
 
     func stop() { timer?.invalidate(); timer = nil }
+
+    private func checkIfDue() {
+        guard timer != nil, isCheckDue(last: lastCheck, now: Date()) else { return }   // nil: turned off meanwhile
+        check()
+    }
 
     /// Asks GitHub now; `done` (main queue) gets what was found. The daily check passes no `done`.
     func check(done: ((UpdateOutcome) -> Void)? = nil) {
@@ -133,9 +148,11 @@ final class Updater {
         let feed = self.feed
         DispatchQueue.global(qos: .utility).async { [weak self] in
             let headers = ["Accept": "application/vnd.github+json", "User-Agent": userAgent]
-            let outcome = checkOutcome(try? httpGet(feed, headers: headers, using: self?.client), current: current)
+            let reply = try? httpGet(feed, headers: headers, using: self?.client)
+            let outcome = checkOutcome(reply, current: current)
             DispatchQueue.main.async {
                 guard let self = self, !self.installing else { return }
+                if reply != nil { self.lastCheck = Date() }   // offline: the hourly wake tries again
                 if case .available(let release) = outcome { self.available = release }
                 if case .upToDate = outcome { self.available = nil }
                 done?(outcome)

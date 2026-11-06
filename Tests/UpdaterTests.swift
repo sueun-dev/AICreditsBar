@@ -55,6 +55,13 @@ func runUpdaterTests() {
     eq(checkOutcome((403, Data()), current: "2.0"), .failed("GitHub answered HTTP 403. Try again later."), "GitHub's rate limit is not 'no release'")
     eq(checkOutcome((200, Data("<html>".utf8)), current: "2.0"), .failed("The latest release has no AICreditsBar.zip."), "an unreadable feed")
 
+    // ③ When the background check runs: a day apart by the wall clock.
+    let checkedAt = Date(timeIntervalSince1970: now)
+    check(isCheckDue(last: nil, now: checkedAt), "never asked: due at launch")
+    check(!isCheckDue(last: checkedAt, now: checkedAt.addingTimeInterval(23 * 3600)), "23 hours later: not yet")
+    check(isCheckDue(last: checkedAt, now: checkedAt.addingTimeInterval(86400)), "a day later: due, however long the Mac slept")
+    check(isCheckDue(last: checkedAt, now: checkedAt.addingTimeInterval(-60)), "a clock moved backwards does not stop checks")
+
     // ④ Only the developer's signature installs (the accepted case needs the certificate: Tests/updater/run.sh).
     check(!isSignedByPublisher(URL(fileURLWithPath: "/System/Applications/Calculator.app")), "another publisher's app is not installable")
     check(!isSignedByPublisher(URL(fileURLWithPath: "/nonexistent.app")), "a missing app is not installable")
