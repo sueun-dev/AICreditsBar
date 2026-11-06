@@ -137,14 +137,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     @objc private func refreshNow() { refresher.refresh() }
     @objc private func openSettings() { settings.show() }
     private func checkForUpdates() {
-        settings.setUpdateStatus("Checking…", available: nil)
-        updater.check { [weak self] outcome in
-            switch outcome {
-            case .upToDate: self?.settings.setUpdateStatus("You have the latest version.", available: nil)
-            case .available(let release): self?.settings.setUpdateStatus("Version \(release.version) is available.", available: release.version)
-            case .failed(let reason): self?.settings.setUpdateStatus(reason, available: nil)
-            }
-        }
+        settings.showUpdate(nil)
+        updater.check { [weak self] in self?.settings.showUpdate($0) }
     }
     @objc private func installUpdate() { updater.install() }
     @objc private func didWake() {

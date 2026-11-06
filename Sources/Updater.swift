@@ -46,6 +46,50 @@ func isSignedByPublisher(_ app: URL, team: String = Updater.publisherTeam) -> Bo
     return SecStaticCodeCheckValidity(code, flags, requirement) == errSecSuccess
 }
 
+enum UpdateOutcome: Equatable { case upToDate, available(ReleaseInfo), failed(String) }
+
+/// What a `releases/latest` reply (nil: no reply at all) means for the installed version.
+func checkOutcome(_ reply: (status: Int, body: Data)?, current: String) -> UpdateOutcome {
+    guard let reply = reply else { return .failed("Couldn't reach GitHub.") }
+    if reply.status == 404 { return .failed("No release has been published yet.") }
+    guard reply.status == 200 else { return .failed("GitHub answered HTTP \(reply.status). Try again later.") }
+    guard let release = parseRelease(reply.body) else { return .failed("The latest release has no AICreditsBar.zip.") }
+    return isNewerVersion(release.version, than: current) ? .available(release) : .upToDate
+}
+
+/// The downloaded release → its app, unpacked into a new temp folder and checked to be
+/// AICreditsBar `version` signed by `team`. Nothing is left behind when it isn't.
+func stageDownload(_ reply: (status: Int, body: Data), version: String, team: String = Updater.publisherTeam) throws -> URL {
+    guard reply.status == 200 else { throw UsageError("Download failed (HTTP \(reply.status))") }
+    guard reply.body.count < 50_000_000 else { throw UsageError("The download is too large to be AICreditsBar") }
+    let folder = FileManager.default.temporaryDirectory.appendingPathComponent("aicb-update-\(UUID().uuidString)")
+    try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+    do {
+        let zip = folder.appendingPathComponent("AICreditsBar.zip")
+        try reply.body.write(to: zip)
+        let unzip = Process()
+        unzip.executableURL = URL(fileURLWithPath: "/usr/bin/ditto")
+        unzip.arguments = ["-x", "-k", zip.path, folder.path]
+        unzip.standardError = FileHandle.nullDevice
+        try unzip.run()
+        unzip.waitUntilExit()
+        let app = folder.appendingPathComponent("AICreditsBar.app")
+        let found = Bundle(url: app)?.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String
+        guard unzip.terminationStatus == 0, found == version else { throw UsageError("The download is not AICreditsBar \(version)") }
+        guard isSignedByPublisher(app, team: team) else { throw UsageError("The download is not signed by the developer, so it was not installed") }
+        return app
+    } catch {
+        try? FileManager.default.removeItem(at: folder)
+        throw error
+    }
+}
+
+/// Swaps the installed bundle for the staged one, then removes the staged app's temp folder.
+func replaceApp(at installed: URL, with staged: URL) throws {
+    defer { try? FileManager.default.removeItem(at: staged.deletingLastPathComponent()) }
+    _ = try FileManager.default.replaceItemAt(installed, withItemAt: staged)
+}
+
 /// Asks GitHub once a day for the latest release. When it is newer, the menu offers
 /// "Update"; choosing it downloads the release, checks its signature, swaps the app
 /// bundle in place and relaunches. Nothing is installed without that choice.
@@ -82,24 +126,19 @@ final class Updater {
 
     func stop() { timer?.invalidate(); timer = nil }
 
-    enum Outcome: Equatable { case upToDate, available(ReleaseInfo), failed(String) }
-
     /// Asks GitHub now; `done` (main queue) gets what was found. The daily check passes no `done`.
-    func check(done: ((Outcome) -> Void)? = nil) {
+    func check(done: ((UpdateOutcome) -> Void)? = nil) {
         guard let current = current, canUpdate else { done?(.failed("This is a development build, not an installed app.")); return }
-        guard !installing else { return }
+        guard !installing else { done?(.failed("An update is already installing.")); return }
         let feed = self.feed
         DispatchQueue.global(qos: .utility).async { [weak self] in
             let headers = ["Accept": "application/vnd.github+json", "User-Agent": userAgent]
-            let reply = try? httpGet(feed, headers: headers, using: self?.client)
-            let release = reply.flatMap { $0.status == 200 ? parseRelease($0.body) : nil }
+            let outcome = checkOutcome(try? httpGet(feed, headers: headers, using: self?.client), current: current)
             DispatchQueue.main.async {
                 guard let self = self, !self.installing else { return }
-                guard reply != nil else { done?(.failed("Couldn't reach GitHub.")); return }
-                guard let release = release else { done?(.failed("No release to install was found.")); return }
-                let newer = isNewerVersion(release.version, than: current) ? release : nil
-                self.available = newer
-                done?(newer.map { .available($0) } ?? .upToDate)
+                if case .available(let release) = outcome { self.available = release }
+                if case .upToDate = outcome { self.available = nil }
+                done?(outcome)
             }
         }
     }
@@ -123,34 +162,13 @@ final class Updater {
     /// Downloads and unpacks the release; returns the verified app inside a temp folder.
     private func download(_ release: ReleaseInfo) throws -> URL {
         let reply = try httpGet(release.zipURL, headers: ["User-Agent": userAgent], using: client, timeout: 120)
-        guard reply.status == 200, reply.body.count < 50_000_000 else { throw UsageError("Download failed (HTTP \(reply.status))") }
-        let folder = FileManager.default.temporaryDirectory.appendingPathComponent("aicb-update-\(UUID().uuidString)")
-        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
-        do {
-            let zip = folder.appendingPathComponent("AICreditsBar.zip")
-            try reply.body.write(to: zip)
-            let unzip = Process()
-            unzip.executableURL = URL(fileURLWithPath: "/usr/bin/ditto")
-            unzip.arguments = ["-x", "-k", zip.path, folder.path]
-            try unzip.run()
-            unzip.waitUntilExit()
-            let app = folder.appendingPathComponent("AICreditsBar.app")
-            let version = Bundle(url: app)?.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String
-            guard unzip.terminationStatus == 0, version == release.version else { throw UsageError("The download is not AICreditsBar \(release.version)") }
-            guard isSignedByPublisher(app) else { throw UsageError("The download is not signed by the developer, so it was not installed") }
-            return app
-        } catch {
-            try? FileManager.default.removeItem(at: folder)
-            throw error
-        }
+        return try stageDownload(reply, version: release.version)
     }
 
     private func replaceAndRelaunch(with staged: URL) {
         let installed = Bundle.main.bundleURL
-        let folder = staged.deletingLastPathComponent()
-        defer { try? FileManager.default.removeItem(at: folder) }
         do {
-            _ = try FileManager.default.replaceItemAt(installed, withItemAt: staged)
+            try replaceApp(at: installed, with: staged)
         } catch {
             installing = false
             onFailure("Couldn't replace the app at \(installed.path): \(error.localizedDescription)")

@@ -218,6 +218,14 @@ out-of-order permission callbacks and responses, temporarily omitted limits,
 10,100 simulated readings, HTTP cancellation, offline/TLS errors, per-provider backoff,
 display scheduling, process locking, and checkout-specific restart behavior.
 
+In-app updates are tested section by section. The unit tests cover version order, the
+release feed, what a check reports, the Settings button, refused downloads and the bundle
+swap. `bash Tests/updater/run.sh` covers what needs the developer's Apple Development
+certificate: it builds a release from a copy of the checkout, checks `scripts/release.sh`
+(version, universal binary, team and timestamp, zip layout, ad-hoc refusal) and that
+ad-hoc, tampered, other-app, truncated and misnamed downloads are refused. Without that
+certificate it skips.
+
 To sample a running app's CPU time, memory footprint, wakeups and disk counters:
 `python3 Tests/measure_resources.py <PID> --seconds 60 --output report.json`.
 For a one-hour run, use `--seconds 3600 --interval 15`. The report records memory
@@ -403,6 +411,13 @@ e2e(키체인 접근 없는 임시 `HOME`)를 실행합니다. 설치된 앱과 
 알림 경계값·재시작·재시도, 10,100회 연속 입력, HTTP 취소·연결 실패, 서비스별 재시도 대기,
 권한 콜백·응답의 순서 역전, 한도 일시 누락, 화면 갱신 시점, 중복 실행 방지와 다른 경로의
 앱을 보존하는 재시작을 검사합니다.
+
+앱 내 업데이트는 단계별로 검사합니다. 단위 테스트는 버전 비교, 릴리스 피드, 확인 결과, 설정
+창 버튼, 거부되는 다운로드, 앱 교체를 다룹니다. 개발자의 Apple Development 인증서가 필요한
+부분은 `bash Tests/updater/run.sh`가 검사합니다. 체크아웃 사본으로 릴리스를 만들어
+`scripts/release.sh`(버전, 유니버설 바이너리, 팀·타임스탬프 서명, zip 구성, ad-hoc 거부)를
+확인하고, ad-hoc·변조·다른 앱·잘린 파일·이름이 다른 다운로드가 거부되는지 봅니다. 인증서가
+없으면 건너뜁니다.
 
 `python3 Tests/measure_resources.py <PID> --seconds 60 --output report.json`으로 실행 중인
 앱의 CPU 시간·메모리·웨이크업·디스크 카운터를 측정할 수 있습니다. 이 스크립트로 배터리

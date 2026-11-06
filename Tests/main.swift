@@ -364,6 +364,7 @@ runRegressionTests(now: now)
 runNotificationTests(now: now)
 runForecastTests(now: now)
 runLoginRenewalTests()
+runUpdaterTests()
 
 let summary = "\(passed) passed, \(failures) failed"
 print(failures == 0 ? "✓ unit: \(summary)" : "✗ unit: \(summary)")

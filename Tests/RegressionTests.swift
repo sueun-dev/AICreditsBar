@@ -273,19 +273,5 @@ func runRegressionTests(now: Double) {
     pump(until: { false }, timeout: 0.05)
     eq(ticks, stoppedCount, "all providers disabled means no requests")
     stopped.stop()
-
-    // Updates: version order, the release feed, and that only the developer's signature installs.
-    check(isNewerVersion("v2.1", than: "2.0"), "2.1 is newer than 2.0")
-    check(isNewerVersion("2.10", than: "2.9"), "versions compare as numbers, not text")
-    check(isNewerVersion("3", than: "2.9.9"), "a shorter version is padded with zeros")
-    check(!isNewerVersion("2.0", than: "2.0.0"), "2.0 equals 2.0.0")
-    check(!isNewerVersion("1.9", than: "2.0"), "an older release is never offered")
-    check(!isNewerVersion("beta", than: "2.0") && !isNewerVersion("2.1", than: ""), "non-numeric versions are ignored")
-    let feed = Data(#"{"tag_name":"v2.1","assets":[{"name":"notes.txt","browser_download_url":"https://x/notes"},{"name":"AICreditsBar.zip","browser_download_url":"https://x/app.zip"}]}"#.utf8)
-    eq(parseRelease(feed), ReleaseInfo(version: "2.1", zipURL: "https://x/app.zip"), "the release feed gives the version and zip")
-    check(parseRelease(Data(#"{"tag_name":"v2.1","assets":[]}"#.utf8)) == nil, "a release without the zip is ignored")
-    check(parseRelease(Data(#"{"tag_name":"nightly","assets":[]}"#.utf8)) == nil && parseRelease(nil) == nil, "bad feeds are ignored")
-    check(!isSignedByPublisher(URL(fileURLWithPath: "/System/Applications/Calculator.app")), "another publisher's app is not installable")
-    check(!isSignedByPublisher(URL(fileURLWithPath: "/nonexistent.app")), "a missing app is not installable")
     Cfg.resetAll()
 }
