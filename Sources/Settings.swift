@@ -21,8 +21,8 @@ final class SettingsWindow: NSObject, NSWindowDelegate, NSTextFieldDelegate {
     private let lowAlertBox = NSButton(checkboxWithTitle: "At or below 20% remaining · once per window", target: nil, action: nil)
     private let recoveryBox = NSButton(checkboxWithTitle: "When the provider confirms quota recovery", target: nil, action: nil)
     private let updatesBox = NSButton(checkboxWithTitle: "Look for new versions on GitHub once a day", target: nil, action: nil)
-    private let updateButton = NSButton(title: "Check for Updates", target: nil, action: nil)
-    private let updateStatus = NSTextField(labelWithString: "")
+    let updateButton = NSButton(title: "Check for Updates", target: nil, action: nil)   // internal for tests
+    let updateStatus = NSTextField(labelWithString: "")
     private var updateReady = false
     private let notificationStatus = NSTextField(wrappingLabelWithString: "Enable notifications to receive alerts.")
     private let cardWidth: CGFloat = 420
@@ -149,11 +149,18 @@ final class SettingsWindow: NSObject, NSWindowDelegate, NSTextFieldDelegate {
     @objc private func resetDefaults() { Cfg.resetAll(); load(); onChange() }
     @objc private func updateClicked() { updateReady ? onInstallUpdate() : onCheckUpdates() }
 
-    /// `available` is the new version when one can be installed; the button then installs it.
-    func setUpdateStatus(_ text: String, available: String?) {
-        updateStatus.stringValue = text
-        updateReady = available != nil
-        updateButton.title = available.map { "Update to \($0) and Restart" } ?? "Check for Updates"
+    /// nil while checking. A found version turns the button into "Update to … and Restart".
+    func showUpdate(_ outcome: UpdateOutcome?) {
+        var ready: String?
+        switch outcome {
+        case nil: updateStatus.stringValue = "Checking…"
+        case .upToDate?: updateStatus.stringValue = "You have the latest version."
+        case .available(let release)?: updateStatus.stringValue = "Version \(release.version) is available."; ready = release.version
+        case .failed(let reason)?: updateStatus.stringValue = reason
+        }
+        updateReady = ready != nil
+        updateButton.isEnabled = outcome != nil
+        updateButton.title = ready.map { "Update to \($0) and Restart" } ?? "Check for Updates"
     }
     @objc private func enableNotifications() { onEnableNotifications() }
     @objc private func testAlerts() { onTestAlerts() }
