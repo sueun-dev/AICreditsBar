@@ -30,7 +30,7 @@ printf '{"auth_mode":"apikey","OPENAI_API_KEY":"sk-test"}' > "$FAKE/.codex/auth.
 check "$(run --once)" "Codex: Codex is signed in with an API key" "API-key login is reported"
 
 echo "4) defaults"
-check "$(run --dump-config)" "display=min refresh=300s warn<30% critical<10%" "default settings"
+check "$(run --dump-config)" "display=min refresh=180s warn<30% critical<10%" "default settings"
 
 echo "5) renders the menu and the settings window"
 run --render-preview "$FAKE/preview.png" >/dev/null && [ -s "$FAKE/preview.png" ] && echo "  ok: preview PNG" || { echo "  FAIL: preview PNG"; fail=1; }

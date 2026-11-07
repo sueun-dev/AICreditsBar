@@ -197,11 +197,11 @@ Cfg.resetAll()
 // MARK: Settings defaults
 
 eq(Cfg.displayMode, "min", "default display")
-eq(Cfg.refreshInterval, 300, "default check interval: 5 minutes")
+eq(Cfg.refreshInterval, 180, "default check interval: 3 minutes")
 Cfg.refreshInterval = 5
 eq(Cfg.refreshInterval, 60, "interval floor protects the rate-limited APIs")
 Cfg.refreshInterval = .nan
-eq(Cfg.refreshInterval, 300, "invalid interval → default")
+eq(Cfg.refreshInterval, 180, "invalid interval → default")
 check(Cfg.isShown(.codex) && Cfg.isShown(.claude), "both providers on by default")
 Cfg.setShown(.claude, false)
 check(!Cfg.isShown(.claude), "provider toggle")

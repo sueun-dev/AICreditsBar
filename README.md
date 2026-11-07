@@ -53,7 +53,7 @@ and may change without notice. Nothing is estimated:
   pin it to the 5-hour or weekly window). Per-model limits are left out of the ring.
 - Drawn in the menu bar's own text color while healthy, **orange** below 30 %, **red**
   below 10 %, faded when the reading isn't current. Thresholds are adjustable.
-- Checks every 5 minutes, when the menu opens (at most every 2 minutes), and after the Mac
+- Checks every 3 minutes, when the menu opens (at most every 2 minutes), and after the Mac
   wakes. The usage endpoints rate-limit hard — Anthropic's especially — so a service that
   answers HTTP 429 is left alone for 5, 10, 20, then 30 minutes.
 - The last good reading is saved, so after a restart it shows right away (faded, with its
@@ -261,7 +261,7 @@ Codex와 Claude Code가 직접 호출하는 내부 사용량 엔드포인트이�
   고정할 수 있습니다. 모델별 한도는 링에서 제외합니다.
 - 여유가 있으면 메뉴바 글자색, 30% 미만 **주황**, 10% 미만 **빨강**, 최신 값이 아니면 흐리게.
   기준값은 설정에서 바꿀 수 있습니다.
-- 5분마다, 메뉴를 열 때(최대 2분에 한 번), 잠자기에서 깨어날 때 확인합니다. 사용량 API는
+- 3분마다, 메뉴를 열 때(최대 2분에 한 번), 잠자기에서 깨어날 때 확인합니다. 사용량 API는
   호출 제한이 엄격해서(특히 Anthropic) HTTP 429를 받으면 그 서비스는 5→10→20→30분 쉽니다.
 - 마지막 정상 값을 저장해 두어, 재시작 직후에도 (흐리게, 몇 분 전 값인지와 함께) 바로 보여줍니다.
 - 카운트다운은 표시 내용이 바뀔 때만 다시 그립니다. 메뉴가 닫혀 있으면 매초 실행되는 타이머가

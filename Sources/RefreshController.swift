@@ -34,7 +34,7 @@ final class RefreshController {
     /// Refresh now, then every `interval` seconds. The timer also fires while the menu is open.
     func start(every interval: TimeInterval, refreshImmediately: Bool = true) {
         stop()
-        let interval = interval.isFinite && interval > 0 ? interval : 300
+        let interval = interval.isFinite && interval > 0 ? interval : 180
         self.interval = interval
         guard sources.contains(where: { isEnabled($0.provider) }) else { return }
         let timer = Timer(timeInterval: interval, repeats: true) { [weak self] _ in self?.refresh() }

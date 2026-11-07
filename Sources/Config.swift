@@ -40,9 +40,9 @@ enum Cfg {
     }
 
     /// Seconds between automatic checks. The usage endpoints rate-limit hard, so
-    /// the default is 5 minutes (the menu also checks when it opens).
+    /// the default is 3 minutes (the menu also checks when it opens).
     static var refreshInterval: Double {
-        get { let value = d.double(forKey: "refreshInterval"); return value.isFinite && value > 0 ? min(3600, max(60, value)) : 300 }
+        get { let value = d.double(forKey: "refreshInterval"); return value.isFinite && value > 0 ? min(3600, max(60, value)) : 180 }
         set { d.set(newValue, forKey: "refreshInterval") }
     }
 

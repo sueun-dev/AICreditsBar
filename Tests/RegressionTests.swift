@@ -173,7 +173,7 @@ func runRegressionTests(now: Double) {
 
     // Display scheduling: no tick timer when closed, and no earlier redraw than needed.
     let fresh = ProviderState(reading: sample(50, now, reset: now + 5000))
-    approx(nextDisplayChange([fresh], now: now + 2, menuOpen: false), now + 660.01, "closed menu waits for stale boundary")
+    approx(nextDisplayChange([fresh], now: now + 2, menuOpen: false), now + 420.01, "closed menu waits for stale boundary")
     approx(nextDisplayChange([fresh], now: now + 2, menuOpen: true), now + 20.01, "open menu updates at next countdown change")
     let nearReset = ProviderState(reading: sample(50, now, reset: now + 50))
     approx(nextDisplayChange([nearReset], now: now + 2, menuOpen: false), now + 50.01, "reset expiry updates even while menu closed")
