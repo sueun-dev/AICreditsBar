@@ -3,7 +3,7 @@ import Foundation
 // MARK: - Helpers shared by the providers, the UI and the CLI
 
 let HOME = ProcessInfo.processInfo.environment["HOME"] ?? NSHomeDirectory()
-let userAgent = "AICreditsBar/2.0"
+let userAgent = "AICreditsBar/" + (Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "dev")
 func nowEpoch() -> Double { Date().timeIntervalSince1970 }
 
 /// Double → Int in [0, 100]. Never call Int() on an unvalidated Double:

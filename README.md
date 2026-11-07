@@ -115,6 +115,22 @@ Start at login: `bash scripts/install-login-item.sh` (remove with `-u`); it also
 app back if it ever crashes. `build.sh` re-registers the login item and restarts the app
 after every rebuild so it uses the newly signed binary.
 
+### Updates
+
+Once a day the app asks GitHub for this repository's latest release. When a newer version
+is out, the menu and **Settings → Updates** offer **Update to X and Restart**: the app
+downloads `AICreditsBar.zip`, installs it only if it is that version and signed by the
+developer's certificate, replaces itself in place and restarts. **Check for Updates** in
+Settings checks right away, and the checkbox there turns the daily check off. A copy whose
+Settings has no Updates section was built before updates existed; run
+`git pull && bash build.sh` once.
+
+The zip on the Releases page is for these in-app updates. It is not notarized, so macOS
+blocks it when opened straight from a browser download; install from source as above.
+
+To publish a release: raise `VERSION`, run `bash scripts/release.sh` with the developer's
+certificate, then upload `dist/AICreditsBar.zip` to a GitHub release tagged `v<VERSION>`.
+
 ### Command line
 
 ```bash
@@ -129,7 +145,9 @@ $B --settings                 # open Settings (launches the app if needed)
 ### Privacy
 
 The app reads the two logins above locally and sends each only to its own provider's
-usage endpoint. No telemetry, no other servers, no cookies or cache written to disk.
+usage endpoint. The only other request is the daily update check, which asks GitHub for
+this repository's latest release and sends nothing about you. No telemetry, no cookies
+or cache written to disk.
 If macOS asks whether it may read "Claude Code-credentials" from the Keychain, choose
 **Always Allow** (Claude Code normally stores it in a way that needs no prompt).
 
@@ -293,6 +311,21 @@ ad-hoc 서명을 사용합니다. 인증서가 없거나 후보가 여러 개면
 로그인 시 자동 실행: `bash scripts/install-login-item.sh` (제거는 `-u`, 앱이 비정상 종료되면 다시 띄움).
 `build.sh`는 재빌드 후 로그인 항목을 다시 등록하고 앱을 재시작해 새 서명 바이너리를 사용합니다.
 
+### 업데이트
+
+앱은 하루에 한 번 GitHub에 이 저장소의 최신 릴리스를 묻습니다. 새 버전이 있으면 메뉴와
+**설정 → Updates**에 **Update to X and Restart**가 나타납니다. 누르면 `AICreditsBar.zip`을
+내려받아, 그 버전이 맞고 개발자 인증서로 서명된 경우에만 앱을 제자리에서 교체하고 다시
+실행합니다. 설정의 **Check for Updates**는 바로 확인하고, 옆의 체크박스로 매일 확인을 끌 수
+있습니다. 설정에 Updates 항목이 없다면 업데이트 기능 전에 빌드한 앱이니
+`git pull && bash build.sh`를 한 번 실행하세요.
+
+Releases 페이지의 zip은 앱 내 업데이트용입니다. 공증을 받지 않아 브라우저로 내려받아 바로 열면
+macOS가 막으므로, 처음 설치는 위처럼 소스에서 빌드하세요.
+
+릴리스 올리는 법: `VERSION`을 올리고, 개발자 인증서로 `bash scripts/release.sh`를 실행한 뒤
+`dist/AICreditsBar.zip`을 `v<VERSION>` 태그의 GitHub 릴리스에 올립니다.
+
 ### 커맨드라인
 
 ```bash
@@ -306,8 +339,9 @@ $B --settings                 # 설정 창 열기 (필요하면 앱 실행)
 
 ### 개인정보
 
-위 두 로그인 정보를 로컬에서 읽어 각 서비스의 사용량 API에만 보냅니다. 텔레메트리, 다른 서버,
-디스크에 쓰는 쿠키·캐시가 없습니다. macOS가 키체인의 "Claude Code-credentials" 접근을 물으면
+위 두 로그인 정보를 로컬에서 읽어 각 서비스의 사용량 API에만 보냅니다. 그 밖의 요청은 하루 한 번
+GitHub에 이 저장소의 최신 릴리스를 묻는 업데이트 확인뿐이며, 사용자 정보는 보내지 않습니다.
+텔레메트리와 디스크에 쓰는 쿠키·캐시가 없습니다. macOS가 키체인의 "Claude Code-credentials" 접근을 물으면
 **항상 허용**을 선택하세요 (보통 Claude Code가 묻지 않아도 되게 저장합니다).
 
 ### 테스트
