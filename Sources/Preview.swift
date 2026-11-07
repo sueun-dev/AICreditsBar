@@ -19,8 +19,15 @@ func renderPreview(to path: String) throws {
         return (provider, state)
     }
 
+    // The history the running app keeps; a copy that has none reads Claude Code's files once.
+    var ledger = LedgerStore().snapshot
+    if Cfg.useClaudeHistory { ledger.scan(root: (claudeConfigDir as NSString).appendingPathComponent("projects"), now: nowEpoch()) }
+    let forecasts = Dictionary(uniqueKeysWithValues: states.map {
+        ($0.0, Forecaster.summary(provider: $0.0, state: $0.1, ledger: Cfg.useClaudeHistory ? ledger : nil,
+                                  samples: SampleLog(data: Cfg.sampleLog), now: nowEpoch()))
+    })
     let width = ProviderCardView.width + 12, barHeight: CGFloat = 30
-    let cardsHeight = states.reduce(CGFloat(0)) { $0 + ProviderCardView.height(for: $1.1) }
+    let cardsHeight = states.reduce(CGFloat(0)) { $0 + ProviderCardView.height(for: $1.1, forecast: forecasts[$1.0] ?? nil) }
     let root = FlippedView(frame: NSRect(x: 0, y: 0, width: width, height: barHeight + 8 + cardsHeight + 12))
     root.appearance = appearance
     root.wantsLayer = true
@@ -45,7 +52,7 @@ func renderPreview(to path: String) throws {
     root.addSubview(panel)
     var y: CGFloat = 6
     for (provider, state) in states {
-        let card = ProviderCardView(provider: provider, state: state)
+        let card = ProviderCardView(provider: provider, state: state, forecast: forecasts[provider] ?? nil)
         card.frame.origin = NSPoint(x: 6, y: panel.frame.minY + y)
         root.addSubview(card)
         y += card.frame.height

@@ -18,6 +18,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private var lastGauges: [MenuBarGauge] = []
     private var lastProviders: [Provider] = []
     private var wakeWork: DispatchWorkItem?
+    private let ledgerStore = LedgerStore()
+    private var samples = SampleLog(data: Cfg.sampleLog)
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
@@ -50,6 +52,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         DistributedNotificationCenter.default().addObserver(self, selector: #selector(openSettings),
                                                             name: showSettingsNotification, object: nil)
         updateTitle(force: true)
+        refreshLedger(minimumGap: 0)
         refresher.start(every: Cfg.refreshInterval)
         scheduleDisplay()
         if CommandLine.arguments.contains("--settings") { openSettings() }
@@ -68,9 +71,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         if case .success(let reading) = result {
             Cfg.save(reading, for: provider)
             notifications.record(reading, provider: provider)
+            if provider == .claude { refreshLedger() }
+            if Cfg.forecastEnabled, samples.record(reading, provider: provider, now: nowEpoch()) { Cfg.sampleLog = samples.data }
         }
         updateTitle()
-        if let state = states[provider] { cards[provider]?.update(state) }
+        if let state = states[provider] { cards[provider]?.update(state, forecast: forecast(for: provider)) }
         scheduleDisplay()
     }
 
@@ -81,6 +86,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             refresher.start(every: Cfg.refreshInterval, refreshImmediately: false)
         }
         enabledProviders = enabled
+        if Cfg.useClaudeHistory { refreshLedger(minimumGap: 0) } else { ledgerStore.clear() }
         if Cfg.checkForUpdates { updater.start() } else { updater.stop() }
         if !added.isEmpty { refresher.refresh(providers: added) }
         updateTitle()
@@ -88,6 +94,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     }
 
     private var shownProviders: [Provider] { Provider.allCases.filter(Cfg.isShown) }
+
+    private func forecast(for provider: Provider) -> ForecastSummary? {
+        Forecaster.summary(provider: provider, state: states[provider] ?? ProviderState(),
+                           ledger: Cfg.useClaudeHistory ? ledgerStore.snapshot : nil, samples: samples, now: nowEpoch())
+    }
+
+    /// Claude Code's history is read in the background; the cards redraw when it has been.
+    private func refreshLedger(minimumGap: TimeInterval = 120) {
+        guard Cfg.forecastEnabled, Cfg.useClaudeHistory, Cfg.isShown(.claude) else { return }
+        ledgerStore.refresh(minimumGap: minimumGap) { [weak self] in
+            guard let self = self else { return }
+            self.updateTitle()
+            for (provider, card) in self.cards { card.update(self.states[provider] ?? ProviderState(), forecast: self.forecast(for: provider)) }
+        }
+    }
 
     private func updateTitle(force: Bool = false) {
         guard let button = statusItem?.button else { return }
@@ -106,6 +127,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             var line = "\(provider.rawValue): \(gauge.text)"
             if gauge.left != nil, let window = state.reading.flatMap({ menuBarWindow($0, now: now) }) { line += " left · \(window.label)" }
             if let error = state.error { line += " (\(error.message))" }
+            if let advice = forecast(for: provider)?.advice { line += "\n  ↳ \(advice.headline) (estimate)" }
             return line
         }.joined(separator: "\n")
         button.toolTip = summary
@@ -148,7 +170,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         menu.removeAllItems()
         cards.removeAll()
         for provider in shownProviders {
-            let card = ProviderCardView(provider: provider, state: states[provider] ?? ProviderState())
+            let card = ProviderCardView(provider: provider, state: states[provider] ?? ProviderState(),
+                                        forecast: forecast(for: provider))
             let item = NSMenuItem()
             item.view = card
             cards[provider] = card
@@ -176,6 +199,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     func menuWillOpen(_ menu: NSMenu) {
         menuOpen = true
         refresher.refresh(minimumGap: 120)
+        refreshLedger()
         scheduleDisplay()
     }
 

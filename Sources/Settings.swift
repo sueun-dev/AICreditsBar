@@ -21,6 +21,8 @@ final class SettingsWindow: NSObject, NSWindowDelegate, NSTextFieldDelegate {
     private let lowAlertBox = NSButton(checkboxWithTitle: "At or below 20% remaining · once per window", target: nil, action: nil)
     private let recoveryBox = NSButton(checkboxWithTitle: "When the provider confirms quota recovery", target: nil, action: nil)
     private let updatesBox = NSButton(checkboxWithTitle: "Look for new versions on GitHub once a day", target: nil, action: nil)
+    private let forecastBox = NSButton(checkboxWithTitle: "Show usage forecast and model advice", target: nil, action: nil)
+    private let historyBox = NSButton(checkboxWithTitle: "Compare models using Claude Code's history on this Mac", target: nil, action: nil)
     let updateButton = NSButton(title: "Check for Updates", target: nil, action: nil)   // internal for tests
     let updateStatus = NSTextField(labelWithString: "")
     private var updateReady = false
@@ -47,7 +49,7 @@ final class SettingsWindow: NSObject, NSWindowDelegate, NSTextFieldDelegate {
         win.delegate = self
 
         modePopup.addItems(withTitles: modes.map { $0.1 })
-        for control in [modePopup, codexBox, claudeBox, lowAlertBox, recoveryBox, updatesBox] as [NSControl] {
+        for control in [modePopup, codexBox, claudeBox, lowAlertBox, recoveryBox, updatesBox, forecastBox, historyBox] as [NSControl] {
             control.target = self
             control.action = #selector(changed)
         }
@@ -67,6 +69,10 @@ final class SettingsWindow: NSObject, NSWindowDelegate, NSTextFieldDelegate {
             form([("Show", modePopup), ("Providers", providers), ("Check every", refresh)]),
             note("Also checks when the menu opens (at most every 2 minutes) and after the Mac wakes. The usage services rate-limit frequent checks.")])
         let warningCard = card("exclamationmark.triangle.fill", "Warnings", [warnings])
+        let forecastCard = card("chart.line.uptrend.xyaxis", "Forecast", [
+            forecastBox,
+            historyBox,
+            note("An estimate, shown apart from the reported numbers. It measures how fast each limit is being used this cycle and says whether it will last to the reset. For Claude it also compares Haiku, Sonnet and Opus: the tokens Claude Code recorded on this Mac are priced at the published API rates, matched to the percentage Claude reports, and repriced for each model. The history is read locally, never sent anywhere, and Claude Code use on other devices or on claude.ai isn't in it.")])
         let enable = NSButton(title: "Enable Notifications", target: self, action: #selector(enableNotifications))
         let test = NSButton(title: "Test Alerts", target: self, action: #selector(testAlerts))
         notificationStatus.font = .systemFont(ofSize: 11)
@@ -85,7 +91,7 @@ final class SettingsWindow: NSObject, NSWindowDelegate, NSTextFieldDelegate {
         let sourcesCard = card("checkmark.shield.fill", "Data", [
             note("Codex — the usage endpoint the Codex CLI uses, using your Codex CLI login (~/.codex/auth.json)."),
             note("Claude — the usage endpoint Claude Code uses, using your Claude Code login (macOS Keychain)."),
-            note("These are the numbers /status and /usage show. Nothing is estimated, and no usage data leaves your Mac — the only other request is the daily update check.")])
+            note("These are the numbers /status and /usage show. The Forecast is the only estimate, and it is labeled as one. No usage data leaves your Mac — the only other request is the daily update check.")])
 
         let reset = NSButton(title: "Reset to Defaults", target: self, action: #selector(resetDefaults))
         let done = NSButton(title: "Done", target: self, action: #selector(closeWindow))
@@ -94,7 +100,7 @@ final class SettingsWindow: NSObject, NSWindowDelegate, NSTextFieldDelegate {
         footer.distribution = .fill
         footer.widthAnchor.constraint(equalToConstant: cardWidth).isActive = true
 
-        let column = NSStackView(views: [menuBarCard, warningCard, alertsCard, updatesCard, sourcesCard, footer])
+        let column = NSStackView(views: [menuBarCard, warningCard, forecastCard, alertsCard, updatesCard, sourcesCard, footer])
         column.orientation = .vertical
         column.alignment = .centerX
         column.spacing = 14
@@ -126,6 +132,8 @@ final class SettingsWindow: NSObject, NSWindowDelegate, NSTextFieldDelegate {
         lowAlertBox.state = Cfg.lowAlerts ? .on : .off
         recoveryBox.state = Cfg.recoveryAlerts ? .on : .off
         updatesBox.state = Cfg.checkForUpdates ? .on : .off
+        forecastBox.state = Cfg.forecastEnabled ? .on : .off
+        historyBox.state = Cfg.useClaudeHistory ? .on : .off
     }
 
     @objc private func changed() {
@@ -135,6 +143,8 @@ final class SettingsWindow: NSObject, NSWindowDelegate, NSTextFieldDelegate {
         Cfg.lowAlerts = lowAlertBox.state == .on
         Cfg.recoveryAlerts = recoveryBox.state == .on
         Cfg.checkForUpdates = updatesBox.state == .on
+        Cfg.forecastEnabled = forecastBox.state == .on
+        Cfg.useClaudeHistory = historyBox.state == .on
         if let minutes = Double(refreshField.stringValue) { Cfg.refreshInterval = minutes * 60 }
         if let percent = Int(warnField.stringValue) { Cfg.warnBelow = min(100, max(0, percent)) }
         if let percent = Int(criticalField.stringValue) { Cfg.criticalBelow = min(100, max(0, percent)) }

@@ -22,6 +22,7 @@ struct UsageWindow: Equatable, Codable {
     var usedPercent: Double        // 0–100, as reported
     var resetsAt: Double?          // unix seconds
     var modelScoped = false        // limit for one model only; not used for the menu-bar number
+    var length: Double?            // seconds the window spans, when the provider says (forecasts default by kind)
 
     var leftPercent: Int { pctClamp(100 - usedPercent) }
 

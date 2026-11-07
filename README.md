@@ -36,7 +36,8 @@ limit, its reset countdown, and your plan.
 
 These are the internal usage endpoints that Codex and Claude Code themselves call — the same
 numbers as Codex's `/status` and Claude Code's `/usage`. They are not documented public APIs
-and may change without notice. Nothing is estimated:
+and may change without notice. The numbers are never estimated (the separate, labeled
+[forecast](#forecast-and-model-advice) is the only estimate):
 
 - Each plan limit is shown as the provider reports it. Codex windows are named by their real
   length (a Pro plan currently has a single 7-day window, so there is no 5-hour row).
@@ -45,7 +46,12 @@ and may change without notice. Nothing is estimated:
 - If a refresh fails, the last reading stays visible but greyed, with its age and the reason.
 - A window whose reset time has passed shows **—** until the next reading. It is never
   assumed to be back at 100%.
-- Not signed in, or a login expired? The menu says so and shows no numbers.
+- Not signed in? The menu says so and shows no numbers.
+- Claude Code renews its login token only while it is running, so someone who works in the desktop
+  app or an editor can be signed in with a stored token that expired hours ago. When that happens the
+  app starts the official `claude` CLI once, headless, so it renews and stores its own token: nothing
+  is sent to the model, no session is saved, the app never reads or uses the refresh token, and it
+  tries at most every 15 minutes. If that doesn't work the menu says the login expired.
 
 ### The menu bar
 
@@ -61,6 +67,54 @@ and may change without notice. Nothing is estimated:
 - Countdown labels redraw only when their displayed value changes. A closed menu has
   no per-second timer; unchanged ring images are reused. Changing display settings
   does not make extra usage requests, and disabling both providers stops polling.
+
+### Forecast and model advice
+
+Below each provider's limits the menu adds a block labeled **FORECAST · ESTIMATE**. It is
+computed on your Mac and never changes the numbers above it. It is hidden when the reading
+isn't current, and **Settings → Forecast** turns it off.
+
+- **Pace.** Each limit says whether you are *on track* (and how much is left at the reset)
+  or *ends ≈2d 10h early (at avg pace)* — the average includes the hours you don't use it.
+- **Per-model estimate (Claude).** Claude Code records every message's model and tokens in
+  `~/.claude/projects` on this Mac. The app prices those tokens at the published API rates,
+  matches the total to the percentage Claude reports for the same cycle (so it learns how
+  much of *your* limit one dollar of work uses), then reprices the same tokens as if Haiku,
+  Sonnet or Opus had done all of it. Each model gets its pace in %/day and the hours of
+  active use the remaining % lasts.
+- **Advice.** The strongest model whose pace fits what you can spend per day (remaining % ÷
+  days left, with a 15% margin): *Opus 5.5 is fine today*, *Stay on Sonnet 5.5*, *Use Haiku 5.5
+  from now on*, or *Go easy — even Haiku 5.5 runs short*. "Stay" and "from now on" are
+  relative to the model that did most of your recent work.
+- **No guessing.** Until a day of the week has passed, or without Claude Code history on this
+  Mac, the advice and per-model rows say *not enough data yet*.
+- **Limit resets.** If the limit is reset mid-cycle (a reset coupon: 98% → 0% with the same reset
+  time), the app sees the figure fall and carries the use before it over: the pace, the tokens-to-%
+  ratio and the per-model numbers keep counting the whole cycle, as if the counter had never been
+  reset, and the card says a reset was noticed. A reset that happens while the app is closed is
+  noticed at the next reading. The 20% warning is armed again too.
+
+Limits: it assumes plan limits follow token prices (calibrated to your own usage, but not
+published by Anthropic); Claude Code use on other devices or in claude.ai counts toward the
+percentage but isn't in the local history; Haiku 5.5's newer tokenizer isn't adjusted for.
+The history is read locally, only what was added since the last read, and never sent
+anywhere. **Settings → Forecast** can turn the comparison off and forgets what was read.
+
+**Checked against what happened.** The app keeps the readings it gets (one per 15 minutes,
+a week at most, on this Mac) and, as time passes, compares its earlier forecasts with the
+readings that followed. The card shows two lines once there are at least 3 checks of each:
+
+- *24h pace: off by 3.1 pts · 12 checks* — the used % it predicted a day ahead from the
+  cycle's average pace, against the used % Claude/Codex then reported (it says *ran high* or
+  *ran low* when it was consistently off one way).
+- *Model costs: real burn ×1.08 of priced* — the % the priced Claude Code tokens predicted for the
+  next 6 hours, against the % actually used. ×1.00 means limits really are used up in
+  proportion to API prices; below 1 means the priced tokens over-predicted, above 1 under.
+  This tests the one assumption the per-model numbers rest on.
+
+Until then it says *Accuracy check: not enough data yet*. Both start from the app's first
+reading, so the cost check has its first numbers after about 9 hours and the pace check after
+about a day (a cycle must also be at least a day old).
 
 ### Notifications
 
@@ -146,8 +200,10 @@ $B --settings                 # open Settings (launches the app if needed)
 
 The app reads the two logins above locally and sends each only to its own provider's
 usage endpoint. The only other request is the daily update check, which asks GitHub for
-this repository's latest release and sends nothing about you. No telemetry, no cookies
-or cache written to disk.
+this repository's latest release and sends nothing about you. The forecast reads Claude
+Code's history in `~/.claude/projects` and saves only token counts per model and 15 minutes
+in `~/Library/Application Support/AICreditsBar`; neither leaves this Mac. No telemetry, no
+cookies.
 If macOS asks whether it may read "Claude Code-credentials" from the Keychain, choose
 **Always Allow** (Claude Code normally stores it in a way that needs no prompt).
 
@@ -246,14 +302,18 @@ Codex와 Claude 요금제 한도가 얼마나 남았는지 macOS 메뉴바에 �
 
 Codex와 Claude Code가 직접 호출하는 내부 사용량 엔드포인트이며, Codex의 `/status`, Claude Code의 `/usage`와 같은 숫자입니다.
 공개 문서화된 API가 아니므로 예고 없이 바뀔 수 있습니다.
-추정치는 없습니다.
+숫자는 추정하지 않습니다(별도로 표시되는 [예측](#예측과-모델-추천)만 추정치입니다).
 
 - 요금제 한도는 서비스가 보고한 그대로 표시합니다. Codex 창 이름은 실제 길이로 정합니다
   (현재 Pro 요금제는 7일 창 하나뿐이라 5시간 줄이 없습니다). Claude의 모델별 주간 한도
   (예: *Weekly (Fable)*)는 별도 줄로 보여줍니다. Codex의 별도 코드리뷰 한도는 표시하지 않습니다.
 - 갱신에 실패하면 마지막 값을 회색으로 남기고, 몇 분 전 값인지와 실패 이유를 표시합니다.
 - 리셋 시각이 지난 창은 새 값을 받을 때까지 **—** 로 표시합니다. 100%로 가정하지 않습니다.
-- 로그인이 없거나 만료되면 그렇게 알려주고 숫자는 표시하지 않습니다.
+- 로그인이 없으면 그렇게 알려주고 숫자는 표시하지 않습니다.
+- Claude Code는 실행 중일 때만 로그인 토큰을 갱신합니다. 데스크톱 앱이나 에디터로만 쓰면 로그인은 되어 있는데 저장된 토큰이
+  몇 시간 전에 만료되어 있을 수 있습니다. 그럴 때 앱이 공식 `claude` CLI를 화면 없이 한 번 실행해서 CLI가 스스로 토큰을 갱신·저장하게
+  합니다. 모델에는 아무것도 보내지 않고, 세션도 저장하지 않으며, 앱은 리프레시 토큰을 읽거나 쓰지 않고, 최대 15분에 한 번만
+  시도합니다. 그래도 안 되면 로그인이 만료됐다고 표시합니다.
 
 ### 메뉴바
 
@@ -267,6 +327,42 @@ Codex와 Claude Code가 직접 호출하는 내부 사용량 엔드포인트이�
 - 카운트다운은 표시 내용이 바뀔 때만 다시 그립니다. 메뉴가 닫혀 있으면 매초 실행되는 타이머가
   없고, 값이 그대로인 링 이미지도 재사용합니다. 표시 설정 변경으로 API를 추가 호출하지 않으며,
   두 서비스를 모두 끄면 자동 조회도 멈춥니다.
+
+### 예측과 모델 추천
+
+각 서비스의 한도 아래에 **FORECAST · ESTIMATE**(추정) 블록이 붙습니다. Mac에서 계산하며 위의 숫자를 바꾸지 않습니다.
+읽은 값이 최신이 아니면 숨겨지고, **설정 → Forecast**에서 끌 수 있습니다.
+
+- **소진 속도.** 한도마다 *순조로움*(리셋 때 남을 양) 또는 *평균 속도면 리셋보다 ≈2d 10h 일찍 끝남*(안 쓰는 시간까지 포함한 평균입니다)을 알려줍니다.
+- **모델별 추정(Claude).** Claude Code는 이 Mac의 `~/.claude/projects`에 메시지마다 모델과 토큰을 기록합니다. 앱은 그
+  토큰을 공식 API 단가로 환산하고, 같은 주기에 Claude가 알려준 사용률과 맞춰서(내 한도에서 1달러어치 작업이 몇 %인지
+  학습) 같은 토큰을 Haiku·Sonnet·Opus가 모두 처리했다면 어땠는지 다시 계산합니다. 모델마다 하루에 닳는 %와, 남은 %로
+  실제로 쓸 수 있는 시간이 나옵니다.
+- **추천.** 하루에 쓸 수 있는 양(남은 % ÷ 남은 일수, 15% 여유) 안에서 감당되는 가장 강한 모델입니다: *Opus 5.5 is fine
+  today*, *Stay on Sonnet 5.5*, *Use Haiku 5.5 from now on*, *Go easy — even Haiku 5.5 runs short*. "Stay"와 "from now on"은
+  최근에 가장 많이 쓴 모델을 기준으로 합니다.
+- **추측하지 않습니다.** 주간이 하루 지나기 전이거나 이 Mac에 Claude Code 기록이 없으면 *not enough data yet*으로 표시합니다.
+- **한도 리셋.** 주기 중간에 한도가 리셋되면(리셋 쿠폰: 리셋 시각은 그대로인데 98% → 0%) 앱이 사용률이 내려간 것을 보고
+  그 이전 사용분을 이어받습니다. 소모 속도, 토큰과 %의 환산 비율, 모델별 수치가 리셋이 없었던 것처럼 주기 전체를 기준으로
+  계속 계산되고, 카드에는 리셋을 알아챘다고 표시합니다. 앱이 꺼져 있는 동안 리셋됐다면 다음에 읽는 값으로 알아챕니다.
+  20% 경고도 다시 켜집니다.
+
+한계: 한도가 토큰 단가에 비례한다고 가정합니다(내 사용량에 맞춰 보정하지만 Anthropic이 공개한 사실은 아님). 다른 기기나
+claude.ai에서의 사용은 사용률에는 반영되지만 이 Mac의 기록에는 없습니다. Haiku 5.5의 새 토크나이저 차이는 보정하지 않습니다.
+기록은 로컬에서 마지막 읽은 이후 추가된 부분만 읽으며 어디로도 전송하지 않습니다. **설정 → Forecast**에서 비교를 끄면
+읽은 내용도 지웁니다.
+
+**실제와 비교.** 앱은 받은 읽기값을 이 Mac에 15분에 하나씩, 최대 일주일치만 보관하고, 시간이 지나면 앞서 낸
+예측을 그 뒤에 들어온 실제 값과 비교합니다. 각각 3번 이상 확인되면 카드에 두 줄이 나옵니다.
+
+- *24h pace: off by 3.1 pts · 12 checks* — 주기 평균 속도로 하루 앞을 예측한 사용률과 실제 보고된 사용률의 차이입니다
+  (계속 한쪽으로 틀리면 *ran high* 또는 *ran low*가 붙습니다).
+- *Model costs: real burn ×1.08 of priced* — 환산한 토큰으로 예측한 앞으로 6시간의 %와 실제로 닳은 %의 비율입니다.
+  ×1.00이면 한도가 정말 API 단가에 비례해 닳는다는 뜻이고, 1보다 작으면 환산이 과하게, 크면 모자라게 예측한 것입니다.
+  모델별 숫자가 기대는 유일한 가정을 직접 확인하는 줄입니다.
+
+그 전에는 *Accuracy check: not enough data yet*으로 표시합니다. 둘 다 앱이 처음 받은 읽기값부터 쌓이므로 비용 확인은 약 9시간,
+속도 확인은 약 하루 뒤에 첫 숫자가 나옵니다(주기가 최소 하루는 지나 있어야 합니다).
 
 ### 알림
 
@@ -341,7 +437,9 @@ $B --settings                 # 설정 창 열기 (필요하면 앱 실행)
 
 위 두 로그인 정보를 로컬에서 읽어 각 서비스의 사용량 API에만 보냅니다. 그 밖의 요청은 하루 한 번
 GitHub에 이 저장소의 최신 릴리스를 묻는 업데이트 확인뿐이며, 사용자 정보는 보내지 않습니다.
-텔레메트리와 디스크에 쓰는 쿠키·캐시가 없습니다. macOS가 키체인의 "Claude Code-credentials" 접근을 물으면
+예측은 이 Mac의 `~/.claude/projects`에 있는 Claude Code 기록을 읽고, 모델별·15분 단위 토큰 수만
+`~/Library/Application Support/AICreditsBar`에 저장합니다. 둘 다 이 Mac 밖으로 나가지 않습니다.
+텔레메트리와 쿠키가 없습니다. macOS가 키체인의 "Claude Code-credentials" 접근을 물으면
 **항상 허용**을 선택하세요 (보통 Claude Code가 묻지 않아도 되게 저장합니다).
 
 ### 테스트

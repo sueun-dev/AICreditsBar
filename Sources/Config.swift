@@ -38,6 +38,21 @@ enum Cfg {
         get { d.data(forKey: "alertHistory") }
         set { if newValue != alertHistory { d.set(newValue, forKey: "alertHistory") } }
     }
+    // Forecast and model advice (estimates; the reported numbers are never changed).
+    static var forecastEnabled: Bool {
+        get { d.object(forKey: "forecastEnabled") as? Bool ?? true }
+        set { d.set(newValue, forKey: "forecastEnabled") }
+    }
+    /// The readings kept to check earlier forecasts against what happened (a week at most).
+    static var sampleLog: Data? {
+        get { d.data(forKey: "sampleLog") }
+        set { if newValue != sampleLog { d.set(newValue, forKey: "sampleLog") } }
+    }
+    /// Read Claude Code's own history on this Mac to compare models. Nothing leaves the Mac.
+    static var useClaudeHistory: Bool {
+        get { d.object(forKey: "useClaudeHistory") as? Bool ?? true }
+        set { d.set(newValue, forKey: "useClaudeHistory") }
+    }
 
     /// Seconds between automatic checks. The usage endpoints rate-limit hard, so
     /// the default is 3 minutes (the menu also checks when it opens).
@@ -69,13 +84,15 @@ enum Cfg {
     static func removeLegacyKeys() {
         for key in ["claudeSessionKey", "codexSessionToken", "claudeOrgUuid", "claudePlan", "claude5hBudget",
                     "claudeWeekBudget", "showGemini", "showLabels", "greenAbove", "yellowAbove",
-                    "colorHigh", "colorMid", "colorLow", "colorUnknown"] {
+                    "colorHigh", "colorMid", "colorLow", "colorUnknown",
+                    "usageHistory", "mainModel", "modelVersion", "modelWeightHaiku", "modelWeightSonnet", "modelWeightOpus"] {
             d.removeObject(forKey: key)
         }
     }
 
     static func resetAll() {
-        for key in ["displayMode", "showCodex", "showClaude", "refreshInterval", "warnBelow", "criticalBelow", "lowAlerts", "recoveryAlerts", "checkForUpdates"] {
+        for key in ["displayMode", "showCodex", "showClaude", "refreshInterval", "warnBelow", "criticalBelow", "lowAlerts", "recoveryAlerts", "checkForUpdates",
+                    "forecastEnabled", "useClaudeHistory"] {
             d.removeObject(forKey: key)
         }
     }

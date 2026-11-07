@@ -19,6 +19,11 @@ func claudeLogin() -> ClaudeLogin? {
     return parseClaudeLogin(FileManager.default.contents(atPath: file))
 }
 
+/// Already expired, or about to be: a request would be rejected before it was answered.
+func loginNeedsRenewal(_ login: ClaudeLogin, now: Double) -> Bool {
+    login.expiresAt.map { $0 <= now + 60 } ?? false
+}
+
 func parseClaudeLogin(_ data: Data?) -> ClaudeLogin? {
     guard let oauth = jsonObject(data)?["claudeAiOauth"] as? [String: Any],
           let token = oauth["accessToken"] as? String, !token.isEmpty else { return nil }
@@ -37,10 +42,64 @@ func claudePlanName(subscription: String?, tier: String?) -> String? {
     return displayPlan(subscription)
 }
 
+/// Claude Code renews its access token (about every 8 hours) only while it is running. Someone who
+/// works in another surface — the desktop app, an editor — can stay signed in for days with a stored
+/// token that has long expired. Starting the official CLI headlessly makes it renew and store its own
+/// token; this app never reads or uses the refresh token, and a nonexistent CLI or a failed renewal
+/// just leaves the usual "login expired" message.
+final class ClaudeLoginRenewer {
+    static let shared = ClaudeLoginRenewer()
+    private let lock = NSLock()
+    private var lastAttempt = -Double.infinity
+
+    /// Where the CLI usually is; the LaunchAgent's PATH is too short to find it by name.
+    static func cliPath(environment: [String: String] = ProcessInfo.processInfo.environment) -> String? {
+        if let forced = environment["AICB_CLAUDE_BIN"] { return FileManager.default.isExecutableFile(atPath: forced) ? forced : nil }
+        var candidates = ["\(HOME)/.local/bin/claude", "\(HOME)/.claude/local/claude", "/opt/homebrew/bin/claude",
+                          "/usr/local/bin/claude", "\(HOME)/.npm-global/bin/claude", "\(HOME)/.bun/bin/claude"]
+        candidates += (environment["PATH"] ?? "").split(separator: ":").map { "\($0)/claude" }
+        return candidates.first { FileManager.default.isExecutableFile(atPath: $0) }
+    }
+
+    /// Runs the CLI once, at most every `minimumGap` seconds. Returns whether it ran to the end; the
+    /// caller reads the stored login again to see whether that renewed it. Blocks: call off the main thread.
+    func renew(cli: String? = ClaudeLoginRenewer.cliPath(), minimumGap: TimeInterval = 900, timeout: TimeInterval = 45,
+               clock: () -> Double = { Double(clock_gettime_nsec_np(CLOCK_MONOTONIC_RAW)) / 1e9 }) -> Bool {
+        guard let cli = cli else { return false }
+        lock.lock()
+        let now = clock()
+        guard now - lastAttempt >= minimumGap else { lock.unlock(); return false }
+        lastAttempt = now
+        lock.unlock()
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: cli)
+        // A command it can't run still starts it up, and starting up is what renews the token;
+        // nothing is sent to the model and no session is saved.
+        process.arguments = ["-p", "/status", "--no-session-persistence"]
+        process.currentDirectoryURL = URL(fileURLWithPath: NSTemporaryDirectory())
+        process.standardInput = FileHandle.nullDevice
+        process.standardOutput = FileHandle.nullDevice
+        process.standardError = FileHandle.nullDevice
+        let finished = DispatchSemaphore(value: 0)
+        process.terminationHandler = { _ in finished.signal() }
+        do { try process.run() } catch { return false }
+        guard finished.wait(timeout: .now() + timeout) == .success else {
+            process.terminate()
+            return false
+        }
+        return true
+    }
+}
+
 func fetchClaudeReading() throws -> Reading {
     let renew = "Open Claude Code once to renew it."
-    guard let login = claudeLogin() else {
+    guard var login = claudeLogin() else {
         throw UsageError("Not signed in to Claude Code", hint: "Run `claude` in Terminal and sign in.")
+    }
+    if loginNeedsRenewal(login, now: nowEpoch()) {
+        // Tests run without the real login, and must not start the real CLI either.
+        let allowed = ProcessInfo.processInfo.environment["AICB_SKIP_KEYCHAIN"] == nil || ProcessInfo.processInfo.environment["AICB_CLAUDE_BIN"] != nil
+        if allowed, ClaudeLoginRenewer.shared.renew(), let fresh = claudeLogin() { login = fresh }
     }
     if let expiry = login.expiresAt, expiry <= nowEpoch() { throw UsageError("Claude Code login expired", hint: renew) }
     let reply = try httpGet("https://api.anthropic.com/api/oauth/usage", headers: [

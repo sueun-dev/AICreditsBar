@@ -65,8 +65,11 @@ struct QuotaAlertTracker {
             } ?? false
             var cycle = previous?.cycle ?? 0
             let unknownRefill = previous?.reset == nil && window.resetsAt == nil && (previous?.used ?? 0) >= 100 && window.usedPercent == 0
-            if newCycle || unknownRefill { cycle &+= 1 }
-            let lowNotified = (newCycle || unknownRefill) ? false : (previous?.lowNotified ?? false)
+            // A reset coupon refills the limit without moving the reset time: from the warning zone
+            // back below it. The next climb past 80% deserves its own warning.
+            let resetBelowWarning = previous.map { $0.used >= 80 && window.usedPercent < 80 && window.usedPercent < $0.used - 2 } ?? false
+            if newCycle || unknownRefill || resetBelowWarning { cycle &+= 1 }
+            let lowNotified = (newCycle || unknownRefill || resetBelowWarning) ? false : (previous?.lowNotified ?? false)
             let pendingRecovery = recoveryEnabled && window.usedPercent < 100
                 && (recovered || (!newCycle && (previous?.pendingRecovery ?? false)))
             if pendingRecovery {

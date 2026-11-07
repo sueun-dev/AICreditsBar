@@ -48,7 +48,8 @@ func parseCodexUsage(_ data: Data, now: Double) throws -> Reading {
         let seconds = number(window["limit_window_seconds"])
         let reset = number(window["reset_at"]) ?? number(window["reset_after_seconds"]).map { now + $0 }
         return UsageWindow(label: windowLabel(seconds: seconds), kind: windowKind(seconds: seconds),
-                           usedPercent: used, resetsAt: sanitizeEpoch(reset))
+                           usedPercent: used, resetsAt: sanitizeEpoch(reset),
+                           length: seconds.flatMap { $0.isFinite && $0 > 0 ? $0 : nil })
     }
     guard !windows.isEmpty else { throw UsageError("chatgpt.com sent no usage limits") }
 
