@@ -51,7 +51,9 @@ and may change without notice. The numbers are never estimated (the separate, la
   app or an editor can be signed in with a stored token that expired hours ago. When that happens the
   app starts the official `claude` CLI once, headless, so it renews and stores its own token: nothing
   is sent to the model, no session is saved, the app never reads or uses the refresh token, and it
-  tries at most every 15 minutes. If that doesn't work the menu says the login expired.
+  tries at most every 15 minutes. If that doesn't work the menu says the login expired. Each attempt is
+  written as one line to `~/Library/Application Support/AICreditsBar/login-renewal.log`, so you can see
+  afterwards whether it really renewed.
 
 ### The menu bar
 
@@ -293,7 +295,8 @@ Codex와 Claude Code가 직접 호출하는 내부 사용량 엔드포인트이�
 - Claude Code는 실행 중일 때만 로그인 토큰을 갱신합니다. 데스크톱 앱이나 에디터로만 쓰면 로그인은 되어 있는데 저장된 토큰이
   몇 시간 전에 만료되어 있을 수 있습니다. 그럴 때 앱이 공식 `claude` CLI를 화면 없이 한 번 실행해서 CLI가 스스로 토큰을 갱신·저장하게
   합니다. 모델에는 아무것도 보내지 않고, 세션도 저장하지 않으며, 앱은 리프레시 토큰을 읽거나 쓰지 않고, 최대 15분에 한 번만
-  시도합니다. 그래도 안 되면 로그인이 만료됐다고 표시합니다.
+  시도합니다. 그래도 안 되면 로그인이 만료됐다고 표시합니다. 시도할 때마다
+  `~/Library/Application Support/AICreditsBar/login-renewal.log`에 한 줄씩 남겨서, 실제로 갱신됐는지 나중에 확인할 수 있습니다.
 
 ### 메뉴바
 
