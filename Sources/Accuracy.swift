@@ -50,7 +50,6 @@ struct SampleLog: Codable, Equatable {
         }
     }
     static let bucket = 900.0          // one reading per 15 minutes
-    static let maxPoints = 700         // a week of buckets, with slack
     static let horizon = 7 * 86400.0   // nothing older than a week is kept
     static let refillDrop = 2.0        // a fall of more than this many points is a reset, not a rounding wobble
 
@@ -102,10 +101,15 @@ struct SampleLog: Codable, Equatable {
             } else {
                 entry.points.append(point)
             }
-            if entry.points.count > Self.maxPoints { entry.points.removeFirst(entry.points.count - Self.maxPoints) }
             series[key] = entry
         }
-        series = series.filter { $0.value.reset > now - Self.horizon }
+        // Only the last week, and only windows someone has used: Codex reports an unused window's
+        // reset as "now + the window", so otherwise every reading would leave a new series behind.
+        series = series.compactMapValues { entry in
+            var kept = entry
+            kept.points.removeAll { $0.t < now - Self.horizon }
+            return kept.points.contains { $0.used > 0 } ? kept : nil
+        }
         return series != before
     }
 }

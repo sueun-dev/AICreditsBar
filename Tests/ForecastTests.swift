@@ -288,6 +288,46 @@ func runForecastTests(now: Double) {
     kept.record(one(5, at: base + 15 * 86400, reset: base + 22 * 86400), provider: .claude, now: base + 15 * 86400)
     eq(kept.series.count, 1, "a cycle that ended more than a week ago is dropped")
 
+    // Windows nobody has used yet: Codex reports their reset as "now + the window", so it moves with every reading.
+    func unused(at t: Double, session: Double = 0) -> Reading {
+        Reading(windows: [UsageWindow(label: "5-hour", kind: .session, usedPercent: session, resetsAt: t + 18000),
+                          UsageWindow(label: "Weekly", kind: .weekly, usedPercent: 0, resetsAt: t + 7 * 86400)], fetchedAt: t)
+    }
+    var idle = SampleLog()
+    for i in 0..<100 { idle.record(unused(at: base + Double(i) * 180), provider: .codex, now: base + Double(i) * 180) }
+    eq(idle.series.count, 0, "an unused window whose reset time slides logs nothing")
+    check(!idle.record(unused(at: base + 18000), provider: .codex, now: base + 18000), "and leaves nothing to save")
+    idle.record(unused(at: base + 18180, session: 3), provider: .codex, now: base + 18180)
+    eq(idle.series.keys.map { $0.split(separator: "|")[2] }, ["5-hour"], "the first use starts its log; the unused window still has none")
+
+    // What 2.2 saved for unused windows goes with the next reading; real records stay.
+    let oldJunk = SampleLog.Series(provider: "Codex", kind: 0, length: 18000, reset: base + 18000, points: [.init(t: base, used: 0)])
+    let oldReal = SampleLog.Series(provider: "Claude", kind: 1, length: 7 * 86400, reset: base + 86400, points: [.init(t: base, used: 40)])
+    var upgraded = SampleLog(data: try? JSONEncoder().encode(["Codex|0|5-hour|1": oldJunk, "Codex|0|5-hour|2": oldJunk, "Claude|1|Weekly|3": oldReal]))
+    eq(upgraded.series.count, 3, "the old log loads")
+    upgraded.record(unused(at: base + 60), provider: .codex, now: base + 60)
+    eq(upgraded.series.keys.sorted(), ["Claude|1|Weekly|3"], "the next reading clears the old empties and keeps the real record")
+
+    // A week means a week, also for a cycle that only just ended.
+    var week = SampleLog()
+    let weekReset = base + 7 * 86400
+    for day in 0...6 { week.record(one(Double(day + 1) * 10, at: base + Double(day) * 86400, reset: weekReset), provider: .claude, now: base + Double(day) * 86400) }
+    eq(week.series.values.first?.points.count, 7, "a whole weekly cycle is kept while it runs")
+    let twoDaysAfter = base + 9 * 86400
+    week.record(one(1, at: twoDaysAfter, reset: base + 14 * 86400), provider: .claude, now: twoDaysAfter)
+    eq(week.series.values.first { $0.reset == weekReset }?.points.map { $0.used }, [30, 40, 50, 60, 70], "readings older than a week go even though the cycle ended two days ago")
+
+    // A week of readings every 3 minutes, one limit in use and one not.
+    var full = SampleLog()
+    for i in 0..<3360 {
+        let t = base + Double(i) * 180
+        full.record(Reading(windows: [UsageWindow(label: "5-hour", kind: .session, usedPercent: 0, resetsAt: t + 18000),
+                                      UsageWindow(label: "Weekly", kind: .weekly, usedPercent: 1 + Double(i) / 50, resetsAt: base + 7 * 86400)], fetchedAt: t),
+                    provider: .codex, now: t)
+    }
+    eq(full.series.count, 1, "a week of readings makes one series")
+    check((full.data?.count ?? .max) < 30_000, "and stays under 30 KB: \(full.data?.count ?? 0) bytes")
+
     // MARK: A limit reset in the middle of a cycle (a reset coupon: 98% → 0% with the reset time unchanged)
 
     func trail(_ used: [Double]) -> SampleLog {
