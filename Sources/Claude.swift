@@ -47,6 +47,16 @@ func claudePlanName(subscription: String?, tier: String?) -> String? {
 /// token that has long expired. Starting the official CLI headlessly makes it renew and store its own
 /// token; this app never reads or uses the refresh token, and a nonexistent CLI or a failed renewal
 /// just leaves the usual "login expired" message.
+/// What one attempt came to. Whether it actually renewed the login is in the Keychain afterwards.
+enum RenewalAttempt: Equatable {
+    case ran(seconds: Double)      // the CLI started and ended on its own
+    case notDue                    // an attempt was made less than `minimumGap` ago
+    case noCLI                     // nothing to run
+    case couldNotStart(String)
+    case timedOut(after: Double)
+    var ran: Bool { if case .ran = self { return true } else { return false } }
+}
+
 final class ClaudeLoginRenewer {
     static let shared = ClaudeLoginRenewer()
     private let lock = NSLock()
@@ -61,16 +71,17 @@ final class ClaudeLoginRenewer {
         return candidates.first { FileManager.default.isExecutableFile(atPath: $0) }
     }
 
-    /// Runs the CLI once, at most every `minimumGap` seconds. Returns whether it ran to the end; the
-    /// caller reads the stored login again to see whether that renewed it. Blocks: call off the main thread.
+    /// Runs the CLI once, at most every `minimumGap` seconds (a missing CLI counts as an attempt, so it
+    /// isn't reported every refresh). The caller reads the stored login again to see whether that renewed
+    /// it. Blocks: call off the main thread.
     func renew(cli: String? = ClaudeLoginRenewer.cliPath(), minimumGap: TimeInterval = 900, timeout: TimeInterval = 45,
-               clock: () -> Double = { Double(clock_gettime_nsec_np(CLOCK_MONOTONIC_RAW)) / 1e9 }) -> Bool {
-        guard let cli = cli else { return false }
+               clock: () -> Double = { Double(clock_gettime_nsec_np(CLOCK_MONOTONIC_RAW)) / 1e9 }) -> RenewalAttempt {
         lock.lock()
         let now = clock()
-        guard now - lastAttempt >= minimumGap else { lock.unlock(); return false }
+        guard now - lastAttempt >= minimumGap else { lock.unlock(); return .notDue }
         lastAttempt = now
         lock.unlock()
+        guard let cli = cli else { return .noCLI }
         let process = Process()
         process.executableURL = URL(fileURLWithPath: cli)
         // A command it can't run still starts it up, and starting up is what renews the token;
@@ -82,12 +93,79 @@ final class ClaudeLoginRenewer {
         process.standardError = FileHandle.nullDevice
         let finished = DispatchSemaphore(value: 0)
         process.terminationHandler = { _ in finished.signal() }
-        do { try process.run() } catch { return false }
+        do { try process.run() } catch { return .couldNotStart(error.localizedDescription) }
         guard finished.wait(timeout: .now() + timeout) == .success else {
             process.terminate()
-            return false
+            return .timedOut(after: timeout)
         }
-        return true
+        return .ran(seconds: clock() - now)
+    }
+}
+
+/// One line per renewal attempt, so whether the app really renewed a login can be checked afterwards:
+/// ~/Library/Application Support/AICreditsBar/login-renewal.log, oldest first, trimmed to the newest lines.
+final class RenewalLog {
+    static let shared = RenewalLog(file: RenewalLog.defaultFile)
+
+    /// Tests set AICB_DEFAULTS_SUITE; they never write the real log.
+    static var defaultFile: URL? {
+        if ProcessInfo.processInfo.environment["AICB_DEFAULTS_SUITE"] != nil { return nil }
+        let directory = ProcessInfo.processInfo.environment["AICB_STATE_DIR"].map { URL(fileURLWithPath: $0) }
+            ?? FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first?
+                .appendingPathComponent("AICreditsBar")
+        return directory?.appendingPathComponent("login-renewal.log")
+    }
+
+    let file: URL?
+    let maxBytes: Int
+    private let lock = NSLock()
+
+    init(file: URL?, maxBytes: Int = 64 * 1024) {
+        self.file = file
+        self.maxBytes = maxBytes
+    }
+
+    func note(_ message: String, at time: Double = nowEpoch()) {
+        guard let file = file else { return }
+        lock.lock(); defer { lock.unlock() }
+        var text = ((try? String(contentsOf: file, encoding: .utf8)) ?? "") + "\(Self.stamp(time))  \(message)\n"
+        // Over the limit, drop the oldest lines down to half of it, so the file stays small and trims rarely.
+        if text.utf8.count > maxBytes {
+            while text.utf8.count > maxBytes / 2, let newline = text.firstIndex(of: "\n"), newline < text.index(before: text.endIndex) {
+                text = String(text[text.index(after: newline)...])
+            }
+        }
+        try? FileManager.default.createDirectory(at: file.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try? text.write(to: file, atomically: true, encoding: .utf8)
+    }
+
+    /// "2026-11-07 02:40:12", local time.
+    static func stamp(_ time: Double) -> String {
+        let f = DateFormatter()
+        f.locale = Locale(identifier: "en_US_POSIX")
+        f.dateFormat = "yyyy-MM-dd HH:mm:ss"
+        return f.string(from: Date(timeIntervalSince1970: time))
+    }
+}
+
+/// The log line for one attempt: what ran, and whether the stored token moved. Nil when nothing was tried.
+func renewalLine(_ attempt: RenewalAttempt, cli: String?, before: ClaudeLogin, after: ClaudeLogin?, now: Double) -> String? {
+    func state(_ login: ClaudeLogin?) -> String {
+        guard let expiry = login?.expiresAt else { return "token has no expiry" }
+        return expiry <= now ? "token expired \(durationText(now - expiry)) ago"
+                             : "token valid until \(RenewalLog.stamp(expiry)) (\(durationText(expiry - now)) left)"
+    }
+    let name = cli ?? "the CLI"
+    switch attempt {
+    case .notDue: return nil
+    case .noCLI: return "no claude CLI found (set AICB_CLAUDE_BIN or install it) · \(state(before))"
+    case .couldNotStart(let reason): return "could not start \(name): \(reason) · \(state(before))"
+    case .timedOut(let limit): return "\(name) did not finish within \(Int(limit))s and was stopped · \(state(after ?? before))"
+    case .ran(let seconds):
+        let took = String(format: "%.1fs", seconds)
+        let renewed = (after?.expiresAt ?? -.infinity) > now && (after?.expiresAt ?? -.infinity) > (before.expiresAt ?? -.infinity)
+        return renewed ? "renewed: ran \(name) in \(took) · was: \(state(before)) · now: \(state(after))"
+                       : "ran \(name) in \(took) but the token did not change · \(state(after ?? before))"
     }
 }
 
@@ -99,7 +177,13 @@ func fetchClaudeReading() throws -> Reading {
     if loginNeedsRenewal(login, now: nowEpoch()) {
         // Tests run without the real login, and must not start the real CLI either.
         let allowed = ProcessInfo.processInfo.environment["AICB_SKIP_KEYCHAIN"] == nil || ProcessInfo.processInfo.environment["AICB_CLAUDE_BIN"] != nil
-        if allowed, ClaudeLoginRenewer.shared.renew(), let fresh = claudeLogin() { login = fresh }
+        if allowed {
+            let cli = ClaudeLoginRenewer.cliPath()
+            let attempt = ClaudeLoginRenewer.shared.renew(cli: cli)
+            let fresh = attempt == .notDue ? nil : claudeLogin()
+            if let line = renewalLine(attempt, cli: cli, before: login, after: fresh, now: nowEpoch()) { RenewalLog.shared.note(line) }
+            if let fresh = fresh { login = fresh }
+        }
     }
     if let expiry = login.expiresAt, expiry <= nowEpoch() { throw UsageError("Claude Code login expired", hint: renew) }
     let reply = try httpGet("https://api.anthropic.com/api/oauth/usage", headers: [
