@@ -55,6 +55,44 @@ func runNotificationTests(now: Double) {
     pump(until: { false }, timeout: 0.03)
     eq(service.requests.count, 2, "a new controller restores the acknowledged history from defaults")
 
+    // Claude Code's sign-in ending: one notification, three days ahead.
+    Cfg.signInWarnedFor = nil
+    func claude(endsIn: Double) -> Reading {
+        var r = Reading(windows: [UsageWindow(label: "Weekly", kind: .weekly, usedPercent: 10, resetsAt: clock + 86400)], fetchedAt: clock)
+        r.signInEndsAt = clock + endsIn
+        return r
+    }
+    let signIn = FakeNotifications()
+    let warner = NotificationController(clock: { clock }, authorization: signIn.read, submit: signIn.add)
+    warner.record(claude(endsIn: 4 * 86400), provider: .claude)
+    pump(until: { false }, timeout: 0.03)
+    eq(signIn.requests.count, 0, "four days before the end, nothing yet")
+    let ends = clock + 2 * 86400 + 3600
+    warner.record(claude(endsIn: 2 * 86400 + 3600), provider: .claude)
+    pump(until: { signIn.requests.count == 1 })
+    eq(signIn.requests.first?.content.title, "Claude Code sign-in ends in 2d 1h", "the notice says when")
+    check(signIn.requests.first?.content.body.contains("/login") == true, "…and what to do")
+    signIn.finish()
+    eq(Cfg.signInWarnedFor, ends, "a delivered notice is remembered")
+    clock += 180
+    warner.record(claude(endsIn: ends - clock), provider: .claude)
+    pump(until: { false }, timeout: 0.03)
+    eq(signIn.requests.count, 1, "the same sign-in is announced once")
+    warner.record(claude(endsIn: 2 * 86400), provider: .claude)
+    pump(until: { signIn.requests.count == 2 })
+    eq(signIn.requests.count, 2, "a new sign-in that also ends soon gets its own notice")
+    signIn.finish()
+    let blocked = FakeNotifications(); blocked.status = .denied
+    let quiet = NotificationController(clock: { clock }, authorization: blocked.read, submit: blocked.add)
+    quiet.record(claude(endsIn: 86400), provider: .claude)
+    pump(until: { false }, timeout: 0.03)
+    eq(blocked.requests.count, 0, "nothing is sent while notifications are blocked")
+    blocked.status = .authorized
+    quiet.record(claude(endsIn: 86400), provider: .claude)
+    pump(until: { blocked.requests.count == 1 })
+    eq(blocked.requests.count, 1, "…and the same controller sends it once they are allowed")
+    Cfg.signInWarnedFor = nil
+
     // A later healthy response wins even if an older permission RPC finishes last.
     Cfg.alertHistory = nil
     let delayed = FakeNotifications(); delayed.delayed = true

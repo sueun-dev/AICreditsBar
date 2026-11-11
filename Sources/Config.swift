@@ -44,6 +44,11 @@ enum Cfg {
         set { d.set(newValue, forKey: "forecastEnabled") }
     }
     /// The readings kept to check earlier forecasts against what happened (a week at most).
+    /// The end of the Claude Code sign-in already warned about, so it is announced once.
+    static var signInWarnedFor: Double? {
+        get { d.object(forKey: "signInWarnedFor") as? Double }
+        set { d.set(newValue, forKey: "signInWarnedFor") }
+    }
     static var sampleLog: Data? {
         get { d.data(forKey: "sampleLog") }
         set { if newValue != sampleLog { d.set(newValue, forKey: "sampleLog") } }

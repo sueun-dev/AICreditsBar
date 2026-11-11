@@ -54,6 +54,11 @@ and may change without notice. The numbers are never estimated (the separate, la
   tries at most every 15 minutes. If that doesn't work the menu says the login expired. Each attempt is
   written as one line to `~/Library/Application Support/AICreditsBar/login-renewal.log`, so you can see
   afterwards whether it really renewed.
+- That renewal can't go past the end of the sign-in itself, which Claude Code stores with the login.
+  Three days before it, the Claude card says so and one notification asks you to
+  run `claude` and type `/login`. Once it has ended, or Claude Code has signed out, the card says
+  "Signed out of Claude Code" with the same step, and the CLI isn't started for it. Only the end time is
+  read, never the refresh token.
 
 ### The menu bar
 
@@ -317,6 +322,9 @@ Codex와 Claude Code가 직접 호출하는 내부 사용량 엔드포인트이�
   합니다. 모델에는 아무것도 보내지 않고, 세션도 저장하지 않으며, 앱은 리프레시 토큰을 읽거나 쓰지 않고, 최대 15분에 한 번만
   시도합니다. 그래도 안 되면 로그인이 만료됐다고 표시합니다. 시도할 때마다
   `~/Library/Application Support/AICreditsBar/login-renewal.log`에 한 줄씩 남겨서, 실제로 갱신됐는지 나중에 확인할 수 있습니다.
+- 이렇게 갱신해도 Claude Code가 로그인과 함께 저장해 둔 로그인 자체의 끝은 넘길 수 없습니다. 끝나기 3일 전부터 Claude 카드에
+  안내가 뜨고, `claude`를 실행해 `/login`을 입력하라는 알림이 한 번 옵니다. 이미 끝났거나 Claude Code가 로그아웃했으면 카드에
+  "Signed out of Claude Code"와 같은 안내가 나오고, 그때는 CLI를 실행하지 않습니다. 끝나는 시각만 읽고 리프레시 토큰은 읽지 않습니다.
 
 ### 메뉴바
 

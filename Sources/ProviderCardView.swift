@@ -6,6 +6,7 @@ final class ProviderCardView: NSView {
     static let width: CGFloat = 300
     private static let left: CGFloat = 18, right: CGFloat = width - 18
     private static let rowHeight: CGFloat = 36
+    private static let footerLine: CGFloat = 16
 
     private let provider: Provider
     private var state: ProviderState
@@ -30,7 +31,15 @@ final class ProviderCardView: NSView {
 
     static func height(for state: ProviderState, forecast: ForecastSummary? = nil) -> CGFloat {
         guard let reading = state.reading else { return 86 }
-        return 66 + CGFloat(reading.windows.count) * rowHeight + forecastHeight(forecast)
+        return 66 + CGFloat(reading.windows.count) * rowHeight + forecastHeight(forecast) + CGFloat(footerLines(state) - 1) * footerLine
+    }
+
+    /// The footer is one line (when it was updated), or an error with its hint and the numbers' age,
+    /// or a notice that Claude Code's sign-in ends soon above the update time.
+    private static func footerLines(_ state: ProviderState) -> Int {
+        if let error = state.error { return error.hint == nil ? 2 : 3 }
+        if let reading = state.reading, signInEndsSoon(reading.signInEndsAt, now: reading.fetchedAt) { return 3 }
+        return 1
     }
 
     private static func lineHeight(_ style: ForecastLine.Style) -> CGFloat {
@@ -161,18 +170,35 @@ final class ProviderCardView: NSView {
         NSBezierPath(roundedRect: fill, xRadius: 2.5, yRadius: 2.5).fill()
     }
 
-    private func footer(_ reading: Reading, y: CGFloat, now: Double) {
-        let font = NSFont.systemFont(ofSize: 11)
-        let age = ago(now - reading.fetchedAt)
+    private func footer(_ reading: Reading, y start: CGFloat, now: Double) {
+        let font = NSFont.systemFont(ofSize: 11), indent = Self.left + 15, width = Self.right - indent
+        var y = start
+        // Each on its own line, so nothing that says what to do is cut off.
         if let error = state.error {
-            text("⚠︎", x: Self.left, y: y, width: 14, font: font, color: .systemOrange)
-            text("\(error.message) · numbers from \(age)", x: Self.left + 15, y: y, width: Self.right - Self.left - 15,
-                 font: font, color: .secondaryLabelColor)
+            warning(error.message, y: y)
+            y += Self.footerLine
+            if let hint = error.hint {
+                text(hint, x: indent, y: y, width: width, font: font, color: .secondaryLabelColor)
+                y += Self.footerLine
+            }
+            text("Numbers from \(ago(now - reading.fetchedAt))", x: indent, y: y, width: width, font: font, color: .tertiaryLabelColor)
             return
         }
+        if let ends = reading.signInEndsAt, signInEndsSoon(ends, now: reading.fetchedAt) {
+            warning("Claude Code sign-in ends in \(durationText(max(0, ends - now)))", y: y)
+            text(signInHint, x: indent, y: y + Self.footerLine, width: width, font: font, color: .secondaryLabelColor)
+            y += 2 * Self.footerLine
+        }
+        let age = ago(now - reading.fetchedAt)
         text((state.isCurrent(now: now) ? "Updated " : "Last updated ") + age, x: Self.left, y: y, width: 140, font: font, color: .tertiaryLabelColor)
         text(reading.notes.joined(separator: " · "), x: Self.left + 140, y: y, width: Self.right - Self.left - 140,
              font: font, color: .secondaryLabelColor, alignment: .right)
+    }
+
+    private func warning(_ message: String, y: CGFloat) {
+        let font = NSFont.systemFont(ofSize: 11)
+        text("⚠︎", x: Self.left, y: y, width: 14, font: font, color: .systemOrange)
+        text(message, x: Self.left + 15, y: y, width: Self.right - Self.left - 15, font: font, color: .secondaryLabelColor)
     }
 
     private func badge(_ label: String, x: CGFloat, y: CGFloat) {
@@ -207,6 +233,9 @@ final class ProviderCardView: NSView {
                 lines.append("\(window.label): \(window.leftPercent)% left (\(pctClamp(window.usedPercent))% used)\(reset)")
             }
             lines += reading.notes
+            if let ends = reading.signInEndsAt, signInEndsSoon(ends, now: reading.fetchedAt) {
+                lines.append("Claude Code sign-in ends in \(durationText(max(0, ends - nowEpoch()))). \(signInHint)")
+            }
             if let forecast = forecast?.lines, !forecast.isEmpty {
                 lines.append("Forecast (estimate):")
                 lines += forecast.map { $0.text }

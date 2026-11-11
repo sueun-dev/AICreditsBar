@@ -22,6 +22,14 @@ func runLoginRenewalTests() {
     check(!loginNeedsRenewal(ClaudeLogin(accessToken: "x", expiresAt: now + 3600, plan: nil), now: now), "a token with an hour left is fine")
     check(!loginNeedsRenewal(ClaudeLogin(accessToken: "x", expiresAt: nil, plan: nil), now: now), "a token with no expiry is left alone")
 
+    // When the sign-in itself ends: renewing the token every 8 hours doesn't move that.
+    check(signInEnded(ClaudeLogin(accessToken: "", expiresAt: 0, plan: nil, signInEndsAt: now + 86400), now: now), "Claude Code emptied the token: signed out")
+    check(signInEnded(ClaudeLogin(accessToken: "x", expiresAt: now - 60, plan: nil, signInEndsAt: now - 1), now: now), "the sign-in's end has passed: signed out, even before Claude Code empties it")
+    check(!signInEnded(ClaudeLogin(accessToken: "x", expiresAt: now - 60, plan: nil, signInEndsAt: now + 86400), now: now), "an expired token within a live sign-in can still be renewed")
+    check(!signInEnded(ClaudeLogin(accessToken: "x", expiresAt: now + 60, plan: nil), now: now), "no stored end, nothing ends")
+    check(signInEndsSoon(now + 3 * 86400, now: now) && signInEndsSoon(now + 60, now: now), "three days out or less: time to warn")
+    check(!signInEndsSoon(now + 3 * 86400 + 1, now: now) && !signInEndsSoon(now - 1, now: now) && !signInEndsSoon(nil, now: now), "not earlier, not after it ended, not without an end")
+
     // Finding the CLI.
     let ok = script("claude-ok", "echo \"$@\" >> '\(log)'\nexit 1")   // the exit status doesn't matter: starting up is what renews
     eq(ClaudeLoginRenewer.cliPath(environment: ["AICB_CLAUDE_BIN": ok]), ok, "an explicit path to the CLI is used")

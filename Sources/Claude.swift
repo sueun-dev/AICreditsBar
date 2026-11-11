@@ -5,18 +5,25 @@ import Foundation
 let claudeConfigDir = ProcessInfo.processInfo.environment["CLAUDE_CONFIG_DIR"] ?? (HOME as NSString).appendingPathComponent(".claude")
 
 struct ClaudeLogin {
-    var accessToken: String
-    var expiresAt: Double?   // unix seconds
+    var accessToken: String       // empty once Claude Code has signed out
+    var expiresAt: Double?        // unix seconds
     var plan: String?
+    var signInEndsAt: Double? = nil   // when Claude Code can't renew this sign-in any more and `claude` needs /login
 }
 
 /// Claude Code keeps its login in the Keychain ("Claude Code-credentials");
-/// some setups use ~/.claude/.credentials.json instead.
+/// some setups use ~/.claude/.credentials.json instead. A signed-in one wins over a signed-out one.
 func claudeLogin() -> ClaudeLogin? {
     let useKeychain = ProcessInfo.processInfo.environment["AICB_SKIP_KEYCHAIN"] == nil   // tests run without the real login
-    if useKeychain, let login = parseClaudeLogin(keychainSecret(service: "Claude Code-credentials")) { return login }
     let file = (claudeConfigDir as NSString).appendingPathComponent(".credentials.json")
-    return parseClaudeLogin(FileManager.default.contents(atPath: file))
+    return preferredLogin([useKeychain ? keychainSecret(service: "Claude Code-credentials") : nil,
+                           FileManager.default.contents(atPath: file)])
+}
+
+/// The first stored login that is signed in, else the first one found (signed out).
+func preferredLogin(_ stored: [Data?]) -> ClaudeLogin? {
+    let logins = stored.compactMap(parseClaudeLogin)
+    return logins.first { !$0.accessToken.isEmpty } ?? logins.first
 }
 
 /// Already expired, or about to be: a request would be rejected before it was answered.
@@ -24,14 +31,28 @@ func loginNeedsRenewal(_ login: ClaudeLogin, now: Double) -> Bool {
     login.expiresAt.map { $0 <= now + 60 } ?? false
 }
 
+/// Claude Code empties the token when it signs out, but keeps the rest. Only the refresh token's expiry
+/// time is read, never the refresh token itself.
 func parseClaudeLogin(_ data: Data?) -> ClaudeLogin? {
-    guard let oauth = jsonObject(data)?["claudeAiOauth"] as? [String: Any],
-          let token = oauth["accessToken"] as? String, !token.isEmpty else { return nil }
-    return ClaudeLogin(accessToken: token,
+    guard let oauth = jsonObject(data)?["claudeAiOauth"] as? [String: Any] else { return nil }
+    return ClaudeLogin(accessToken: oauth["accessToken"] as? String ?? "",
                        expiresAt: number(oauth["expiresAt"]).map { $0 / 1000 },   // stored in milliseconds
                        plan: claudePlanName(subscription: oauth["subscriptionType"] as? String,
-                                            tier: oauth["rateLimitTier"] as? String))
+                                            tier: oauth["rateLimitTier"] as? String),
+                       signInEndsAt: number(oauth["refreshTokenExpiresAt"]).map { $0 / 1000 })
 }
+
+/// Renewing the token every 8 hours doesn't move the end of a sign-in: past it, or once Claude Code
+/// has emptied the token, only /login in `claude` brings the numbers back.
+func signInEnded(_ login: ClaudeLogin, now: Double) -> Bool {
+    login.accessToken.isEmpty || (login.signInEndsAt.map { $0 <= now } ?? false)
+}
+
+/// Three days' notice before that, on the card and in one notification.
+func signInEndsSoon(_ endsAt: Double?, now: Double) -> Bool {
+    endsAt.map { $0 > now && $0 - now <= 3 * 86400 } ?? false
+}
+let signInHint = "Run `claude` in Terminal and type /login."
 
 /// "default_claude_max_20x" → "Max 20x"; otherwise the subscription ("pro" → "Pro").
 func claudePlanName(subscription: String?, tier: String?) -> String? {
@@ -174,6 +195,8 @@ func fetchClaudeReading() throws -> Reading {
     guard var login = claudeLogin() else {
         throw UsageError("Not signed in to Claude Code", hint: "Run `claude` in Terminal and sign in.")
     }
+    // An ended sign-in can't be renewed, so the CLI isn't started for it: that would only sign it out.
+    if signInEnded(login, now: nowEpoch()) { throw UsageError("Signed out of Claude Code", hint: signInHint) }
     if loginNeedsRenewal(login, now: nowEpoch()) {
         // Tests run without the real login, and must not start the real CLI either.
         let allowed = ProcessInfo.processInfo.environment["AICB_SKIP_KEYCHAIN"] == nil || ProcessInfo.processInfo.environment["AICB_CLAUDE_BIN"] != nil
@@ -190,7 +213,10 @@ func fetchClaudeReading() throws -> Reading {
         "Authorization": "Bearer \(login.accessToken)", "anthropic-beta": "oauth-2025-04-20",
         "Accept": "application/json", "User-Agent": userAgent])
     switch reply.status {
-    case 200: return try parseClaudeUsage(reply.body, plan: login.plan, now: nowEpoch())
+    case 200:
+        var reading = try parseClaudeUsage(reply.body, plan: login.plan, now: nowEpoch())
+        reading.signInEndsAt = login.signInEndsAt
+        return reading
     case 401: throw UsageError("Claude Code login was rejected", hint: "Open Claude Code and sign in again.")
     case 429: throw UsageError("Anthropic is rate-limiting usage checks", hint: "Checking less often until it clears.", rateLimited: true)
     default: throw UsageError("api.anthropic.com answered HTTP \(reply.status)")

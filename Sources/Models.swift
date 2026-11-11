@@ -37,6 +37,7 @@ struct Reading: Codable {
     var plan: String?
     var limitReached = false
     var notes: [String] = []       // other provider-reported facts, e.g. "58,600 credits"
+    var signInEndsAt: Double? = nil   // Claude: when Claude Code's sign-in ends (from its stored login, not the provider)
     var fetchedAt: Double
 }
 

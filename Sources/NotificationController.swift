@@ -62,6 +62,25 @@ final class NotificationController: NSObject, UNUserNotificationCenterDelegate {
                                                  recoveryEnabled: allowed && Cfg.recoveryAlerts)
                 Cfg.alertHistory = self.tracker.data
                 if !alerts.isEmpty { self.send(alerts) }
+                if allowed { self.warnSignInEnding(reading) }
+            }
+        }
+    }
+
+    /// Once per sign-in, three days before Claude Code's sign-in ends and needs /login.
+    private func warnSignInEnding(_ reading: Reading) {
+        let now = clock()
+        guard let ends = reading.signInEndsAt, signInEndsSoon(ends, now: now), Cfg.signInWarnedFor != ends,
+              submitting.insert("sign-in").inserted else { return }
+        let content = UNMutableNotificationContent()
+        content.title = "Claude Code sign-in ends in \(durationText(ends - now))"
+        content.body = "After that the menu bar can't read Claude's limits. \(signInHint)"
+        content.threadIdentifier = Provider.claude.rawValue
+        submit(UNNotificationRequest(identifier: "aicb-sign-in-\(Int(ends))", content: content, trigger: nil)) { error in
+            DispatchQueue.main.async {
+                self.submitting.remove("sign-in")
+                if let error = error { self.onStatus("Could not schedule alert: \(error.localizedDescription)") }
+                else { Cfg.signInWarnedFor = ends }
             }
         }
     }

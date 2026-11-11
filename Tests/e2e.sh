@@ -24,6 +24,15 @@ mkdir -p "$FAKE/.claude"
 printf '{"claudeAiOauth":{"accessToken":"sk-ant-oat-test","expiresAt":1000,"subscriptionType":"max","rateLimitTier":"default_claude_max_20x"}}' > "$FAKE/.claude/.credentials.json"
 check "$(run --once)" "Claude: Claude Code login expired — Open Claude Code once to renew it." "expired login is reported"
 
+echo "2b) Claude Code signed out, or its sign-in ended → says so and doesn't start the CLI"
+printf '#!/bin/sh\ntouch "%s/cli-ran"\n' "$FAKE" > "$FAKE/claude-stand-in"; chmod +x "$FAKE/claude-stand-in"
+printf '{"claudeAiOauth":{"accessToken":"","refreshToken":"","expiresAt":0,"refreshTokenExpiresAt":1794376860000}}' > "$FAKE/.claude/.credentials.json"
+check "$(AICB_CLAUDE_BIN="$FAKE/claude-stand-in" run --once)" "Claude: Signed out of Claude Code — Run \`claude\` in Terminal and type /login." "an emptied login is reported as signed out"
+printf '{"claudeAiOauth":{"accessToken":"sk-ant-oat-test","expiresAt":1000,"refreshTokenExpiresAt":2000}}' > "$FAKE/.claude/.credentials.json"
+check "$(AICB_CLAUDE_BIN="$FAKE/claude-stand-in" run --once)" "Claude: Signed out of Claude Code" "a sign-in past its end is reported as signed out"
+if [ -e "$FAKE/cli-ran" ]; then echo "  FAIL: started the CLI for a sign-in that can't be renewed"; fail=1; else echo "  ok: the CLI isn't started for it"; fi
+printf '{"claudeAiOauth":{"accessToken":"sk-ant-oat-test","expiresAt":1000,"subscriptionType":"max","rateLimitTier":"default_claude_max_20x"}}' > "$FAKE/.claude/.credentials.json"
+
 echo "3) Codex signed in with an API key → explains there are no plan limits"
 mkdir -p "$FAKE/.codex"
 printf '{"auth_mode":"apikey","OPENAI_API_KEY":"sk-test"}' > "$FAKE/.codex/auth.json"
